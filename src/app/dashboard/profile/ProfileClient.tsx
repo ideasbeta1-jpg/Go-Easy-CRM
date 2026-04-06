@@ -117,18 +117,18 @@ export default function ProfileClient({ initialProfile }: { initialProfile: Prof
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 px-4 md:px-0">
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Mi Perfil</h1>
-        <p className="text-sm font-medium text-slate-400">Gestiona tu información personal y de contacto.</p>
+      <div className="flex flex-col gap-1 md:gap-2">
+        <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Mi Perfil</h1>
+        <p className="text-xs md:text-sm font-medium text-slate-400">Gestiona tu información personal y de contacto.</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
         
         {/* Left Column: Avatar & Basic Info */}
-        <div className="lg:col-span-1 space-y-8">
-          <div className="bg-white/70 backdrop-blur-xl border border-white p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 flex flex-col items-center gap-6 relative overflow-hidden group">
+        <div className="lg:col-span-1 space-y-6 md:space-y-8">
+          <div className="bg-white/70 backdrop-blur-xl border border-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-xl shadow-slate-200/50 flex flex-col items-center gap-6 relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4">
               <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/10">
                 {profile.role === 'admin' ? 'Administrador' : 'Agente'}
@@ -178,19 +178,19 @@ export default function ProfileClient({ initialProfile }: { initialProfile: Prof
             </div>
           </div>
 
-          <div className="bg-slate-900 text-white p-8 rounded-[3rem] shadow-xl shadow-slate-200/50 space-y-4">
+          <div className="bg-slate-900 text-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] shadow-xl shadow-slate-200/50 space-y-4">
              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Estado de Cuenta</div>
-             <p className="text-xs font-medium text-slate-400 leading-relaxed italic opacity-80">
+             <p className="text-[10px] md:text-xs font-medium text-slate-400 leading-relaxed italic opacity-80">
                Tu cuenta está activa y tienes permisos de {profile.role === 'admin' ? 'administración total' : 'gestión de leads'}.
              </p>
           </div>
         </div>
 
         {/* Right Column: Detailed Form */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="bg-white/70 backdrop-blur-xl border border-white p-10 rounded-[3.5rem] shadow-xl shadow-slate-200/50 space-y-10">
+        <div className="lg:col-span-2 space-y-6 md:space-y-8">
+          <div className="bg-white/70 backdrop-blur-xl border border-white p-6 md:p-10 rounded-[2rem] md:rounded-[3.5rem] shadow-xl shadow-slate-200/50 space-y-6 md:space-y-10">
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               {/* First Name */}
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
@@ -224,7 +224,7 @@ export default function ProfileClient({ initialProfile }: { initialProfile: Prof
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
               {/* Phone */}
               <div className="space-y-3">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">

@@ -23,6 +23,7 @@ interface Provider {
   contact_name: string | null
   email: string | null
   whatsapp_group_id: string | null
+  logo_url: string | null
   created_at: string
 }
 

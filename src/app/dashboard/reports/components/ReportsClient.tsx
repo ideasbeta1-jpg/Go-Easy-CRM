@@ -124,11 +124,15 @@ export default function ReportsClient({
   }, [messageData]);
 
   const locationCounts = useMemo(() => {
-    return Object.entries(locationData.reduce((acc: any, curr: any) => {
+    const counts = locationData.reduce((acc: Record<string, number>, curr: any) => {
       const name = curr.location?.name || 'Desconocida';
       acc[name] = (acc[name] || 0) + 1;
       return acc;
-    }, {})).map(([name, value]) => ({ name, value }));
+    }, {});
+    
+    return Object.entries(counts)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
   }, [locationData]);
 
   // --- Process Message Activity Over Last 7 Days ---
@@ -433,7 +437,7 @@ export default function ReportsClient({
                </div>
                
                <div className="space-y-8 overflow-y-auto max-h-[300px] pr-4 scrollbar-hide">
-                  {locationCounts.sort((a,b) => b.value - a.value).map((item, i) => {
+                  {locationCounts.map((item, i) => {
                      const percent = ((item.value / locationData.length) * 100).toFixed(0);
                      return (
                         <div key={i} className="space-y-2">

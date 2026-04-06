@@ -94,14 +94,6 @@ async function processInboundMessage(phoneNumber: string, content: string, pushN
   }
 }
 
-    // Always respond with 200 to acknowledge the webhook
-    return NextResponse.json({ status: 'ok' })
-  } catch (error) {
-    console.error('Webhook error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
-  }
-}
-
 // GET handler for Webhook verification (some providers like Meta require this)
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)

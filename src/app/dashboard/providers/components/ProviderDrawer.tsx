@@ -13,6 +13,7 @@ interface Provider {
   email: string | null
   whatsapp_group_id: string | null
   logo_url: string | null
+  created_at: string
 }
 
 interface Location {

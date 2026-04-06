@@ -46,15 +46,15 @@ export default function SettingsPage() {
       </div>
 
       {/* Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
         {SETTINGS_CATEGORIES.map((category) => (
           <Link 
             key={category.id} 
             href={category.href}
-            className="group block bg-white/70 backdrop-blur-xl border border-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02] transition-all duration-500 relative overflow-hidden"
+            className="group block bg-white/70 backdrop-blur-xl border border-white p-6 md:p-8 rounded-[2rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:scale-[1.02] transition-all duration-500 relative overflow-hidden"
           >
             {/* Background Decor */}
-            <div className={`absolute -right-4 -bottom-4 w-32 h-32 opacity-5 scale-150 rotate-12 transition-transform duration-700 group-hover:rotate-45 group-hover:scale-[1.7]`}>
+            <div className={`absolute -right-4 -bottom-4 w-24 h-24 md:w-32 md:h-32 opacity-5 scale-150 rotate-12 transition-transform duration-700 group-hover:rotate-45 group-hover:scale-[1.7]`}>
               <category.icon className="w-full h-full" />
             </div>
 

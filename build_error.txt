@@ -1,0 +1,42 @@
+﻿
+> go-easy-crm@0.1.0 build
+> next build
+
+▲ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local
+
+node.exe : ⚠ The "middleware" file convention is 
+deprecated. Please use "proxy" instead. Learn more: 
+https://nextjs.org/docs/messages/middleware-to-proxy
+En línea: 1 Carácter: 1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program 
+Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (⚠ The "mid 
+   dlewa...leware-to-proxy:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.4s
+  Running TypeScript ...
+Failed to type check.
+
+./src/app/dashboard/reports/components/ReportsClient.tsx
+:131:70
+Type error: 'b.value' is of type 'unknown'.
+
+  [90m129 |[0m       acc[name] = (acc[name] || 
+[35m0[0m) + [35m1[0m;
+  [90m130 |[0m       [36mreturn[0m acc;
+[31m[1m>[0m [90m131 |[0m     }, {})).map(([name, 
+value]) => ({ name, value })).sort((a, b) => b.value - 
+a.value);
+  [90m    |[0m                                        
+                              [31m[1m^[0m
+  [90m132 |[0m   }, [locationData]);
+  [90m133 |[0m
+  [90m134 |[0m   [90m// --- Process Message Activity 
+Over Last 7 Days ---[0m
+Next.js build worker exited with code: 1 and signal: 
+null
