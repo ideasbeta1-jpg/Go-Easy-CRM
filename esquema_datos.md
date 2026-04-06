@@ -92,6 +92,34 @@ Historial de interacción por WhatsApp / Evolution API.
 * **`direction`**: `TEXT` (`inbound` / `outbound`)
 * **`created_at`**: `TIMESTAMPTZ` (Fecha de envío/recepción)
 
+### **Perfiles de Staff (`profiles`)**
+Información extendida de los usuarios del sistema.
+* **`id`**: `UUID` (PK, FK -> `auth.users`)
+* **`first_name`**: `TEXT` (Nombre)
+* **`last_name`**: `TEXT` (Apellido)
+* **`role`**: `user_role` (`admin` / `agente`)
+* **`phone`**: `TEXT` (Teléfono de contacto)
+* **`whatsapp_number`**: `TEXT` (Número para WhatsApp CRM)
+* **`bio`**: `TEXT` (Biografía o notas)
+* **`avatar_url`**: `TEXT` (URL de la imagen de perfil en Storage)
+
+---
+
+## 5. Almacenamiento (Storage Buckets)
+
+### **`avatars`**
+* **Uso**: Fotos de perfil de agentes y administradores.
+* **Estructura**: `avatars/{user_id}/{filename}`.
+* **Acceso**: Público para lectura, restringido por UID para escritura/borrado.
+
+### **`provider-logos`**
+* **Uso**: Logotipos de las rentadoras aliadas.
+
+### **`vehicles`**
+* **Uso**: Imágenes de la flota por categorías.
+
+---
+
 ---
 
 > **Nota técnica:** Todas las tablas incluyen campos de auditoría `created_at` y, en el caso de leads, `updated_at` para control de cambios.

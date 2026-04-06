@@ -66,7 +66,9 @@ export async function sendTemplateMessage(
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: recipient.replace(/\D/g, ''), // Clean non-digits
+          to: recipient.includes(':') || /[a-zA-Z]/.test(recipient) 
+            ? recipient 
+            : recipient.replace(/\D/g, ''), // Only clean if it looks like a standard phone number
           type: 'template',
           template: {
             name: templateName,

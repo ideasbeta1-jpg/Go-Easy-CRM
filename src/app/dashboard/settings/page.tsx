@@ -1,9 +1,18 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Settings2, ShieldCheck, ChevronRight } from 'lucide-react'
+import { MapPin, Settings2, ShieldCheck, ChevronRight, User } from 'lucide-react'
 
 const SETTINGS_CATEGORIES = [
+  {
+    id: 'profile',
+    title: 'Mi Perfil',
+    description: 'Gestiona tu información personal, foto de perfil, datos de contacto y biografía.',
+    icon: User,
+    href: '/dashboard/profile',
+    color: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+    badge: 'Cuenta'
+  },
   {
     id: 'locations',
     title: 'Sitios y Ubicaciones',

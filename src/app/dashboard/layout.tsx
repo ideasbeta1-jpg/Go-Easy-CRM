@@ -22,10 +22,11 @@ export default async function DashboardLayout({
   const menuItems = [
     { name: 'Inicio', href: '/dashboard' },
     { name: 'Leads (Kanban)', href: '/dashboard/leads' },
+    { name: 'Chats WhatsApp', href: '/dashboard/chats' },
     { name: 'Catálogo Flota', href: '/dashboard/catalog' },
     { name: 'Proveedores', href: '/dashboard/providers' },
     { name: 'Reportes', href: '/dashboard/reports' },
-    { name: 'Mensajes / n8n', href: '/dashboard/automations' },
+    { name: 'Automa n8n', href: '/dashboard/automations' },
   ]
 
   return (

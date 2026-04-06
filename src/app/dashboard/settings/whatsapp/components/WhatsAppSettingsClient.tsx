@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Settings2
 } from 'lucide-react'
+import WhatsAppTemplateForm from './WhatsAppTemplateForm'
 import { getWABATemplatesAction } from '@/app/utils/actions/waba'
 
 interface Template {
@@ -27,6 +28,7 @@ export default function WhatsAppSettingsClient() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
 
   const fetchTemplates = async () => {
     setLoading(true)
@@ -114,11 +116,28 @@ export default function WhatsAppSettingsClient() {
             Biblioteca de Plantillas
             <span className="text-[10px] bg-slate-100 px-2 py-1 rounded-full text-slate-500 uppercase tracking-widest font-black">Meta Approved</span>
           </h2>
-          <button className="text-sm font-black text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors">
-            Crear nueva
-            <Plus className="w-4 h-4" />
-          </button>
+          {!showForm && (
+            <button 
+               onClick={() => setShowForm(true)}
+               className="text-sm font-black text-blue-600 hover:text-blue-700 flex items-center gap-1 transition-colors"
+            >
+              Crear nueva
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
         </div>
+
+        {showForm && (
+          <div className="max-w-2xl mx-auto py-8">
+            <WhatsAppTemplateForm 
+               onCancel={() => setShowForm(false)}
+               onSuccess={() => {
+                 setShowForm(false)
+                 fetchTemplates()
+               }}
+            />
+          </div>
+        )}
 
         {error && (
           <div className="bg-amber-50 border border-amber-100 p-6 rounded-3xl flex items-start gap-4">

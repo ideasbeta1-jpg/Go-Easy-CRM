@@ -14,10 +14,11 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
   const iconMap: Record<string, string> = {
     'Inicio': 'grid_view',
     'Leads (Kanban)': 'view_kanban',
+    'Chats WhatsApp': 'forum',
     'Catálogo Flota': 'directions_car',
     'Proveedores': 'inventory_2',
     'Reportes': 'monitoring',
-    'Mensajes / n8n': 'forum'
+    'Automa n8n': 'settings_input_component'
   };
 
   return (

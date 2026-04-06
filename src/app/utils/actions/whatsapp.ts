@@ -8,7 +8,9 @@ export async function sendManualWhatsApp(phoneNumber: string, message: string, l
   const supabase = await createClient()
   
   // Clean phone number (remove +, spaces, etc if needed by API)
-  const cleanPhone = phoneNumber.replace(/\D/g, '')
+  const cleanPhone = phoneNumber.includes(':') || /[a-zA-Z]/.test(phoneNumber)
+    ? phoneNumber
+    : phoneNumber.replace(/\D/g, '') // Only clean if it looks like a standard phone number
   
   const success = await sendWhatsAppMessage(cleanPhone, message)
   
