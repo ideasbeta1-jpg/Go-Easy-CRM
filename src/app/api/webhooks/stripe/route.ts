@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { stripe } from '@/utils/stripe'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { sendLeadToN8n } from '@/utils/n8n'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function POST(req: Request) {
   const body = await req.text()
@@ -41,12 +41,12 @@ export async function POST(req: Request) {
       if (error) {
         console.error('Error updating lead status:', error)
       } else {
-        // Trigger n8n for payment confirmation notifications and conversion tracking
-        await sendLeadToN8n(leadId, 'payment_confirmed', {
+        // Trigger Automation (Includes n8n fallback)
+        await executeStageAutomation(leadId, 'reserva_confirmada', {
           stripe_payment_id: session.payment_intent,
           amount: session.amount_total ? session.amount_total / 100 : 0,
           currency: session.currency?.toUpperCase() || 'USD',
-          event_id: session.id // Vital for Meta CAPI Deduplication
+          event_id: session.id
         })
       }
     }

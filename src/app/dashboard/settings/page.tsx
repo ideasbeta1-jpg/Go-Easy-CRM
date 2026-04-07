@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Settings2, ShieldCheck, ChevronRight, User } from 'lucide-react'
+import { MapPin, Settings2, ShieldCheck, ChevronRight, User, Mail } from 'lucide-react'
 
 const SETTINGS_CATEGORIES = [
   {
@@ -22,7 +22,7 @@ const SETTINGS_CATEGORIES = [
     color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     badge: 'Logística'
   },
-  {
+   {
     id: 'whatsapp',
     title: 'WhatsApp Business API',
     description: 'Configura la conexión oficial con Meta, gestiona tus plantillas y automatiza mensajes.',
@@ -30,6 +30,15 @@ const SETTINGS_CATEGORIES = [
     href: '/dashboard/settings/whatsapp',
     color: 'bg-blue-50 text-blue-600 border-blue-100',
     badge: 'Oficial API'
+  },
+  {
+    id: 'emails',
+    title: 'Plantillas de Email',
+    description: 'Personaliza los correos electrónicos automáticos que se envían a los clientes en cada etapa.',
+    icon: Mail,
+    href: '/dashboard/settings/emails',
+    color: 'bg-purple-50 text-purple-600 border-purple-100',
+    badge: 'Automatización'
   }
 ]
 

@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { NextResponse } from 'next/server'
 import { assignLeadToAgent } from '@/utils/assignment'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function POST(req: Request) {
   try {
@@ -118,6 +119,8 @@ async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: 
   if (newLead?.id) {
     // Intentar asignación automática
     await assignLeadToAgent(newLead.id)
+    // Disparar automatización de lead nuevo
+    await executeStageAutomation(newLead.id, 'lead_nuevo')
   }
 
   return newLead?.id || null

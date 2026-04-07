@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { stripe } from '@/utils/stripe'
-import { sendLeadToN8n } from '@/utils/n8n'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function generateQuoteForLead(leadId: string, totalAmount: number) {
   const supabase = await createClient()
@@ -108,8 +108,8 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
 
   if (updateQuoteError) throw new Error(updateQuoteError.message)
 
-  // 6. Trigger n8n
-  await sendLeadToN8n(leadId, 'quote_generated', {
+  // 6. Trigger Automation Engine (Includes n8n fallback)
+  await executeStageAutomation(leadId, 'en_cotizacion', {
      amount: totalAmount,
      stripe_link: session.url
   })

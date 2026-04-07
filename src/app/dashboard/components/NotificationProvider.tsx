@@ -177,7 +177,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           const oldAssignedTo = oldLead?.assigned_to
           const newAssignedTo = newLead?.assigned_to
           
-          if (oldAssignedTo !== currentUser.id && newAssignedTo === currentUser.id) {
+          if (currentUser && oldAssignedTo !== currentUser.id && newAssignedTo === currentUser.id) {
             playNotificationSound()
             toast.message('👤 ¡Nuevo Lead Asignado!', {
               description: `Se te ha asignado el lead: ${leadName}`,

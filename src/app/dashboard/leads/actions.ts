@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
@@ -40,6 +41,9 @@ export async function updateLeadStatus(id: string, status: string) {
   if (error) {
     throw new Error(error.message)
   }
+
+  // Trigger automation
+  await executeStageAutomation(id, status)
 
   revalidatePath('/dashboard/leads')
 }
