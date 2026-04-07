@@ -16,10 +16,10 @@ export async function executeStageAutomation(
   console.log(`[AutomationEngine] Procesando etapa ${stage} para Lead ${leadId}`);
 
   try {
-    // 1. Obtener datos del lead
+    // 1. Obtener datos del lead y su agente si existe
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('*, category:categories(name)')
+      .select('*, category:categories(name), assigned_agent:profiles!leads_assigned_to_fkey(first_name, phone, email)')
       .eq('id', leadId)
       .single();
 
@@ -28,76 +28,58 @@ export async function executeStageAutomation(
       return;
     }
 
-    // 2. Configuración de automatizaciones por etapa
-    const config: Record<string, any> = {
-      'lead_nuevo': {
-        whatsapp: { template: 'bienvenida_lead', params: [lead.first_name || 'Cliente'] },
-        email: true
-      },
-      'en_cotizacion': {
-        whatsapp: { 
-          template: 'cotizacion_enviada', 
-          params: [
-            lead.first_name || 'Cliente', 
-            extraData.stripe_link || 'pendiente'
-          ] 
-        },
-        email: true
-      },
-      'reserva_confirmada': {
-        whatsapp: { 
-          template: 'pago_confirmado', 
-          params: [
-            lead.first_name || 'Cliente', 
-            lead.pickup_date ? new Date(lead.pickup_date).toLocaleDateString() : 'tu fecha'
-          ] 
-        },
-        email: true
-      },
-      'voucher_enviado': {
-        whatsapp: { 
-          template: 'voucher_disponible', 
-          params: [
-            lead.first_name || 'Cliente', 
-            extraData.voucher_url || 'pendiente'
-          ] 
-        },
-        email: true
-      },
-      'cerrado': {
-        whatsapp: { template: 'gracias_feedback', params: [lead.first_name || 'Cliente'] },
-        email: true
-      }
+    // 2. Configuración por defecto por etapa
+    const defaultTemplates: Record<string, string> = {
+      'lead_nuevo': 'bienvenida_lead',
+      'en_cotizacion': 'cotizacion_enviada',
+      'reserva_confirmada': 'pago_confirmado',
+      'voucher_enviado': 'voucher_disponible',
+      'cerrado': 'gracias_feedback'
     };
 
-    const automation = config[stage];
-    if (!automation) {
-      console.log(`[AutomationEngine] No hay automatización definida para la etapa: ${stage}`);
-      return;
-    }
+    // Intentar buscar un mapping manual para esta etapa
+    const { data: mapping } = await supabase
+      .from('whatsapp_template_mappings')
+      .select('*')
+      .eq('stage', stage)
+      .maybeSingle();
 
-    // 3. Ejecutar WhatsApp (si hay teléfono)
-    if (automation.whatsapp && lead.phone) {
-      const waRecipient = lead.phone;
-      const components = [
-        {
-          type: 'body',
-          parameters: automation.whatsapp.params.map((p: string) => ({ type: 'text', text: p }))
+    const templateName = mapping?.template_name || defaultTemplates[stage];
+    
+    if (!templateName) {
+      console.log(`[AutomationEngine] No hay plantilla definida para la etapa: ${stage}`);
+    } else if (lead.phone) {
+      // 3. Resolver parámetros de WhatsApp
+      let params: string[] = [];
+
+      if (mapping && mapping.mappings) {
+        // Usar mapeo dinámico
+        const sortedKeys = Object.keys(mapping.mappings).sort((a, b) => parseInt(a) - parseInt(b));
+        params = sortedKeys.map(key => resolveLeadField(mapping.mappings[key], lead, extraData));
+      } else {
+        // Fallback a lógica cableada anterior si no hay mapping
+        switch(stage) {
+          case 'lead_nuevo': params = [lead.first_name || 'Cliente']; break;
+          case 'en_cotizacion': params = [lead.first_name || 'Cliente', extraData.stripe_link || 'pendiente']; break;
+          case 'reserva_confirmada': params = [lead.first_name || 'Cliente', formatValue(lead.pickup_date, 'date')]; break;
+          case 'voucher_enviado': params = [lead.first_name || 'Cliente', extraData.voucher_url || 'pendiente']; break;
+          default: params = [lead.first_name || 'Cliente'];
         }
-      ];
+      }
 
-      const waSuccess = await sendTemplateMessage(
-        waRecipient, 
-        automation.whatsapp.template, 
-        'es', 
-        components
-      );
+      // Enviar WhatsApp
+      const components = [{
+        type: 'body',
+        parameters: params.map(p => ({ type: 'text', text: p }))
+      }];
 
-      await logAutomation(leadId, stage, 'whatsapp', automation.whatsapp.template, waSuccess ? 'sent' : 'failed');
+      const waSuccess = await sendTemplateMessage(lead.phone, templateName, mapping?.language_code || 'es', components);
+      await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed');
     }
 
     // 4. Ejecutar Email (si hay email)
-    if (automation.email && lead.email) {
+    const automationConfig = { email: true }; // Por ahora siempre activado
+    if (automationConfig.email && lead.email) {
       const { subject, html } = await getStageEmailTemplate(stage, lead, extraData);
       const emailResult = await sendEmail({ to: lead.email, subject, html });
       
@@ -111,13 +93,51 @@ export async function executeStageAutomation(
       );
     }
 
-    // 5. Fallback a n8n (como pidió el usuario)
+    // 5. Fallback a n8n
     await sendLeadToN8n(leadId, stage, extraData);
 
   } catch (error: any) {
     console.error('[AutomationEngine] Error inesperado:', error);
   }
 }
+
+/**
+ * Resuelve un campo del lead basado en el id de mapping
+ */
+function resolveLeadField(fieldId: string, lead: any, extraData: any): string {
+  switch(fieldId) {
+    case 'first_name': return lead.first_name || 'Cliente';
+    case 'last_name': return lead.last_name || '';
+    case 'category_name': return lead.category?.name || 'Auto';
+    case 'pickup_date': return formatValue(lead.pickup_date, 'date');
+    case 'pickup_time': return formatValue(lead.pickup_date, 'time');
+    case 'pickup_location': return lead.pickup_location || '—';
+    case 'return_date': return formatValue(lead.return_date, 'date');
+    case 'return_time': return formatValue(lead.return_date, 'time');
+    case 'return_location': return lead.return_location || '—';
+    case 'agreed_daily_price': return `$${lead.agreed_daily_price || '—'}`;
+    case 'total_amount': return `$${lead.total_amount || '0'}`;
+    case 'deposit_amount': return `$${((lead.total_amount || 0) * 0.3).toFixed(2)}`;
+    case 'stripe_link': return extraData.stripe_link || lead.stripe_link || '—';
+    case 'agent_name': return lead.assigned_agent?.first_name || 'Tu Asesor';
+    case 'agent_phone': return lead.assigned_agent?.phone || '';
+    case 'voucher_url': return extraData.voucher_url || '—';
+    default: return '—';
+  }
+}
+
+/**
+ * Formatea valores para visualización
+ */
+function formatValue(val: any, type: 'date' | 'time'): string {
+  if (!val) return '—';
+  const date = new Date(val);
+  if (type === 'date') {
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+  }
+  return date.toLocaleTimeString('es-ES', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
 
 /**
  * Registra el resultado en la tabla automation_logs

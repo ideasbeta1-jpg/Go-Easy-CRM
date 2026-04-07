@@ -119,47 +119,25 @@ export default function WhatsAppTemplateForm({ onSuccess, onCancel }: Props) {
               <p className="text-[10px] text-slate-400 italic">Usa {'{{n}}'} para insertar variables dinámicas que el CRM completará automáticamente.</p>
             </div>
             
-            <div className="bg-blue-50/50 border border-blue-100 p-6 rounded-[2rem] space-y-6 overflow-y-auto max-h-[500px]">
-               <div className="space-y-1">
-                 <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600">Diccionario de Variables</h4>
-                 <p className="text-[9px] text-slate-400 leading-tight">Usa estos códigos para que el CRM complete los datos automáticamente.</p>
+            <div className="bg-blue-50/50 border border-blue-100 p-8 rounded-[2rem] space-y-6">
+               <div className="space-y-4">
+                 <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600">Guía de Variables</h4>
+                 <div className="space-y-4 text-[11px] font-bold text-slate-500 leading-relaxed">
+                   <p>1. Escribe tu mensaje usando <code className="text-blue-600">{'{{1}}'}</code> hasta <code className="text-blue-600">{'{{9}}'}</code>.</p>
+                   <p>2. Meta solo permite un máximo de 9 variables numeradas.</p>
+                   <p>3. Una vez aprobada por Meta, podrás entrar a <span className="text-blue-600">Configurar</span> para elegir qué dato del CRM rellena cada número.</p>
+                 </div>
                </div>
 
-               <div className="space-y-6">
-                 {/* Cliente & General */}
-                 <div className="space-y-3">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Cliente & General</p>
-                   <ul className="space-y-2">
-                     <VariableItem label="Nombre Cliente" id="1" />
-                     <VariableItem label="Categoría Auto" id="8" />
-                     <VariableItem label="Link de Pago / Landing" id="12" />
-                   </ul>
-                 </div>
-
-                 {/* Fechas & Logística */}
-                 <div className="space-y-3">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Logística (Entrega/Dev)</p>
-                   <ul className="space-y-2">
-                     <VariableItem label="Fecha Entrega" id="2" />
-                     <VariableItem label="Hora Entrega" id="3" />
-                     <VariableItem label="Lugar Entrega" id="4" />
-                     <VariableItem label="Fecha Devolución" id="5" />
-                     <VariableItem label="Hora Devolución" id="6" />
-                     <VariableItem label="Lugar Devolución" id="7" />
-                   </ul>
-                 </div>
-
-                 {/* Precios */}
-                 <div className="space-y-3">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Precios & Pagos</p>
-                   <ul className="space-y-2">
-                     <VariableItem label="Precio por Día" id="9" />
-                     <VariableItem label="Monto Total" id="10" />
-                     <VariableItem label="Monto Depósito" id="11" />
-                   </ul>
-                 </div>
+               <div className="pt-6 border-t border-blue-100/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ejemplo Correcto</span>
+                  </div>
+                  <p className="text-[10px] text-slate-400 italic">"Hola {'{{1}}'}, tu reserva para el dia {'{{2}}'} está lista."</p>
                </div>
             </div>
+
           </div>
         </div>
 

@@ -24,7 +24,10 @@ import {
   Save,
   X,
   Trash2,
-  Calculator
+  Calculator,
+  Mic,
+  Square,
+  Volume2
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -32,7 +35,8 @@ import { updateLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
 import { generateVoucherForLead } from '@/app/utils/actions/vouchers'
-import { sendManualWhatsApp } from '@/app/utils/actions/whatsapp'
+import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
+import { uploadChatMedia } from '@/app/utils/actions/storage'
 
 export default function LeadDetailClient({ 
   lead, 
@@ -128,6 +132,102 @@ export default function LeadDetailClient({
   const [isPending, startTransition] = useTransition()
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+
+  // Audio Recording States
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [audioChunks, setAudioChunks] = useState<Blob[]>([])
+  const recordingInterval = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    if (isRecording) {
+      recordingInterval.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1)
+      }, 1000)
+    } else {
+      if (recordingInterval.current) clearInterval(recordingInterval.current)
+      setRecordingTime(0)
+    }
+    return () => {
+      if (recordingInterval.current) clearInterval(recordingInterval.current)
+    }
+  }, [isRecording])
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      setMediaRecorder(recorder)
+      setAudioChunks([])
+      
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) setAudioChunks(prev => [...prev, e.data])
+      }
+      
+      recorder.onstop = async () => {
+        // Handle stop logic in handleStopRecording to get final blob
+      }
+      
+      recorder.start()
+      setIsRecording(true)
+    } catch (err) {
+      console.error('Error starting recording:', err)
+      alert('No se pudo acceder al micrófono.')
+    }
+  }
+
+  const stopRecordingAndSend = async () => {
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') return
+    
+    mediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/ogg; codecs=opus' })
+      if (audioBlob.size < 1000) {
+        setIsRecording(false)
+        return // Too short
+      }
+      
+      setIsSendingMessage(true)
+      try {
+        // 1. Convert blob to array buffer for server action
+        const arrayBuffer = await audioBlob.arrayBuffer()
+        const buffer = Array.from(new Uint8Array(arrayBuffer))
+        
+        // 2. Upload to storage
+        const { publicUrl, error } = await uploadChatMedia({
+          name: `audio-${Date.now()}.ogg`,
+          type: 'audio/ogg',
+          buffer
+        })
+        
+        if (error) throw new Error(error)
+        
+        // 3. Send via WhatsApp
+        if (publicUrl) {
+          await sendManualWhatsAppMedia(formData.phone || '', publicUrl, 'audio/ogg', lead.id)
+          router.refresh()
+        }
+      } catch (err: any) {
+        console.error('Error uploading/sending audio:', err)
+        alert('Error al enviar el audio: ' + err.message)
+      } finally {
+        setIsSendingMessage(false)
+        setIsRecording(false)
+      }
+    }
+    
+    mediaRecorder.stop()
+    mediaRecorder.stream.getTracks().forEach(track => track.stop())
+  }
+
+  const cancelRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop()
+      mediaRecorder.stream.getTracks().forEach(track => track.stop())
+    }
+    setIsRecording(false)
+    setAudioChunks([])
+  }
 
   const handleSendMessage = async () => {
     if (!chatMessage.trim() || isSendingMessage) return;
@@ -1123,14 +1223,31 @@ export default function LeadDetailClient({
 
                {/* Messages Feed */}
                <div className="flex-1 space-y-8 mb-8 overflow-y-auto pr-4 scrollbar-hide py-2">
-                  {messages?.length > 0 ? messages.map((msg, i) => (
+                   {messages?.length > 0 ? messages.map((msg, i) => (
                     <div key={i} className={`flex flex-col ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
-                       <div className={`max-w-[85%] p-6 rounded-[2rem] text-sm font-bold leading-relaxed mb-2 ${
+                       <div className={`max-w-[85%] p-4 md:p-6 rounded-[2rem] text-sm font-bold leading-relaxed mb-2 ${
                           msg.direction === 'outbound' 
                             ? 'bg-primary text-white rounded-tr-none shadow-lg shadow-primary/10' 
                             : 'bg-slate-50 text-slate-700 rounded-tl-none border border-slate-100'
                        }`}>
-                          {msg.content}
+                          {msg.media_type?.startsWith('audio/') ? (
+                             <div className="flex flex-col gap-3 min-w-[200px] md:min-w-[240px]">
+                               <div className="flex items-center justify-between">
+                                 <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${msg.direction === 'outbound' ? 'bg-white/20' : 'bg-primary/10'}`}>
+                                       <Volume2 className={`w-4 h-4 ${msg.direction === 'outbound' ? 'text-white' : 'text-primary'}`} />
+                                    </div>
+                                    <span className="text-[10px] uppercase tracking-widest opacity-60">Mensaje de Voz</span>
+                                 </div>
+                               </div>
+                               <div className={`rounded-2xl p-2 ${msg.direction === 'outbound' ? 'bg-white/10' : 'bg-white/50'}`}>
+                                 <audio controls src={msg.media_url} className="w-full h-8 hue-rotate-[180deg] invert-[0.1]" />
+                               </div>
+                               {msg.content && msg.content !== 'Media: audio/ogg' && msg.content !== '[Multimedia]' && <p className="mt-1 text-xs opacity-90">{msg.content}</p>}
+                             </div>
+                          ) : (
+                             msg.content
+                          )}
                        </div>
                        <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest px-1">
                           {format(new Date(msg.created_at), 'HH:mm', { locale: es })}
@@ -1144,24 +1261,64 @@ export default function LeadDetailClient({
                   )}
                </div>
 
-               {/* Chat Input */}
-               <div className="relative group mt-auto">
-                  <input 
-                    type="text" 
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Mensaje de WhatsApp..." 
-                    className="w-full bg-slate-50 border-none rounded-[1.8rem] pl-6 pr-14 py-5 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all"
-                  />
-                  <button 
-                    onClick={handleSendMessage}
-                    disabled={isSendingMessage}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:bg-slate-300"
-                  >
-                     {isSendingMessage ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
-                  </button>
-               </div>
+                {/* Chat Input */}
+                <div className="relative group mt-auto flex items-center gap-3 px-1">
+                   {isRecording ? (
+                      <div className="flex-1 flex items-center justify-between bg-rose-50 border-2 border-rose-100 rounded-[1.8rem] px-6 py-4 animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex items-center gap-3">
+                           <div className="w-3 h-3 bg-rose-500 rounded-full animate-pulse" />
+                           <span className="text-sm font-black text-rose-600 font-mono">
+                             {Math.floor(recordingTime / 60)}:{(recordingTime % 60).toString().padStart(2, '0')}
+                           </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                           <button 
+                             onClick={cancelRecording}
+                             className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                           >
+                             <Trash2 className="w-5 h-5" />
+                           </button>
+                           <button 
+                             onClick={stopRecordingAndSend}
+                             disabled={isSendingMessage}
+                             className="w-10 h-10 bg-rose-500 text-white rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-rose-200"
+                           >
+                             {isSendingMessage ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+                           </button>
+                        </div>
+                      </div>
+                   ) : (
+                      <>
+                        <div className="relative flex-1">
+                          <input 
+                            type="text" 
+                            value={chatMessage}
+                            onChange={(e) => setChatMessage(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Mensaje de WhatsApp..." 
+                            className="w-full bg-slate-50 border-none rounded-[1.8rem] pl-6 pr-14 py-5 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all"
+                          />
+                          {chatMessage ? (
+                            <button 
+                              onClick={handleSendMessage}
+                              disabled={isSendingMessage}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:bg-slate-300"
+                            >
+                               {isSendingMessage ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={startRecording}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-10 h-10 bg-slate-200 text-slate-500 rounded-full flex items-center justify-center hover:bg-primary hover:text-white transition-all"
+                              title="Grabar audio"
+                            >
+                               <Mic className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                   )}
+                </div>
            </div>
         </div>
       </div>
