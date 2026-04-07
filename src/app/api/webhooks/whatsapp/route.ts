@@ -15,7 +15,11 @@ export async function POST(req: Request) {
         const phoneNumber = remoteJid?.split('@')[0]
         const content = msgData.message?.conversation || msgData.message?.extendedTextMessage?.text || 'MMS/Media/Otro'
         const pushName = msgData.pushName || 'WhatsApp Contact'
-        if (phoneNumber && content) await processInboundMessage(phoneNumber, content, pushName)
+        
+        if (phoneNumber) {
+           const leadId = await getOrCreateLead(phoneNumber, pushName, content)
+           if (leadId) await storeMessage(leadId, content)
+        }
       }
     }
 
@@ -25,10 +29,8 @@ export async function POST(req: Request) {
         for (const change of entry.changes) {
           if (change.value.messages) {
             for (const message of change.value.messages) {
-              const phoneNumber = message.from
-              const content = message.text?.body || '[Multimedia/Template]'
-              const pushName = change.value.contacts?.[0]?.profile?.name || 'WABA Contact'
-              if (phoneNumber && content) await processInboundMessage(phoneNumber, content, pushName)
+               const contact = change.value.contacts?.[0]
+               await handleWabaMessage(message, contact)
             }
           }
         }
@@ -42,56 +44,89 @@ export async function POST(req: Request) {
   }
 }
 
-async function processInboundMessage(phoneNumber: string, content: string, pushName: string) {
-  const supabase = createAdminClient()
+async function handleWabaMedia(mediaId: string, leadId: string) {
+  try {
+    const { downloadWABAMedia } = await import('@/utils/waba')
+    const media = await downloadWABAMedia(mediaId)
+    if (!media) return null
 
-  // 1. Try to find an existing lead
-  // We check for exact match (best for BSUIDs) or last 10 digits (for flexible phone matching)
+    const supabase = createAdminClient()
+    const extension = media.mimeType.split('/')[1]?.split(';')[0] || 'bin'
+    const fileName = `inbound_${leadId}_${Date.now()}.${extension}`
+    
+    const { error: uploadError } = await supabase.storage
+      .from('chat_media')
+      .upload(fileName, media.blob, { contentType: media.mimeType })
+
+    if (uploadError) throw uploadError
+
+    const { data: publicUrlData } = supabase.storage.from('chat_media').getPublicUrl(fileName)
+    return { url: publicUrlData.publicUrl, type: media.mimeType }
+  } catch (error) {
+    console.error('[handleWabaMedia] Error:', error)
+    return null
+  }
+}
+
+// Meta WABA Loop helper
+async function handleWabaMessage(message: any, contact: any) {
+  const phoneNumber = message.from
+  const pushName = contact?.profile?.name || 'WABA Contact'
+  let content = message.text?.body || '[Multimedia]'
+  let mediaUrl = null
+  let mediaType = null
+
+  // Handle Media
+  const mediaObj = message.audio || message.image || message.video || message.document
+  if (mediaObj?.id) {
+    const leadId = await getOrCreateLead(phoneNumber, pushName, content)
+    if (leadId) {
+      const mediaResult = await handleWabaMedia(mediaObj.id, leadId)
+      if (mediaResult) {
+        mediaUrl = mediaResult.url
+        mediaType = mediaResult.type
+        content = `Media: ${mediaType}`
+      }
+      await storeMessage(leadId, content, mediaUrl, mediaType)
+    }
+    return
+  }
+
+  // Handle Text
+  const leadId = await getOrCreateLead(phoneNumber, pushName, content)
+  if (leadId) await storeMessage(leadId, content)
+}
+
+async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: string) {
+  const supabase = createAdminClient()
   const isBSUID = phoneNumber.includes(':') || /[a-z]/i.test(phoneNumber)
   const last10 = phoneNumber.slice(-10)
-  
-  const query = isBSUID 
-    ? `phone.eq.${phoneNumber}` 
-    : `phone.like.%${phoneNumber}%,phone.like.%${last10}%`
+  const query = isBSUID ? `phone.eq.${phoneNumber}` : `phone.like.%${phoneNumber}%,phone.like.%${last10}%`
 
-  const { data: leads } = await supabase
-    .from('leads')
-    .select('id, phone')
-    .or(query)
-    .limit(1)
+  const { data: leads } = await supabase.from('leads').select('id').or(query).limit(1)
+  if (leads?.[0]?.id) return leads[0].id
 
-  let leadId = leads?.[0]?.id
+  const { data: newLead } = await supabase.from('leads').insert({
+    first_name: pushName,
+    last_name: '(WhatsApp)',
+    phone: phoneNumber,
+    status: 'lead_nuevo',
+    notes: `Lead creado desde WhatsApp. Msg: ${firstMsg}`
+  }).select('id').single()
 
-  // 2. If no lead exists, create a new one automatically
-  if (!leadId) {
-    const { data: newLead, error: createError } = await supabase
-      .from('leads')
-      .insert({
-        first_name: pushName,
-        last_name: '(WhatsApp)',
-        phone: phoneNumber, // Store the BSUID or standard phone here
-        status: 'lead_nuevo',
-        notes: `[Sistema] Lead creado desde WhatsApp (${isBSUID ? 'BSUID' : 'Teléfono'}). Primero msg: ${content}`
-      })
-      .select('id')
-      .single()
+  return newLead?.id || null
+}
 
-    if (createError) {
-      console.error('Error creating lead from WhatsApp:', createError)
-    } else {
-      leadId = newLead.id
-    }
-  }
-
-  // 3. Store the message
-  if (leadId) {
-    await supabase.from('messages').insert({
-      lead_id: leadId,
-      content: content,
-      direction: 'inbound',
-      created_at: new Date().toISOString()
-    })
-  }
+async function storeMessage(leadId: string, content: string, mediaUrl?: string | null, mediaType?: string | null) {
+  const supabase = createAdminClient()
+  return await supabase.from('messages').insert({
+    lead_id: leadId,
+    content,
+    direction: 'inbound',
+    media_url: mediaUrl,
+    media_type: mediaType,
+    created_at: new Date().toISOString()
+  })
 }
 
 // GET handler for Webhook verification (some providers like Meta require this)

@@ -11,7 +11,13 @@ import {
   Filter, 
   ArrowLeft,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Mic,
+  Square,
+  Trash2,
+  X,
+  PlayIcon,
+  PauseIcon
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -42,6 +48,69 @@ export default function ChatInboxClient({
   const [leads, setLeads] = useState(initialLeads)
   const [messages, setMessages] = useState(initialMessages)
 
+  // Audio Recording State
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Audio Functions
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data)
+      }
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }) // Modern browsers typically use webm for native MediaRecorder
+        const url = URL.createObjectURL(audioBlob)
+        setAudioBlob(audioBlob)
+        setAudioUrl(url)
+        
+        // Cleanup stream tracks
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      setRecordingTime(0)
+      timerIntervalRef.current = setInterval(() => setRecordingTime(prev => prev + 1), 1000)
+    } catch (err) {
+      console.error('Error accessing microphone:', err)
+      alert('No se pudo acceder al micrófono. Por favor, asegúrate de dar permisos.')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    }
+  }
+
+  const discardAudio = () => {
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    setAudioUrl(null)
+    setAudioBlob(null)
+    setRecordingTime(0)
+  }
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60).toString().padStart(2, '0')
+    const s = (seconds % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
   useEffect(() => {
     const supabase = createClient()
     
@@ -61,7 +130,10 @@ export default function ChatInboxClient({
     const messagesChannel = supabase
       .channel('messages-all')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        setMessages(prev => [payload.new, ...prev])
+        setMessages(prev => {
+          if (prev.some(m => m.id === payload.new.id)) return prev;
+          return [payload.new, ...prev];
+        })
       })
       .subscribe()
 
@@ -111,18 +183,42 @@ export default function ChatInboxClient({
       const ok = await sendManualWhatsApp(selectedLead.phone || '', chatMessage, selectedLeadId);
       if (ok) {
         setChatMessage('');
-        // Local update for immediate feedback
-        const newMsg = {
-           lead_id: selectedLeadId,
-           content: chatMessage,
-           direction: 'outbound',
-           created_at: new Date().toISOString()
-        }
-        setMessages([newMsg, ...messages])
-        router.refresh()
+        // Realtime subscription will automatically pick up the inserted message
+        // No need for duplicate local update or router.refresh()
       }
     } finally {
       setIsSendingMessage(false);
+    }
+  };
+
+  const handleSendAudio = async () => {
+    if (!audioBlob || isUploadingMedia || !selectedLeadId || !selectedLead) return;
+    setIsUploadingMedia(true);
+    try {
+      const supabase = createClient()
+      const fileName = `${selectedLeadId}_${Date.now()}.webm`
+      
+      const { data, error } = await supabase.storage
+        .from('chat_media')
+        .upload(fileName, audioBlob, { contentType: 'audio/webm' })
+        
+      if (error) throw error
+
+      const { data: publicData } = supabase.storage.from('chat_media').getPublicUrl(fileName)
+      const publicUrl = publicData.publicUrl
+
+      // Ensure we import sendManualWhatsAppMedia at the top, or we can use it dynamically if not imported
+      const { sendManualWhatsAppMedia } = await import('@/app/utils/actions/whatsapp')
+      const ok = await sendManualWhatsAppMedia(selectedLead.phone || '', publicUrl, 'audio/webm', selectedLeadId)
+
+      if (ok) {
+        discardAudio()
+      }
+    } catch (err) {
+      console.error('Error uploading/sending audio:', err)
+      alert('Error enviando el audio.')
+    } finally {
+      setIsUploadingMedia(false);
     }
   };
 
@@ -292,7 +388,16 @@ export default function ChatInboxClient({
                               ? 'bg-primary text-white rounded-br-none' 
                               : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
                         }`}>
-                            {msg.content}
+                            {msg.media_url && msg.media_type?.startsWith('audio/') ? (
+                              <div className="flex flex-col gap-2 min-w-[200px]">
+                                <audio src={msg.media_url} controls className={`w-full h-8 ${msg.direction === 'outbound' ? 'brightness-200' : ''}`} />
+                                {msg.content && msg.content !== `Media: ${msg.media_type}` && (
+                                  <p className="mt-2">{msg.content}</p>
+                                )}
+                              </div>
+                            ) : (
+                              msg.content
+                            )}
                         </div>
                         <span className={`text-[8px] font-black uppercase tracking-widest px-2 ${msg.direction === 'outbound' ? 'text-right' : 'text-left'} text-slate-300`}>
                             {format(new Date(msg.created_at), 'hh:mm a', { locale: es })}
@@ -307,24 +412,58 @@ export default function ChatInboxClient({
 
             {/* Input Overlay */}
             <div className="p-8 pb-12 bg-gradient-to-t from-white via-white/80 to-transparent">
-              <div className="relative group max-w-4xl mx-auto">
-                <input 
-                  type="text" 
-                  value={chatMessage}
-                  onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Escribe tu respuesta de WhatsApp..." 
-                  className="w-full bg-slate-50 border-none rounded-[2.5rem] pl-8 pr-20 py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
-                />
-                <button 
-                  onClick={handleSendMessage}
-                  disabled={isSendingMessage || !chatMessage.trim()}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 w-14 h-14 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
-                >
-                  {isSendingMessage ? <Clock className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5 ml-1" />}
-                </button>
+              <div className="relative group max-w-4xl mx-auto flex items-center gap-3">
+                
+                {isRecording ? (
+                  <div className="flex-1 bg-red-50 border border-red-100 rounded-[2.5rem] px-8 py-5 flex items-center justify-between shadow-lg shadow-red-500/5 transition-all">
+                    <div className="flex items-center gap-4">
+                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-red-500 font-bold tracking-widest">{formatTime(recordingTime)}</span>
+                      <span className="text-[10px] font-black text-red-400 uppercase tracking-widest ml-4 hidden sm:inline-block">Grabando Audio...</span>
+                    </div>
+                    <button onClick={stopRecording} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors">
+                      <Square className="w-5 h-5 fill-current" />
+                    </button>
+                  </div>
+                ) : audioUrl ? (
+                  <div className="flex-1 bg-slate-50 border-none rounded-[2.5rem] px-6 py-4 flex items-center gap-4 shadow-lg shadow-primary/5 transition-all">
+                    <button onClick={discardAudio} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <audio src={audioUrl} controls className="h-10 flex-1 w-full outline-none" />
+                  </div>
+                ) : (
+                  <input 
+                    type="text" 
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Escribe tu respuesta o graba un audio..." 
+                    className="flex-1 w-full bg-slate-50 border-none rounded-[2.5rem] pl-8 pr-8 py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
+                  />
+                )}
+
+                {!isRecording && !audioUrl && !chatMessage.trim() && (
+                  <button 
+                    onClick={startRecording}
+                    className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md group border-2 border-transparent hover:border-red-100"
+                  >
+                    <Mic className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  </button>
+                )}
+
+                {(!isRecording && (chatMessage.trim() || audioUrl)) && (
+                   <button 
+                    onClick={audioUrl ? handleSendAudio : handleSendMessage}
+                    disabled={isSendingMessage || isUploadingMedia}
+                    className="w-[60px] h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
+                  >
+                    {isSendingMessage || isUploadingMedia ? <Clock className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6 ml-1" />}
+                  </button>
+                )}
+                
               </div>
-              <p className="text-[9px] font-black text-slate-300 text-center mt-6 uppercase tracking-widest opacity-50">Pulse Enter para enviar • Conectado a la API Oficial</p>
+              <p className="text-[9px] font-black text-slate-300 text-center mt-6 uppercase tracking-widest opacity-50">Pulse Enter para enviar texto • Conectado a la API Oficial</p>
             </div>
           </>
         ) : (

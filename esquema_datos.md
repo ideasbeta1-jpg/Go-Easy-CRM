@@ -85,11 +85,13 @@ Documentación final una vez cerrada la venta.
 * **`voucher_url`**: Link al PDF alojado en Supabase Storage.
 
 ### **Mensajes / Chats (`messages`)**
-Historial de interacción por WhatsApp / Evolution API.
+Historial de interacción por WhatsApp / WABA / Evolution API.
 * **`id`**: `UUID` (PK)
 * **`lead_id`**: `UUID` (FK -> `leads`)
 * **`content`**: `TEXT` (Contenido del mensaje)
 * **`direction`**: `TEXT` (`inbound` / `outbound`)
+* **`media_url`**: `TEXT` (Enlace al archivo de audio/multimedia en Storage)
+* **`media_type`**: `TEXT` (Tipo MIME, ej. `audio/ogg`, `image/jpeg`)
 * **`created_at`**: `TIMESTAMPTZ` (Fecha de envío/recepción)
 
 ### **Perfiles de Staff (`profiles`)**
@@ -111,6 +113,10 @@ Información extendida de los usuarios del sistema.
 * **Uso**: Fotos de perfil de agentes y administradores.
 * **Estructura**: `avatars/{user_id}/{filename}`.
 * **Acceso**: Público para lectura, restringido por UID para escritura/borrado.
+
+### **`chat_media`**
+* **Uso**: Audios, notas de voz, imágenes o documentos enviados/recibidos en el chat.
+* **Acceso**: Público para lectura (facilita reproducción en web y envío por API).
 
 ### **`provider-logos`**
 * **Uso**: Logotipos de las rentadoras aliadas.
