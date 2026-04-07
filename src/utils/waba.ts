@@ -165,13 +165,11 @@ export async function createTemplate(templateData: {
       }
     );
 
-    if (!response.ok) {
-       console.error('[sendWABAMediaMessage] Error from WABA media message:', data);
-    }
-    return response.ok;
+    const data = await response.json();
+    return data;
   } catch (error) {
-    console.error('[sendWABAMediaMessage] Error sending WABA media message:', error);
-    return false;
+    console.error('Error creating WABA template:', error);
+    return null;
   }
 }
 
