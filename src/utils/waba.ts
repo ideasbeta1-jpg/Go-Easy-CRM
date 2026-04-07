@@ -1,7 +1,7 @@
 const WABA_ID = process.env.WABA_ID;
 const PHONE_NUMBER_ID = process.env.WABA_PHONE_NUMBER_ID;
 const ACCESS_TOKEN = process.env.WABA_ACCESS_TOKEN;
-const VERSION = process.env.WABA_VERSION || 'v19.0';
+const VERSION = process.env.WABA_VERSION || 'v21.0';
 const BASE_URL = `https://graph.facebook.com/${VERSION}`;
 
 export interface WABATemplate {
@@ -55,6 +55,10 @@ export async function sendTemplateMessage(
     return false;
   }
 
+  const cleanRecipient = (recipient.includes(':') || /[a-zA-Z]/.test(recipient))
+    ? recipient
+    : recipient.replace(/\D/g, '');
+
   try {
     const response = await fetch(
       `${BASE_URL}/${PHONE_NUMBER_ID}/messages`,
@@ -66,9 +70,7 @@ export async function sendTemplateMessage(
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: recipient.includes(':') || /[a-zA-Z]/.test(recipient) 
-            ? recipient 
-            : recipient.replace(/\D/g, ''), // Only clean if it looks like a standard phone number
+          to: cleanRecipient,
           type: 'template',
           template: {
             name: templateName,
@@ -80,6 +82,9 @@ export async function sendTemplateMessage(
     );
 
     const data = await response.json();
+    if (!response.ok) {
+      console.error('WABA Template Error:', data);
+    }
     return response.ok;
   } catch (error) {
     console.error('Error sending WABA message:', error);
@@ -97,12 +102,15 @@ export async function sendWABATextMessage(recipient: string, message: string) {
     return false;
   }
 
+  // Clean recipient — only strip non-digits if it looks like a standard phone (not BSUID)
+  const cleanRecipient = (recipient.includes(':') || /[a-zA-Z]/.test(recipient))
+    ? recipient
+    : recipient.replace(/\D/g, '');
+
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
-    to: recipient.includes(':') || /[a-zA-Z]/.test(recipient) 
-      ? recipient 
-      : recipient.replace(/\D/g, ''),
+    to: cleanRecipient,
     type: 'text',
     text: {
       preview_url: false,
@@ -237,9 +245,12 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
     ? recipient
     : recipient.replace(/\D/g, '');
 
-  const mediaPayload: Record<string, string> = { link: mediaUrl };
+  const mediaPayload: Record<string, string> = { 
+    link: mediaUrl 
+  };
 
-  const payload = {
+  // For audio, sometimes Meta requires an empty caption object or specific format
+  const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to: cleanRecipient,
@@ -247,11 +258,12 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
     [wabaType]: mediaPayload
   };
 
-  console.log('[sendWABAMediaMessage] Payload:', JSON.stringify(payload));
+  console.log('[sendWABAMediaMessage] Final Payload:', JSON.stringify(payload));
 
   try {
+    const url = `${BASE_URL}/${PHONE_NUMBER_ID}/messages`;
     const response = await fetch(
-      `${BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+      url,
       {
         method: 'POST',
         headers: {
@@ -263,14 +275,15 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
     );
 
     const data = await response.json();
-    console.log('[sendWABAMediaMessage] Response status:', response.status, 'data:', JSON.stringify(data));
+    console.log(`[sendWABAMediaMessage] Meta response (${response.status}):`, JSON.stringify(data));
     
     if (!response.ok) {
-       console.error('[sendWABAMediaMessage] Error from WABA media message:', JSON.stringify(data));
+       console.error('[sendWABAMediaMessage] FAILED payload was:', JSON.stringify(payload));
+       console.error('[sendWABAMediaMessage] Endpoint used was:', url);
     }
     return response.ok;
   } catch (error) {
-    console.error('[sendWABAMediaMessage] Error sending WABA media message:', error);
+    console.error('[sendWABAMediaMessage] Exception in fetch:', error);
     return false;
   }
 }
