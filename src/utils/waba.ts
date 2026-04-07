@@ -1,7 +1,7 @@
 const WABA_ID = process.env.WABA_ID;
 const PHONE_NUMBER_ID = process.env.WABA_PHONE_NUMBER_ID;
 const ACCESS_TOKEN = process.env.WABA_ACCESS_TOKEN;
-const VERSION = process.env.WABA_VERSION || 'v21.0';
+const VERSION = 'v21.0'; // Hardcode version to v21.0 to avoid invalid v29.0 strings
 const BASE_URL = `https://graph.facebook.com/${VERSION}`;
 
 export interface WABATemplate {
