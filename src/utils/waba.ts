@@ -245,20 +245,19 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
     ? recipient
     : recipient.replace(/\D/g, '');
 
-  const mediaPayload: Record<string, string> = { 
-    link: mediaUrl 
-  };
-
-  // For audio, sometimes Meta requires an empty caption object or specific format
+  // For non-audio media, we use the standard link object
+  // For audio, we strictly use the audio object per Meta's specs
   const payload: any = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to: cleanRecipient,
     type: wabaType,
-    [wabaType]: mediaPayload
+    [wabaType]: {
+      link: mediaUrl
+    }
   };
 
-  console.log('[sendWABAMediaMessage] Final Payload:', JSON.stringify(payload));
+  console.log('[sendWABAMediaMessage] Final Payload for Meta:', JSON.stringify(payload));
 
   try {
     const url = `${BASE_URL}/${PHONE_NUMBER_ID}/messages`;
