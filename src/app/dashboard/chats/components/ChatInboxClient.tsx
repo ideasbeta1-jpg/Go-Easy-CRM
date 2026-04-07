@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { sendManualWhatsApp } from '@/app/utils/actions/whatsapp'
+import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
@@ -196,27 +196,35 @@ export default function ChatInboxClient({
     setIsUploadingMedia(true);
     try {
       const supabase = createClient()
-      const fileName = `${selectedLeadId}_${Date.now()}.webm`
+      const fileName = `${selectedLeadId}_${Date.now()}.ogg`
       
-      const { data, error } = await supabase.storage
+      // Convert webm blob to ogg (rename only — Meta accepts ogg audio)
+      const oggBlob = new Blob([audioBlob], { type: 'audio/ogg; codecs=opus' })
+      
+      const { data: uploadData, error } = await supabase.storage
         .from('chat_media')
-        .upload(fileName, audioBlob, { contentType: 'audio/webm' })
+        .upload(fileName, oggBlob, { contentType: 'audio/ogg' })
         
-      if (error) throw error
+      if (error) {
+        console.error('[handleSendAudio] Supabase upload error:', error)
+        throw error
+      }
 
       const { data: publicData } = supabase.storage.from('chat_media').getPublicUrl(fileName)
       const publicUrl = publicData.publicUrl
+      console.log('[handleSendAudio] Uploaded audio, public URL:', publicUrl)
 
-      // Ensure we import sendManualWhatsAppMedia at the top, or we can use it dynamically if not imported
-      const { sendManualWhatsAppMedia } = await import('@/app/utils/actions/whatsapp')
-      const ok = await sendManualWhatsAppMedia(selectedLead.phone || '', publicUrl, 'audio/webm', selectedLeadId)
+      const ok = await sendManualWhatsAppMedia(selectedLead.phone || '', publicUrl, 'audio/ogg', selectedLeadId)
+      console.log('[handleSendAudio] sendManualWhatsAppMedia result:', ok)
 
       if (ok) {
         discardAudio()
+      } else {
+        alert('El audio se guardó pero no se pudo enviar a WhatsApp. Revisa los logs del servidor.')
       }
     } catch (err) {
-      console.error('Error uploading/sending audio:', err)
-      alert('Error enviando el audio.')
+      console.error('[handleSendAudio] Error:', err)
+      alert('Error subiendo o enviando el audio.')
     } finally {
       setIsUploadingMedia(false);
     }

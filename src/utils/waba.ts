@@ -234,17 +234,22 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
   if (mediaType.startsWith('image/')) wabaType = 'image';
   if (mediaType.startsWith('video/')) wabaType = 'video';
 
+  // Clean recipient — only strip non-digits if it looks like a standard phone (not BSUID)
+  const cleanRecipient = (recipient.includes(':') || /[a-zA-Z]/.test(recipient))
+    ? recipient
+    : recipient.replace(/\D/g, '');
+
+  const mediaPayload: Record<string, string> = { link: mediaUrl };
+
   const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
-    to: recipient.includes(':') || /[a-zA-Z]/.test(recipient) 
-      ? recipient 
-      : recipient.replace(/\D/g, ''),
+    to: cleanRecipient,
     type: wabaType,
-    [wabaType]: {
-      link: mediaUrl
-    }
+    [wabaType]: mediaPayload
   };
+
+  console.log('[sendWABAMediaMessage] Payload:', JSON.stringify(payload));
 
   try {
     const response = await fetch(
@@ -260,10 +265,10 @@ export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, 
     );
 
     const data = await response.json();
-    console.log('[sendWABAMediaMessage] Response status:', response.status, 'data:', data);
+    console.log('[sendWABAMediaMessage] Response status:', response.status, 'data:', JSON.stringify(data));
     
     if (!response.ok) {
-       console.error('[sendWABAMediaMessage] Error from WABA media message:', data);
+       console.error('[sendWABAMediaMessage] Error from WABA media message:', JSON.stringify(data));
     }
     return response.ok;
   } catch (error) {
