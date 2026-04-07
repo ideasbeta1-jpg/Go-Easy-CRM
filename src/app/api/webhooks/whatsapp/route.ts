@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { NextResponse } from 'next/server'
+import { assignLeadToAgent } from '@/utils/assignment'
 
 export async function POST(req: Request) {
   try {
@@ -113,6 +114,11 @@ async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: 
     status: 'lead_nuevo',
     notes: `Lead creado desde WhatsApp. Msg: ${firstMsg}`
   }).select('id').single()
+
+  if (newLead?.id) {
+    // Intentar asignación automática
+    await assignLeadToAgent(newLead.id)
+  }
 
   return newLead?.id || null
 }

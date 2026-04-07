@@ -98,12 +98,12 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-4">
-      <div className="flex gap-8 h-full min-w-max pr-8">
+    <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide">
+      <div className="flex gap-4 md:gap-8 h-full min-w-max pr-8 px-4 md:px-0">
         {statuses.map((status) => (
           <div 
             key={status} 
-            className="w-80 flex flex-col gap-6"
+            className="w-[85vw] sm:w-80 flex flex-col gap-4 md:gap-6 snap-center"
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={(e) => handleDrop(e, status)}
@@ -112,10 +112,10 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
             <div className="flex items-center justify-between px-2 shrink-0">
               <div className="flex items-center gap-3">
                 <div className={`w-2.5 h-2.5 rounded-full ${statusConfig[status]?.color || 'bg-slate-300'}`} />
-                <span className="font-sans font-black text-slate-900 uppercase tracking-tighter text-base">
+                <span className="font-sans font-black text-slate-900 uppercase tracking-tighter text-sm md:text-base">
                   {statusConfig[status]?.label || status}
                 </span>
-                <span className="bg-slate-200 text-slate-500 px-2.5 py-0.5 rounded-full text-[11px] font-black">
+                <span className="bg-slate-200 text-slate-500 px-2 md:px-2.5 py-0.5 rounded-full text-[10px] md:text-[11px] font-black">
                   {getGroupedLeads(status).length}
                 </span>
               </div>
@@ -129,20 +129,20 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
                   draggable
                   onDragStart={(e) => handleDragStart(e, lead.id)}
                   onDragEnd={handleDragEnd}
-                  className="bg-white p-6 rounded-[2.5rem] shadow-[0_10px_40px_rgba(30,41,59,0.04)] border border-slate-100/50 hover:shadow-[0_20px_60px_rgba(64,82,182,0.12)] hover:scale-[1.02] transition-all duration-500 group cursor-grab active:cursor-grabbing relative overflow-hidden"
+                  className="bg-white p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] shadow-[0_10px_40px_rgba(30,41,59,0.04)] border border-slate-100/50 hover:shadow-[0_20px_60px_rgba(64,82,182,0.12)] hover:scale-[1.02] transition-all duration-500 group cursor-grab active:cursor-grabbing relative overflow-hidden"
                 >
                   <Link href={`/dashboard/leads/${lead.id}`} draggable={false}>
-                    <div className="flex justify-between items-start mb-6">
-                      <span className="text-[10px] font-bold text-slate-400 bg-slate-100/50 px-2.5 py-1 rounded-full tracking-wider">
+                    <div className="flex justify-between items-start mb-4 md:mb-6">
+                      <span className="text-[9px] md:text-[10px] font-bold text-slate-400 bg-slate-100/50 px-2 md:px-2.5 py-1 rounded-full tracking-wider">
                         #{lead.id.slice(0, 4)}
                       </span>
-                      <span className="text-xl font-sans font-black text-primary tracking-tight">
-                        <span className="text-sm opacity-50 mr-0.5">$</span>{Math.floor(lead.total_amount || 0).toLocaleString()}
+                      <span className="text-lg md:text-xl font-sans font-black text-primary tracking-tight">
+                        <span className="text-xs md:text-sm opacity-50 mr-0.5">$</span>{Math.floor(lead.total_amount || 0).toLocaleString()}
                       </span>
                     </div>
 
                     <div className="space-y-4">
-                      <h3 className="text-lg font-sans font-black text-slate-900 leading-tight uppercase tracking-tight">
+                      <h3 className="text-base md:text-lg font-sans font-black text-slate-900 leading-tight uppercase tracking-tight">
                         {lead.first_name} {lead.last_name}
                       </h3>
                       

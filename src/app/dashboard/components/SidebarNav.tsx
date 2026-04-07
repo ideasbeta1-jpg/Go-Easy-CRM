@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useNotifications } from './NotificationProvider'
 
 interface MenuItem {
   name: string;
@@ -10,6 +11,7 @@ interface MenuItem {
 
 export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
   const pathname = usePathname();
+  const { unreadCount } = useNotifications();
 
   const iconMap: Record<string, string> = {
     'Inicio': 'grid_view',
@@ -38,7 +40,12 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
             <span className={`material-symbols-outlined text-[22px] ${isActive ? 'fill-1' : ''}`}>
               {iconMap[item.name]}
             </span>
-            <span className="font-sans font-bold text-sm tracking-tight">{item.name}</span>
+            <span className="font-sans font-bold text-sm tracking-tight flex-1">{item.name}</span>
+            {item.name === 'Chats WhatsApp' && unreadCount > 0 && (
+              <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-rose-500/20 mr-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </Link>
         );
       })}

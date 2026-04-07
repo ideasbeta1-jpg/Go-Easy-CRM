@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendLeadToN8n } from '@/utils/n8n'
+import { assignLeadToAgent } from '@/utils/assignment'
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
     if (error) {
       console.error('Supabase error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    if (data?.id) {
+       // Intentar asignación automática
+       await assignLeadToAgent(data.id)
     }
 
     // Trigger n8n for lead_created (for Meta CAPI and general automation)

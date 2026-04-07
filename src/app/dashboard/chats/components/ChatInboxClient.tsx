@@ -22,9 +22,10 @@ import {
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/utils/supabase/client'
+import { useNotifications } from '@/app/dashboard/components/NotificationProvider'
 
 export default function ChatInboxClient({ 
   initialLeads, 
@@ -38,6 +39,8 @@ export default function ChatInboxClient({
   isAdmin?: boolean
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { refreshUnreadCount } = useNotifications()
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<'my' | 'all'>('my')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
@@ -143,6 +146,42 @@ export default function ChatInboxClient({
     }
   }, [])
 
+  // Auto-select lead from URL search param (for notifications)
+  useEffect(() => {
+    const leadId = searchParams.get('leadId')
+    if (leadId && leads.some(l => l.id === leadId)) {
+      setSelectedLeadId(leadId)
+    }
+  }, [searchParams, leads])
+
+  // Mark as Read Logic
+  useEffect(() => {
+    if (!selectedLeadId) return
+
+    const markAsRead = async () => {
+      const supabase = createClient()
+      const { error } = await supabase
+        .from('messages')
+        .update({ is_read: true })
+        .eq('lead_id', selectedLeadId)
+        .eq('direction', 'inbound')
+        .eq('is_read', false)
+      
+      if (!error) {
+        // Update local state to reflect read status (optional for UI, but important for global count)
+        setMessages(prev => prev.map(m => 
+          (m.lead_id === selectedLeadId && m.direction === 'inbound') 
+          ? { ...m, is_read: true } 
+          : m
+        ))
+        // Refresh global unread count
+        refreshUnreadCount()
+      }
+    }
+
+    markAsRead()
+  }, [selectedLeadId, refreshUnreadCount])
+
   // Memoize lead data for the list (with unread/pending info)
   const processedLeads = useMemo(() => {
     return leads.map(lead => {
@@ -239,9 +278,9 @@ export default function ChatInboxClient({
   }, [selectedLeadId, messages])
 
   return (
-    <div className="h-[calc(100vh-140px)] bg-slate-50/50 rounded-[3rem] border border-slate-100 overflow-hidden flex animate-in fade-in duration-700">
+    <div className={`h-[calc(100vh-100px)] md:h-[calc(100vh-140px)] bg-slate-50/50 rounded-2xl md:rounded-[3rem] border border-slate-100 overflow-hidden flex animate-in fade-in duration-700`}>
       {/* Sidebar: Chat List */}
-      <div className="w-[380px] border-r border-slate-100 flex flex-col bg-white">
+      <div className={`${selectedLeadId ? 'hidden md:flex' : 'flex'} w-full md:w-[380px] border-r border-slate-100 flex-col bg-white`}>
         {/* Sidebar Header */}
         <div className="p-8 pb-4 space-y-6">
           <div className="flex items-center justify-between">
@@ -263,7 +302,7 @@ export default function ChatInboxClient({
             />
           </div>
 
-          <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl">
+          <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl shrink-0">
             <button 
               onClick={() => setFilterType('my')}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
@@ -339,41 +378,51 @@ export default function ChatInboxClient({
       </div>
 
       {/* Main Content: Chat Pane */}
-      <div className="flex-1 flex flex-col bg-white/40 backdrop-blur-xl relative">
+      <div className={`${!selectedLeadId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-white/40 backdrop-blur-xl relative`}>
         {selectedLead ? (
           <>
             {/* Thread Header */}
-            <div className="p-8 border-b border-slate-100/50 flex items-center justify-between">
-              <div className="flex items-center gap-5">
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-black text-sm">
+            <div className="p-4 md:p-8 border-b border-slate-100/50 flex items-center justify-between">
+              <div className="flex items-center gap-3 md:gap-5">
+                {/* Mobile Back Button */}
+                <button 
+                  onClick={() => setSelectedLeadId(null)}
+                  className="md:hidden p-2 -ml-2 text-slate-400 hover:text-primary transition-colors"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs md:text-sm">
                   {selectedLead.first_name?.[0] || '?'}{selectedLead.last_name?.[0] || ''}
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 leading-none uppercase tracking-tighter">{selectedLead.first_name} {selectedLead.last_name}</h2>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[10px] font-bold text-slate-400">{selectedLead.phone}</span>
-                    <span className="w-1.5 h-1.5 bg-slate-200 rounded-full" />
-                    <Link href={`/dashboard/leads/${selectedLead.id}`} className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline flex items-center gap-1">
-                      Ver Ficha Lead <ChevronRight className="w-2.5 h-2.5" />
+                  <h2 className="text-lg md:text-xl font-black text-slate-900 leading-none uppercase tracking-tighter truncate max-w-[150px] md:max-w-none">{selectedLead.first_name} {selectedLead.last_name}</h2>
+                  <div className="flex items-center gap-2 mt-1 md:mt-2">
+                    <span className="text-[10px] font-bold text-slate-400 hidden sm:inline-block">{selectedLead.phone}</span>
+                    <span className="w-1.5 h-1.5 bg-slate-200 rounded-full hidden sm:inline-block" />
+                    <Link href={`/dashboard/leads/${selectedLead.id}`} className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-widest hover:underline flex items-center gap-1">
+                      {/* En móvil quitamos "Ver Ficha Lead" y dejamos icono o texto corto */}
+                      <span className="hidden md:inline">Ver Ficha Lead</span>
+                      <span className="md:hidden">Ficha</span> 
+                      <ChevronRight className="w-2.5 h-2.5" />
                     </Link>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4">
                  <div className="hidden lg:flex flex-col items-end mr-4">
                     <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Estado Lead</span>
                     <span className="text-[10px] font-black text-primary uppercase tracking-widest">{selectedLead.status?.replace('_', ' ')}</span>
                  </div>
                  {/* Quick Action Button for detail */}
-                 <button onClick={() => router.push(`/dashboard/leads/${selectedLead.id}`)} className="p-3.5 bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-2xl transition-all">
-                    <Filter className="w-4 h-4" />
+                 <button onClick={() => router.push(`/dashboard/leads/${selectedLead.id}`)} className="p-2.5 md:p-3.5 bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-2xl transition-all">
+                    <Filter className="w-3.5 h-3.5 md:w-4 h-4" />
                  </button>
               </div>
             </div>
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-8 space-y-10 bg-dots scroll-smooth">
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-10 bg-dots scroll-smooth">
               {selectedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
@@ -391,7 +440,7 @@ export default function ChatInboxClient({
                          </div>
                        )}
                        <div className="flex flex-col gap-2">
-                        <div className={`p-6 rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md ${
+                        <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md ${
                             msg.direction === 'outbound' 
                               ? 'bg-primary text-white rounded-br-none' 
                               : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
@@ -419,8 +468,8 @@ export default function ChatInboxClient({
             </div>
 
             {/* Input Overlay */}
-            <div className="p-8 pb-12 bg-gradient-to-t from-white via-white/80 to-transparent">
-              <div className="relative group max-w-4xl mx-auto flex items-center gap-3">
+            <div className="p-4 md:p-8 pb-8 md:pb-12 bg-gradient-to-t from-white via-white/80 to-transparent">
+              <div className="relative group max-w-4xl mx-auto flex items-center gap-2 md:gap-3">
                 
                 {isRecording ? (
                   <div className="flex-1 bg-red-50 border border-red-100 rounded-[2.5rem] px-8 py-5 flex items-center justify-between shadow-lg shadow-red-500/5 transition-all">
@@ -447,7 +496,7 @@ export default function ChatInboxClient({
                     onChange={(e) => setChatMessage(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder="Escribe tu respuesta o graba un audio..." 
-                    className="flex-1 w-full bg-slate-50 border-none rounded-[2.5rem] pl-8 pr-8 py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
+                    className="flex-1 w-full bg-slate-50 border-none rounded-[2rem] md:rounded-[2.5rem] pl-6 md:pl-8 pr-6 md:pr-8 py-4 md:py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
                   />
                 )}
 
@@ -461,17 +510,17 @@ export default function ChatInboxClient({
                 )}
 
                 {(!isRecording && (chatMessage.trim() || audioUrl)) && (
-                   <button 
+                  <button 
                     onClick={audioUrl ? handleSendAudio : handleSendMessage}
                     disabled={isSendingMessage || isUploadingMedia}
-                    className="w-[60px] h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
+                    className="w-12 h-12 md:w-[60px] md:h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                   >
-                    {isSendingMessage || isUploadingMedia ? <Clock className="w-6 h-6 animate-spin" /> : <Send className="w-6 h-6 ml-1" />}
+                    {isSendingMessage || isUploadingMedia ? <Clock className="w-5 h-5 md:w-6 md:h-6 animate-spin" /> : <Send className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />}
                   </button>
                 )}
                 
               </div>
-              <p className="text-[9px] font-black text-slate-300 text-center mt-6 uppercase tracking-widest opacity-50">Pulse Enter para enviar texto • Conectado a la API Oficial</p>
+              <p className="text-[9px] font-black text-slate-300 text-center mt-3 md:mt-6 uppercase tracking-widest opacity-50 hidden sm:block">Pulse Enter para enviar texto • Conectado a la API Oficial</p>
             </div>
           </>
         ) : (

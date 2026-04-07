@@ -92,7 +92,9 @@ Historial de interacción por WhatsApp / WABA / Evolution API.
 * **`direction`**: `TEXT` (`inbound` / `outbound`)
 * **`media_url`**: `TEXT` (Enlace al archivo de audio/multimedia en Storage)
 * **`media_type`**: `TEXT` (Tipo MIME, ej. `audio/ogg`, `image/jpeg`)
+* **`is_read`**: `BOOLEAN` (Default: `FALSE`, indica si el mensaje fue visto por un agente)
 * **`created_at`**: `TIMESTAMPTZ` (Fecha de envío/recepción)
+
 
 ### **Perfiles de Staff (`profiles`)**
 Información extendida de los usuarios del sistema.
