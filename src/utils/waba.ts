@@ -88,6 +88,50 @@ export async function sendTemplateMessage(
 }
 
 /**
+ * Send a simple text message via WABA (requires an open 24h window)
+ */
+export async function sendWABATextMessage(recipient: string, message: string) {
+  if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
+    console.error('WABA credentials missing');
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `${BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: recipient.includes(':') || /[a-zA-Z]/.test(recipient) 
+            ? recipient 
+            : recipient.replace(/\D/g, ''),
+          type: 'text',
+          text: {
+            preview_url: false,
+            body: message
+          }
+        }),
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+       console.error('Error from WABA text message:', data);
+    }
+    return response.ok;
+  } catch (error) {
+    console.error('Error sending WABA text message:', error);
+    return false;
+  }
+}
+
+/**
  * Create a new message template
  */
 export async function createTemplate(templateData: {

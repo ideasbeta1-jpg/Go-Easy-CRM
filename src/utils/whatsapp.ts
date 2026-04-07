@@ -1,4 +1,4 @@
-import { sendTemplateMessage } from './waba'
+import { sendTemplateMessage, sendWABATextMessage } from './waba'
 
 export async function sendWhatsAppMessage(recipient: string, message: string, templateData?: { name: string, language?: string, components?: any[] }) {
   const evolutionUrl = process.env.WHATSAPP_EVOLUTION_URL
@@ -9,6 +9,12 @@ export async function sendWhatsAppMessage(recipient: string, message: string, te
     return await sendTemplateMessage(recipient, templateData.name, templateData.language || 'es', templateData.components || [])
   }
 
+  // If they want to use WABA for all text messages:
+  if (process.env.WABA_ID) {
+    return await sendWABATextMessage(recipient, message)
+  }
+
+  // Fallback to Evolution API (if WABA not fully set up)
   if (!evolutionUrl || !apiKey || !instance) {
     console.error('WhatsApp configuration missing')
     return false

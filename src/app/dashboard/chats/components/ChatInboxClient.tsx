@@ -23,11 +23,13 @@ import { createClient } from '@/utils/supabase/client'
 export default function ChatInboxClient({ 
   initialLeads, 
   initialMessages, 
-  currentUserId 
+  currentUserId,
+  isAdmin = false
 }: { 
   initialLeads: any[], 
   initialMessages: any[], 
-  currentUserId: string 
+  currentUserId: string,
+  isAdmin?: boolean
 }) {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState('')
@@ -84,8 +86,13 @@ export default function ChatInboxClient({
       }
     }).filter(lead => {
         const matchesSearch = (lead.first_name + ' ' + lead.last_name + ' ' + lead.phone).toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesFilter = filterType === 'all' || lead.assigned_to === currentUserId
-        return matchesSearch && (matchesFilter || lead.isPending) // Always show pending if they belong to you or everyone
+        if (!matchesSearch) return false
+        
+        // Admins or 'Todos' tab: show ALL leads
+        if (isAdmin || filterType === 'all') return true
+        
+        // 'Mis Chats' for agents: show only leads assigned to the current user
+        return lead.assigned_to === currentUserId
     }).sort((a, b) => {
         // Sort by last message date, then by creation date
         const dateA = a.lastMessage?.created_at || a.created_at
