@@ -1,10 +1,10 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    console.log('--- WhatsApp Webhook received ---', body.event)
+    console.log('--- WhatsApp Webhook received ---', JSON.stringify(body, null, 2))
 
     // --- HANDLE EVOLUTION API ---
     if (body.event === 'messages.upsert' && body.data) {
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
 }
 
 async function processInboundMessage(phoneNumber: string, content: string, pushName: string) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // 1. Try to find an existing lead
   // We check for exact match (best for BSUIDs) or last 10 digits (for flexible phone matching)
