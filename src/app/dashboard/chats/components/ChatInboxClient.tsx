@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale'
 import { sendManualWhatsApp } from '@/app/utils/actions/whatsapp'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { createClient } from '@/utils/supabase/client'
 
 export default function ChatInboxClient({ 
   initialLeads, 
@@ -35,9 +36,38 @@ export default function ChatInboxClient({
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
   
-  // Real-time (Simplified for now - we'll refresh on message send)
+  // Real-time
   const [leads, setLeads] = useState(initialLeads)
   const [messages, setMessages] = useState(initialMessages)
+
+  useEffect(() => {
+    const supabase = createClient()
+    
+    // Subscribe to Leads (to show new chats)
+    const leadsChannel = supabase
+      .channel('leads-all')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setLeads(prev => [payload.new, ...prev])
+        } else if (payload.eventType === 'UPDATE') {
+          setLeads(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l))
+        }
+      })
+      .subscribe()
+
+    // Subscribe to Messages (to update conversation history/sidebar preview)
+    const messagesChannel = supabase
+      .channel('messages-all')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        setMessages(prev => [payload.new, ...prev])
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(leadsChannel)
+      supabase.removeChannel(messagesChannel)
+    }
+  }, [])
 
   // Memoize lead data for the list (with unread/pending info)
   const processedLeads = useMemo(() => {
