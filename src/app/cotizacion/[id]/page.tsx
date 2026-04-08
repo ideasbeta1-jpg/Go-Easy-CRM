@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { notFound } from 'next/navigation'
 import { 
   Car, 
@@ -19,10 +19,12 @@ export default async function QuoteLandingPage({
   params,
   searchParams
 }: {
-  params: { id: string },
-  searchParams: { session_id?: string }
+  params: Promise<{ id: string }>,
+  searchParams: Promise<{ session_id?: string }>
 }) {
-  const supabase = await createClient()
+  const { id } = await params
+  const { session_id } = await searchParams
+  const supabase = createAdminClient()
   
   // Fetch quote and associated lead
   const { data: quote, error } = await supabase
@@ -34,7 +36,7 @@ export default async function QuoteLandingPage({
         category:categories(*)
       )
     `)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !quote) {
@@ -44,7 +46,7 @@ export default async function QuoteLandingPage({
   const { lead } = quote
   const category = lead.category
 
-  const isPaid = searchParams.session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
+  const isPaid = session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
 
   // Mock days calculation (simplified)
   const pickup = new Date(lead.pickup_date)
