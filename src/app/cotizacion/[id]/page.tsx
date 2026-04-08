@@ -12,7 +12,9 @@ import {
   Clock, 
   ArrowRight,
   Sparkles,
-  Zap
+  Zap,
+  Shield,
+  LayoutGrid
 } from 'lucide-react'
 
 export default async function QuoteLandingPage({
@@ -41,13 +43,17 @@ export default async function QuoteLandingPage({
 
   if (error || !quote) {
      return (
-       <div className="p-10 bg-red-50 text-red-900 font-mono">
-         <h1 className="text-2xl font-bold mb-4">Error loading quote</h1>
-         <p>ID: {id}</p>
-         <pre className="mt-4 p-4 bg-red-100 rounded">
-           {JSON.stringify(error, null, 2)}
-         </pre>
-         {!quote && <p className="mt-4">No quote found for this ID.</p>}
+       <div className="min-h-screen py-20 px-6 bg-slate-50 flex items-center justify-center">
+         <div className="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 text-center space-y-6">
+            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto">
+               <Shield className="w-10 h-10" />
+            </div>
+            <h1 className="text-2xl font-black text-slate-900 leading-none tracking-tight">Error al cargar cotización</h1>
+            <p className="text-slate-500 font-medium">No hemos podido encontrar los detalles de tu cotización en este momento.</p>
+            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 p-3 rounded-xl overflow-auto">
+               ID: {id}
+            </div>
+         </div>
        </div>
      )
   }
@@ -71,123 +77,144 @@ export default async function QuoteLandingPage({
   const isPremium = lead.rate_plan === 'premium'
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-20">
+    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-20">
        
        {/* High-Impact Header */}
-       <header className="relative py-32 px-6 overflow-hidden bg-slate-950 text-white rounded-b-[4rem] shadow-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,#4338ca,transparent)] opacity-40 animate-pulse transition-all duration-1000" />
-          <div className="absolute bottom-10 left-10 w-64 h-64 bg-indigo-500/10 blur-[100px] rounded-full" />
+       <header className="relative py-28 md:py-40 px-6 overflow-hidden bg-slate-950 text-white rounded-b-[5rem] md:rounded-b-[7rem] shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
+          {/* Animated Background Elements */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)] transition-all duration-1000" />
+          <div className="absolute top-0 left-0 w-full h-full bg-grid-white/[0.02] [mask-image:radial-gradient(ellipse_at_center,white,transparent)]" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 blur-[150px] rounded-full" />
           
           {/* Success Banner if paid */}
           {isPaid && (
-            <div className="max-w-4xl mx-auto mb-16 p-10 bg-emerald-600 rounded-[3.5rem] text-white space-y-4 animate-in zoom-in-95 duration-700 shadow-[0_30px_60px_rgba(16,185,129,0.4)] border-4 border-emerald-400/30 relative z-30">
-               <div className="flex items-center justify-center gap-6">
-                  <div className="w-20 h-20 bg-white rounded-[2rem] flex items-center justify-center text-emerald-600 shadow-xl">
-                     <CheckCircle2 className="w-10 h-10" />
+            <div className="max-w-4xl mx-auto mb-16 p-8 md:p-10 bg-emerald-500/10 backdrop-blur-xl rounded-[3.5rem] border border-emerald-500/20 text-white animate-in zoom-in-95 duration-700 shadow-2xl relative z-30">
+               <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-center md:text-left">
+                  <div className="w-16 h-16 bg-emerald-500 rounded-[1.5rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                     <CheckCircle2 className="w-8 h-8" />
                   </div>
-                  <div className="text-left">
-                     <h2 className="text-4xl font-black tracking-tight leading-none italic uppercase">¡Reserva Asegurada! 🌴</h2>
-                     <p className="text-emerald-50 font-medium text-lg opacity-90">Tu pago ha sido procesado con éxito. Un agente te contactará en breve.</p>
+                  <div className="space-y-1">
+                     <h2 className="text-3xl font-black tracking-tight leading-none uppercase italic">¡Reserva Asegurada! 🌴</h2>
+                     <p className="text-emerald-100/70 font-medium">Tu pago ha sido procesado con éxito. Un agente te contactará pronto.</p>
                   </div>
                </div>
             </div>
           )}
 
-          <div className="max-w-4xl mx-auto text-center relative z-10 space-y-8">
-             <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-sm font-black uppercase tracking-[0.3em] mb-4">
+          <div className="max-w-5xl mx-auto text-center relative z-10 space-y-10">
+             <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <Sparkles className="w-4 h-4" /> Oferta Personalizada Florida
              </div>
-             <h1 className="text-6xl md:text-8xl font-black tracking-tighter italic leading-none">
-                Tu Reserva está <span className="text-indigo-500 underline decoration-indigo-300">Lista</span>
+             <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-none animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
+                Tu Reserva <br/>está <span className="text-indigo-400 italic">Lista</span>
              </h1>
-             <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-2xl mx-auto">
-                Hola <span className="text-white font-black">{lead.first_name}</span>! Hemos bloqueado esta oferta para ti. Confirma tu reserva con el pago del depósito.
+             <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
+                Hola <span className="text-white font-black">{lead.first_name}</span>! Hemos bloqueado esta oferta exclusiva para ti.
              </p>
           </div>
        </header>
 
        {/* Detailed Quote Breakdown */}
-       <main className="max-w-6xl mx-auto px-6 -mt-16 relative z-20">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+       <main className="max-w-6xl mx-auto px-6 -mt-16 md:-mt-24 relative z-20">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
              
              {/* Left Column: Vehicle & Features */}
-             <div className="lg:col-span-2 space-y-12">
+             <div className="lg:col-span-2 space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
                 
                 {/* Vehicle Showcase Card */}
-                <div className="bg-white border border-slate-100 shadow-2xl rounded-[3.5rem] p-12 overflow-hidden relative group">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
+                <div className="bg-white border border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.04)] rounded-[4rem] p-8 md:p-14 overflow-hidden relative group">
+                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full -mr-20 -mt-20" />
                    
-                   <div className="flex flex-col md:flex-row items-center gap-12">
-                      <div className="w-full md:w-1/2 aspect-video bg-slate-50 rounded-[2.5rem] overflow-hidden border border-slate-100 shadow-inner group-hover:scale-105 transition-transform duration-700">
-                         <img 
-                           src={category.image_url} 
-                           className="w-full h-full object-cover" 
-                           alt={category.name}
-                         />
-                      </div>
-                      <div className="w-full md:w-1/2 space-y-4">
-                         <div className="inline-block px-4 py-1.5 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-widest rounded-full">
-                            Categoría Seleccionada
+                   <div className="flex flex-col xl:flex-row items-start gap-12 md:gap-16">
+                      <div className="w-full xl:w-1/2 relative">
+                         {/* Removed clunky gray container, using cleaner presentation */}
+                         <div className="relative z-10 group-hover:scale-110 transition-transform duration-1000 ease-out">
+                            <img 
+                              src={category.image_url} 
+                              className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]" 
+                              alt={category.name}
+                            />
                          </div>
-                         <h2 className="text-5xl font-black text-slate-900 tracking-tighter leading-none italic">{category.name}</h2>
-                         <p className="text-slate-500 font-medium text-lg leading-relaxed">
+                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-4 bg-black/10 blur-2xl rounded-full" />
+                      </div>
+
+                      <div className="w-full xl:w-1/2 space-y-6">
+                         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50/50 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-xl border border-indigo-100/50">
+                            <Car className="w-3 h-3" /> Categoría Seleccionada
+                         </div>
+                         <h2 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tighter leading-none italic">{category.name}</h2>
+                         <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-md">
                             {category.description}
                          </p>
-                         <div className="flex flex-wrap gap-3 pt-4">
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
                             {(isPremium 
-                              ? ['Millas Ilimitadas (Cualquier Estado)', 'Full Cover $0 Deducible', 'SunPass Prepago', 'Conductor Adicional (+25)', 'Asistencia 24/7 VIP'] 
-                              : ['Millas Ilimitadas (Sólo Florida)', 'Seguro CDW (Básico)', 'Asistencia 24/7', 'Conductor Adicional (+25)']
+                              ? ['Millas Ilimitadas (USA)', 'Full Cover $0 Deducible', 'SunPass Prepago', 'Conductor Adicional', 'Asistencia 24/7 VIP'] 
+                              : ['Millas Sólo Florida', 'Seguro CDW (Básico)', 'Asistencia 24/7', 'Conductor Adicional']
                             ).map(item => (
-                               <span key={item} className={`px-4 py-2 bg-slate-50 font-black text-[10px] uppercase tracking-widest rounded-2xl flex items-center gap-2 ${isPremium ? 'text-indigo-600' : 'text-slate-500'}`}>
-                                  {isPremium ? <Sparkles className="w-4 h-4 text-indigo-500" /> : <ShieldCheck className="w-4 h-4 text-emerald-500" />} {item}
-                               </span>
+                               <div key={item} className="flex items-center gap-3 px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl group/item hover:bg-white hover:shadow-sm transition-all duration-300">
+                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                     {isPremium ? <Sparkles className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{item}</span>
+                               </div>
                             ))}
                          </div>
                       </div>
                    </div>
 
-                   <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 pt-12 border-t border-slate-50">
+                   <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pt-12 border-t border-slate-50">
                       {[ 
-                        { label: 'Pick-up', val: lead.pickup_location, icon: MapPin },
-                        { label: 'Return', val: lead.return_location, icon: MapPin },
-                        { label: 'Duración', val: `${diffDays} días`, icon: Calendar },
-                        { label: 'Asistencia', val: isPremium ? '24/7 VIP' : '24/7 Estándar', icon: Star }
+                        { label: 'Entrega', val: lead.pickup_location, icon: MapPin, color: 'text-blue-500' },
+                        { label: 'Devolución', val: lead.return_location, icon: MapPin, color: 'text-indigo-500' },
+                        { label: 'Duración', val: `${diffDays} días`, icon: Calendar, color: 'text-emerald-500' },
+                        { label: 'Protección', val: isPremium ? 'Premium VIP' : 'Estándar', icon: ShieldCheck, color: 'text-amber-500' }
                        ].map(item => (
-                         <div key={item.label} className="space-y-1">
-                            <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-[0.2em] flex items-center gap-1">
-                               <item.icon className="w-3 h-3" /> {item.label}
+                         <div key={item.label} className="space-y-2 group/info">
+                            <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                               <item.icon className={`w-3.5 h-3.5 ${item.color}`} /> {item.label}
                             </span>
-                            <p className="font-black text-slate-800 tracking-tight leading-tight">{item.val}</p>
+                            <p className="font-extrabold text-slate-900 tracking-tight leading-tight md:text-lg group-hover:text-indigo-600 transition-colors">{item.val}</p>
                          </div>
                        ))}
                    </div>
                 </div>
 
                 {/* Benefits / Assurance */}
-                <div className="flex flex-col gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
                    {isPremium ? (
-                      <div className="bg-indigo-900 rounded-[3rem] p-10 text-white flex flex-col justify-between group overflow-hidden relative shadow-[0_20px_40px_rgba(49,46,129,0.2)] border border-indigo-800">
-                         <Zap className="absolute top-8 right-8 w-24 h-24 text-indigo-500/20 group-hover:scale-125 transition-transform duration-700" />
-                         <div className="space-y-4 relative z-10">
-                            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-indigo-300 backdrop-blur-md">
-                               <Sparkles className="w-7 h-7" />
+                      <div className="bg-indigo-600 rounded-[3.5rem] p-10 md:p-14 text-white group overflow-hidden relative shadow-[0_30px_60px_rgba(79,70,229,0.25)] border border-white/10">
+                         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] rounded-full -mr-40 -mt-40" />
+                         <Zap className="absolute top-12 right-12 w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-1000" />
+                         
+                         <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
+                            <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-[2rem] flex items-center justify-center text-white border border-white/20 shrink-0">
+                               <Sparkles className="w-10 h-10" />
                             </div>
-                            <h3 className="text-3xl font-black tracking-tight leading-none italic">Premium Full Cover 👑</h3>
-                            <p className="text-indigo-200 font-medium italic">Cobertura total sin deducible. Incluye SunPass prepago, millas en cualquier estado de USA y conductor adicional (+25).</p>
-                         </div>
-                         <div className="mt-8 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-300">
-                            <CheckCircle2 className="w-4 h-4" /> 100% Sin Costos Ocultos
+                            <div className="space-y-4 text-center md:text-left">
+                               <h3 className="text-4xl font-black tracking-tight leading-none italic uppercase">Premium Full Cover 👑</h3>
+                               <p className="text-indigo-100 text-lg font-medium leading-relaxed max-w-2xl opacity-90">
+                                  Viaja con absoluta tranquilidad. Cobertura total sin deducible, SunPass prepago incluido y libertad total de movimiento en cualquier estado de USA.
+                               </p>
+                               <div className="flex items-center justify-center md:justify-start gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">
+                                  <CheckCircle2 className="w-4 h-4 text-white" /> 100% Sin Costos Ocultos en el Counter
+                               </div>
+                            </div>
                          </div>
                       </div>
                    ) : (
-                      <div className="bg-emerald-600 rounded-[3rem] p-10 text-white flex flex-col justify-between group overflow-hidden relative shadow-sm">
-                         <ShieldCheck className="absolute top-8 right-8 w-24 h-24 text-white/10 group-hover:scale-125 transition-transform duration-700" />
-                         <div className="space-y-4 relative z-10">
-                            <div className="w-12 h-12 bg-white/10 rounded-2xl flex items-center justify-center text-white backdrop-blur-md">
-                               <ShieldCheck className="w-7 h-7" />
+                      <div className="bg-white border border-slate-100 rounded-[3.5rem] p-10 md:p-14 text-slate-900 group overflow-hidden relative shadow-sm">
+                         <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
+                            <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center text-emerald-500 border border-emerald-100 shrink-0 shadow-sm">
+                               <ShieldCheck className="w-10 h-10" />
                             </div>
-                            <h3 className="text-3xl font-black tracking-tight leading-none italic">Protección Estándar</h3>
-                            <p className="text-emerald-100 font-medium italic">Cobertura CDW (daños). Millas limitadas a Florida, incluye asistencia 24/7 y conductor adicional (+25).</p>
+                            <div className="space-y-3 text-center md:text-left">
+                               <h3 className="text-3xl font-black tracking-tight leading-none italic uppercase">Protección Estándar</h3>
+                               <p className="text-slate-500 font-medium leading-relaxed max-w-2xl">
+                                  Incluye cobertura CDW (daños). Millas limitadas a Florida, asistencia 24/7 y conductor adicional (+25). Ideal para recorridos locales.
+                               </p>
+                            </div>
                          </div>
                       </div>
                    )}
@@ -195,69 +222,80 @@ export default async function QuoteLandingPage({
              </div>
 
              {/* Right Column: Pricing & Payment */}
-             <div className="space-y-8">
-                <div className="bg-white border border-slate-100 shadow-2xl rounded-[3.5rem] p-10 sticky top-12 space-y-10">
-                   <div className="space-y-2">
-                      <h3 className="text-2xl font-black tracking-tighter uppercase italic">Desglose de Pago</h3>
-                      <div className="h-1 w-12 bg-indigo-600 rounded-full" />
+             <div className="animate-in fade-in slide-in-from-right-10 duration-1000 delay-500">
+                <div className="bg-white border border-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.06)] rounded-[4.5rem] p-10 md:p-12 sticky top-12 space-y-10 group overflow-hidden">
+                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
+                   
+                   <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                         <div className="w-1 h-6 bg-indigo-600 rounded-full" />
+                         <h3 className="text-2xl font-black tracking-tight uppercase italic">Resumen</h3>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-4">Detalles de Facturación</p>
                    </div>
 
-                   <div className="space-y-6">
-                      <div className="flex justify-between items-center text-sm font-bold text-slate-500 italic">
-                         <span>Renta Estándar ({diffDays} días)</span>
-                         <span className="text-slate-900">${subtotal.toFixed(2)}</span>
+                   <div className="space-y-6 pl-4">
+                      <div className="flex justify-between items-center group/price">
+                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Renta ({diffDays} días)</span>
+                         <span className="text-lg font-black text-slate-900 tracking-tight">${subtotal.toFixed(2)}</span>
                       </div>
-                      <div className="flex justify-between items-center text-sm font-bold text-slate-500 italic">
-                         <span>Taxes & Service Fees (15%)</span>
-                         <span className="text-slate-900">${taxes.toFixed(2)}</span>
+                      <div className="flex justify-between items-center group/price">
+                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Taxes & Fees (15%)</span>
+                         <span className="text-lg font-black text-slate-900 tracking-tight">${taxes.toFixed(2)}</span>
                       </div>
-                      <div className="pt-6 border-t border-slate-100 flex justify-between items-end">
-                         <div className="space-y-1">
-                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Total Reservación</span>
-                            <div className="text-4xl font-black text-slate-900 tracking-tighter">${grandTotal.toFixed(2)}</div>
+                      
+                      <div className="pt-10 mt-6 border-t border-slate-100">
+                         <div className="flex justify-between items-end mb-2">
+                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Total Final</span>
+                            <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-black uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-full animate-bounce">
+                               <Tag className="w-3 h-3" /> Best Price
+                            </div>
                          </div>
-                         <div className="text-right">
-                             <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-bold uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg mb-1">
-                                <Tag className="w-3 h-3" /> Best Price
-                             </div>
-                         </div>
+                         <div className="text-6xl font-black text-slate-950 tracking-tighter leading-none">${grandTotal.toFixed(2)}</div>
                       </div>
                    </div>
 
-                   <div className="bg-slate-50 rounded-[2.5rem] p-8 space-y-6 border border-slate-100 text-center relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 blur-3xl rounded-full" />
-                      <div className="space-y-1">
-                         <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Pago Inicial Requerido (Booking Fee)</p>
-                         <p className="text-5xl font-black text-indigo-700 tracking-tighter">${deposit.toFixed(2)}</p>
+                   <div className="bg-slate-50 border border-slate-100 rounded-[3.5rem] p-10 space-y-8 text-center relative overflow-hidden group/pay shadow-inner">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-3xl rounded-full" />
+                      <div className="space-y-2 relative z-10">
+                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Pago Inicial Requerido (Depósito)</p>
+                         <div className="inline-flex items-baseline gap-1">
+                            <span className="text-6xl font-black text-indigo-700 tracking-tighter">${deposit.toFixed(2)}</span>
+                         </div>
+                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest pt-2">Saldo a pagar en counter</p>
                       </div>
-                      <p className="text-xs text-slate-500 font-medium px-4">El resto de la tarifa se abona directamente al recibir el vehículo en Florida.</p>
                       
                       {isPaid ? (
-                        <div className="w-full bg-emerald-50 text-emerald-700 font-bold py-5 rounded-3xl border border-emerald-100 flex items-center justify-center gap-3">
-                           <CheckCircle2 className="w-5 h-5" /> Reserva Confirmada
+                        <div className="w-full bg-emerald-500 text-white font-black py-6 rounded-[2rem] shadow-[0_20px_40px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 animate-in fade-in zoom-in-95">
+                           <CheckCircle2 className="w-6 h-6 animate-pulse" /> RESERVA PAGADA
                         </div>
                       ) : (
-                        <a 
-                          href={quote.stripe_link || '#'} 
-                          className="w-full bg-slate-900 text-white font-black text-lg py-5 rounded-3xl hover:bg-slate-800 hover:scale-105 active:scale-95 transition-all shadow-xl shadow-slate-900/20 flex items-center justify-center gap-3 group"
-                        >
-                           Confirmar & Pagar
-                           <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform text-indigo-400" />
-                        </a>
+                        <div className="space-y-4 relative z-10">
+                           <a 
+                             href={quote.stripe_link || '#'} 
+                             className="w-full bg-indigo-600 text-white font-black text-xl py-6 rounded-[2.5rem] hover:bg-indigo-700 hover:shadow-[0_25px_50px_rgba(79,70,229,0.4)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 group/btn shadow-[0_20px_40px_rgba(79,70,229,0.2)] active:scale-95"
+                           >
+                              Confirmar Ahora
+                              <ArrowRight className="w-6 h-6 group-hover/btn:translate-x-3 transition-transform duration-500" />
+                           </a>
+                           <div className="flex items-center justify-center gap-2 opacity-30 group-hover/pay:opacity-60 transition-opacity">
+                              <CreditCard className="w-5 h-5" />
+                              <span className="text-[8px] font-black uppercase tracking-[0.3em]">Checkout Seguro · Stripe</span>
+                           </div>
+                        </div>
                       )}
-
-                      <div className="flex items-center justify-center gap-4 pt-2 opacity-40">
-                         <CreditCard className="w-6 h-6" />
-                         <span className="text-[10px] font-bold uppercase tracking-widest">Pago Seguro via Stripe</span>
-                      </div>
                    </div>
 
-                   <div className="flex items-center gap-4 text-slate-400 p-4 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200">
-                      <Clock className="w-5 h-5 text-indigo-400 shrink-0" />
-                      <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">
-                         Esta cotización vence el <br/>
-                         <span className="text-slate-600">{new Date(quote.expires_at || Date.now() + 86400000).toLocaleDateString()}</span>
-                      </p>
+                   <div className="flex items-center gap-5 p-6 bg-slate-50/50 rounded-[2rem] border border-dashed border-slate-200 group/vence">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm group-hover/vence:rotate-12 transition-transform duration-500">
+                         <Clock className="w-5 h-5 text-indigo-400" />
+                      </div>
+                      <div className="space-y-0.5">
+                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Esta oferta vence el</p>
+                         <p className="text-sm font-black text-slate-800 tracking-tight">
+                            {new Date(quote.expires_at || Date.now() + 86400000).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                         </p>
+                      </div>
                    </div>
                 </div>
              </div>
@@ -265,11 +303,19 @@ export default async function QuoteLandingPage({
        </main>
 
        {/* Floating Footer Decor */}
-       <footer className="mt-32 py-12 text-center space-y-4 border-t border-slate-100 max-w-4xl mx-auto">
-          <p className="text-sm font-black text-slate-300 uppercase tracking-[0.5em]">Go Easy Florida · Premium Car Rental · 2026</p>
-          <div className="flex items-center justify-center gap-12 text-slate-400 font-bold text-sm">
-             <a href="#" className="hover:text-indigo-600 transition-colors">Términos del Servicio</a>
-             <a href="#" className="hover:text-indigo-600 transition-colors">Política de Devolución</a>
+       <footer className="mt-40 py-16 text-center space-y-8 max-w-4xl mx-auto border-t border-slate-100">
+          <div className="flex items-center justify-center gap-4">
+             <div className="h-px w-12 bg-slate-200" />
+             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.6em]">Go Easy Florida · Premium Fleet</p>
+             <div className="h-px w-12 bg-slate-200" />
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 px-6 max-w-xl mx-auto leading-relaxed">
+             © 2026 Go Easy CRM. Todos los derechos reservados. Las imágenes son ilustrativas y pueden variar según disponibilidad técnica al momento de la entrega.
+          </p>
+          <div className="flex items-center justify-center gap-12 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
+             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Ayuda</a>
+             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Condiciones</a>
+             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Privacidad</a>
           </div>
        </footer>
     </div>

@@ -22,7 +22,7 @@ export async function createWABATemplateAction(formData: any) {
 }
 
 export async function getTemplateMappingsAction() {
-  const supabase = createClient();
+  const supabase = await createClient();
   try {
     const { data, error } = await supabase
       .from('whatsapp_template_mappings')
@@ -35,7 +35,7 @@ export async function getTemplateMappingsAction() {
 }
 
 export async function saveTemplateMappingAction(templateName: string, mappings: any, stage?: string, language?: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   try {
     const { data, error } = await supabase
       .from('whatsapp_template_mappings')
@@ -58,7 +58,7 @@ export async function saveTemplateMappingAction(templateName: string, mappings: 
 }
 
 export async function getTemplateMappingByNameAction(templateName: string) {
-  const supabase = createClient();
+  const supabase = await createClient();
   try {
     const { data, error } = await supabase
       .from('whatsapp_template_mappings')
