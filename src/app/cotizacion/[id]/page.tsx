@@ -40,7 +40,16 @@ export default async function QuoteLandingPage({
     .single()
 
   if (error || !quote) {
-     return notFound()
+     return (
+       <div className="p-10 bg-red-50 text-red-900 font-mono">
+         <h1 className="text-2xl font-bold mb-4">Error loading quote</h1>
+         <p>ID: {id}</p>
+         <pre className="mt-4 p-4 bg-red-100 rounded">
+           {JSON.stringify(error, null, 2)}
+         </pre>
+         {!quote && <p className="mt-4">No quote found for this ID.</p>}
+       </div>
+     )
   }
 
   const { lead } = quote
