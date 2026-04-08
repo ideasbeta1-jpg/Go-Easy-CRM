@@ -51,7 +51,7 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
   // Detect variables in template body
   const bodyComponent = template.components?.find(c => c.type === 'BODY');
   const bodyText = bodyComponent?.text || '';
-  const variables = Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g)).map(m => m[1]);
+  const variables = (Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g)) as RegExpMatchArray[]).map(m => m[1]);
   const uniqueVariables = Array.from(new Set(variables)).sort((a, b) => parseInt(a) - parseInt(b));
 
   useEffect(() => {
