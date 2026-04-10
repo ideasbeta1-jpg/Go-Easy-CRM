@@ -63,16 +63,19 @@ export default async function QuoteLandingPage({
 
   const isPaid = session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
 
-  // Mock days calculation (simplified)
+  // 1. Duración exacta en días
   const pickup = new Date(lead.pickup_date)
   const returnDate = new Date(lead.return_date)
   const diffDays = Math.max(1, Math.ceil((returnDate.getTime() - pickup.getTime()) / (1000 * 3600 * 24)))
   
-  // Taxes & Fees logic (mock)
-  const subtotal = lead.total_amount || (category.daily_price * diffDays)
-  const taxes = subtotal * 0.15 // 15% Taxes & Fees
-  const grandTotal = subtotal + taxes
-  const deposit = subtotal * 0.2 // 20% Deposit
+  // 2. Pricing Logic (Using negotiated values from DB)
+  // total_amount is the final price negotiated in the CRM
+  const grandTotal = Number(lead.total_amount || 0)
+  
+  // dailyMargin (agreed_daily_price) is the go easy profit, which is the deposit
+  const dailyMargin = lead.agreed_daily_price !== null ? Number(lead.agreed_daily_price) : Number(category.daily_price || 0)
+  const deposit = dailyMargin * diffDays
+  const balanceAtCounter = Math.max(0, grandTotal - deposit)
 
   const isPremium = lead.rate_plan === 'premium'
 
@@ -236,33 +239,33 @@ export default async function QuoteLandingPage({
 
                    <div className="space-y-6 pl-4">
                       <div className="flex justify-between items-center group/price">
-                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Renta ({diffDays} días)</span>
-                         <span className="text-lg font-black text-slate-900 tracking-tight">${subtotal.toFixed(2)}</span>
+                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Reserva ({diffDays} días)</span>
+                         <span className="text-lg font-black text-slate-900 tracking-tight">${grandTotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center group/price">
-                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Taxes & Fees (15%)</span>
-                         <span className="text-lg font-black text-slate-900 tracking-tight">${taxes.toFixed(2)}</span>
+                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Depósito de Garantía</span>
+                         <span className="text-lg font-black text-indigo-600 tracking-tight">-${deposit.toFixed(2)}</span>
                       </div>
                       
                       <div className="pt-10 mt-6 border-t border-slate-100">
                          <div className="flex justify-between items-end mb-2">
-                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Total Final</span>
+                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Saldo en Counter</span>
                             <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-black uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-full animate-bounce">
-                               <Tag className="w-3 h-3" /> Best Price
+                               <CreditCard className="w-3 h-3" /> Pay at Pickup
                             </div>
                          </div>
-                         <div className="text-6xl font-black text-slate-950 tracking-tighter leading-none">${grandTotal.toFixed(2)}</div>
+                         <div className="text-6xl font-black text-slate-950 tracking-tighter leading-none">${balanceAtCounter.toFixed(2)}</div>
                       </div>
                    </div>
 
                    <div className="bg-slate-50 border border-slate-100 rounded-[3.5rem] p-10 space-y-8 text-center relative overflow-hidden group/pay shadow-inner">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-3xl rounded-full" />
                       <div className="space-y-2 relative z-10">
-                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Pago Inicial Requerido (Depósito)</p>
+                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Reserva hoy con tan solo</p>
                          <div className="inline-flex items-baseline gap-1">
                             <span className="text-6xl font-black text-indigo-700 tracking-tighter">${deposit.toFixed(2)}</span>
                          </div>
-                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest pt-2">Saldo a pagar en counter</p>
+                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest pt-2">Asegura tu tarifa y disponibilidad</p>
                       </div>
                       
                       {isPaid ? (

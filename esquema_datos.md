@@ -59,8 +59,8 @@ Centraliza toda la información del cliente y el ciclo de vida de la reserva.
 | `assigned_to` | UUID (FK) | Relación con `auth.users` |
 | `provider_id` | UUID (FK) | Proveedor asignado al confirmar |
 | `rate_plan` | TEXT | Tarifa seleccionada ('base' o 'premium') |
-| `agreed_daily_price` | DECIMAL | Tarifa por día negociada/fija para este lead |
-| `total_amount` | DECIMAL | Monto total de la renta |
+| `agreed_daily_price` | DECIMAL | Ganancia Go Easy acordada ($/día). Base para el depósito. |
+| `total_amount` | DECIMAL | Monto total final (Costo Prov + Ganancia * días). |
 | `deposit_paid` | BOOLEAN | Indica si el depósito fue abonado |
 | `stripe_payment_id`| TEXT | ID de transacción de Stripe |
 | `notes` | TEXT | Notas internas (solo agentes) |
@@ -125,6 +125,31 @@ Información extendida de los usuarios del sistema.
 
 ### **`vehicles`**
 * **Uso**: Imágenes de la flota por categorías.
+
+---
+
+## 6. Lógica de Cálculo y Negociación (Sistema de Triple Control)
+
+El CRM implementa un sistema de cálculo dinámico y bidireccional que permite a los agentes negociar tarifas de forma flexible.
+
+### **Fórmulas Base**
+*   **Total Diario** = `Costo Vehículo (Base)` + `Ganancia Go Easy (Margen)`
+*   **Total Reserva** = `Total Diario` × `Días de Renta`
+*   **Depósito (Stripe)** = `Ganancia Go Easy` × `Días de Renta`
+
+### **Comportamiento en la Interfaz (Lead Detail)**
+Cuando el asesor entra en modo edición, el sistema ofrece tres campos interconectados:
+1.  **Costo Vehículo**: Editable para reflejar acuerdos con proveedores. Al cambiarlo, el **Total Diario** se actualiza manteniendo la **Ganancia** fija.
+2.  **Ganancia Go Easy**: Editable para ajustar la rentabilidad. Al cambiarlo, el **Total Diario** se actualiza manteniendo el **Costo** fijo.
+3.  **Total Diario**: Editable para igualar precios de la competencia. Al cambiarlo, el **Costo Vehículo** se recalcula manteniendo la **Ganancia** fija (comportamiento por defecto para "price matching").
+
+### **Persistencia y Escalado**
+*   **Tarifa locked-in**: Una vez que se guarda un total personalizado, el sistema calcula un rate diario implícito.
+*   **Cambio de Fechas**: Si el asesor cambia las fechas de la reserva, el sistema mantiene el valor diario negociado en lugar de volver a los de la categoría por defecto.
+*   **Cobro de Depósito**: `generateQuoteForLead` prioriza `agreed_daily_price` para determinar el depósito en Stripe, asegurando que la ganancia pactada se capture correctamente.
+*   **Restablecer**: Un botón permite volver a los valores predeterminados de la tabla `categories`.
+
+---
 
 ---
 
