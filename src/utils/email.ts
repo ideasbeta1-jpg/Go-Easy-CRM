@@ -24,7 +24,7 @@ export async function sendEmail({ to, subject, html }: SendEmailParams) {
 
   try {
     const { data, error } = await getResend().emails.send({
-      from: process.env.EMAIL_FROM || 'Go Easy Florida <reservas@goeasyflorida.com>',
+      from: process.env.EMAIL_FROM || 'Goeasy Florida <reservas@goeasyflorida.com>',
       to: [to],
       subject,
       html,
