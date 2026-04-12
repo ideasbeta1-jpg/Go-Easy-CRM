@@ -1,4 +1,5 @@
 import { createAdminClient } from './supabase/admin'
+import { broadcastNotification } from '@/app/utils/actions/notifications'
 
 /**
  * Lógica centralizada de asignación de leads (Round Robin)
@@ -57,6 +58,32 @@ export async function assignLeadToAgent(leadId: string) {
       .eq('id', agent.id)
 
     console.log(`[Assignment] Lead ${leadId} asignado exitosamente a ${agent.full_name}`)
+
+    // Create in-app notification for the assigned agent
+    try {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('first_name, last_name')
+        .eq('id', leadId)
+        .single()
+
+      if (lead) {
+        const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim()
+        await broadcastNotification(
+          {
+            type: 'lead_assigned',
+            title: '👤 ¡Nuevo Lead Asignado!',
+            body: `Se te ha asignado el lead: ${leadName}`,
+            link: `/dashboard/leads/${leadId}`,
+            lead_id: leadId,
+          },
+          agent.id
+        )
+      }
+    } catch (notifErr) {
+      console.error('[Assignment] Error creating notification:', notifErr)
+    }
+
     return agent
 
   } catch (error) {

@@ -3,7 +3,10 @@
 Este documento describe el funcionamiento del motor de automatización interno diseñado para gestionar la comunicación con los clientes de Go Easy Florida de forma automática según el estado del lead en el embudo de ventas.
 
 ## 🚀 Filosofía del Sistema
-Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-engine.ts`)** para mayor velocidad, confiabilidad y control. Cada vez que un lead cambia de etapa, el sistema dispara automáticamente mensajes personalizados a través de **WhatsApp Business API** y **Resend (Email)**.
+Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-engine.ts`)** para mayor velocidad, confiabilidad y control. Cada vez que un lead cambia de etapa, el sistema dispara automáticamente:
+1.  **WhatsApp Business API**: Mensajes directos al cliente.
+2.  **Resend (Email)**: Confirmaciones formales.
+3.  **Sistema de Notificaciones In-App**: Alertas persistentes en la "campanita" del CRM para que el vendedor nunca pierda un evento crítico (nuevos mensajes, pagos, asignaciones).
 
 ---
 
@@ -91,6 +94,7 @@ Cada paso crítico del proceso alimenta la **Línea de Tiempo** del lead:
 - **Cotización Generada**: Incluye botón directo **"Ver Propuesta"**.
 - **Alerta de Mismatch**: Aparece si hay cambios en precio/fechas sin regenerar.
 - **Depósito Recibido**: Confirmación automática vía Stripe.
+- **Notificaciones In-App**: Registro persistente de cada evento para consulta rápida desde el header.
 
 > [!TIP]
 > Si una automatización falla, el sistema todavía realiza un "fallback" enviando la notificación a **n8n** como respaldo de seguridad.

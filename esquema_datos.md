@@ -113,6 +113,18 @@ Información extendida de los usuarios del sistema.
 * **`bio`**: `TEXT` (Biografía o notas)
 * **`avatar_url`**: `TEXT` (URL de la imagen de perfil en Storage)
 
+### **Notificaciones (`notifications`)**
+Centraliza las alertas internas para los usuarios del CRM.
+* **`id`**: `UUID` (PK)
+* **`user_id`**: `UUID` (FK -> `auth.users`)
+* **`type`**: `TEXT` (Tipo de evento: `new_lead`, `payment_confirmed`, etc.)
+* **`title`**: `TEXT` (Título de la notificación)
+* **`body`**: `TEXT` (Cuerpo/adelanto de la información)
+* **`link`**: `TEXT` (URL de redirección interna)
+* **`lead_id`**: `UUID` (FK -> `leads`)
+* **`is_read`**: `BOOLEAN` (Default: `FALSE`)
+* **`created_at`**: `TIMESTAMPTZ` (Fecha de creación)
+
 ---
 
 ## 5. Almacenamiento (Storage Buckets)

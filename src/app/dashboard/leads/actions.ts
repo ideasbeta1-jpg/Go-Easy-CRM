@@ -21,10 +21,15 @@ export async function createLead(formData: FormData) {
     status: 'lead_nuevo'
   }
 
-  const { error } = await supabase.from('leads').insert(data)
+  const { data: newLead, error } = await supabase.from('leads').insert(data).select('id').single()
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  // Trigger automation (this will create the in-app notification)
+  if (newLead) {
+    await executeStageAutomation(newLead.id, 'lead_nuevo')
   }
 
   revalidatePath('/dashboard/leads')

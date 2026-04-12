@@ -2,6 +2,7 @@ import { createAdminClient } from './supabase/admin';
 import { sendTemplateMessage, sendWABATextMessage } from './waba';
 import { sendEmail, getStageEmailTemplate } from './email';
 import { sendLeadToN8n } from './n8n';
+import { broadcastNotification } from '@/app/utils/actions/notifications';
 
 /**
  * Motor central de automatización de Go Easy CRM
@@ -103,6 +104,50 @@ export async function executeStageAutomation(
       
       console.log(`[AutomationEngine] Notificando al vendedor ${lead.assigned_agent.first_name} (${lead.assigned_agent.phone})`);
       await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
+    }
+
+    // 7. In-App Notifications (persisted to DB for the bell icon)
+    const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim();
+    const stageNotifications: Record<string, { title: string; body: string; type: any }> = {
+      'lead_nuevo': {
+        type: 'new_lead',
+        title: '🟢 Nuevo Lead Registrado',
+        body: `${leadName} ha sido registrado en el sistema.`,
+      },
+      'en_cotizacion': {
+        type: 'quote_generated',
+        title: '📄 Cotización Generada',
+        body: `Se generó una cotización para ${leadName}.`,
+      },
+      'reserva_confirmada': {
+        type: 'payment_confirmed',
+        title: '💰 ¡Pago Confirmado!',
+        body: `${leadName} ha confirmado su reserva con un depósito.`,
+      },
+      'voucher_enviado': {
+        type: 'voucher_sent',
+        title: '📋 Voucher Enviado',
+        body: `El voucher de ${leadName} fue enviado.`,
+      },
+      'cerrado': {
+        type: 'lead_closed',
+        title: '✅ Lead Cerrado',
+        body: `El alquiler de ${leadName} ha finalizado.`,
+      },
+    };
+
+    const notifConfig = stageNotifications[stage];
+    if (notifConfig) {
+      await broadcastNotification(
+        {
+          type: notifConfig.type,
+          title: notifConfig.title,
+          body: notifConfig.body,
+          link: `/dashboard/leads/${leadId}`,
+          lead_id: leadId,
+        },
+        lead.assigned_to || null
+      );
     }
 
   } catch (error: any) {

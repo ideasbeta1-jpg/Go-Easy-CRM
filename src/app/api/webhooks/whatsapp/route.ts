@@ -2,6 +2,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { NextResponse } from 'next/server'
 import { assignLeadToAgent } from '@/utils/assignment'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { broadcastNotification } from '@/app/utils/actions/notifications'
 
 export async function POST(req: Request) {
   try {
@@ -128,7 +129,7 @@ async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: 
 
 async function storeMessage(leadId: string, content: string, mediaUrl?: string | null, mediaType?: string | null) {
   const supabase = createAdminClient()
-  return await supabase.from('messages').insert({
+  const result = await supabase.from('messages').insert({
     lead_id: leadId,
     content,
     direction: 'inbound',
@@ -136,6 +137,34 @@ async function storeMessage(leadId: string, content: string, mediaUrl?: string |
     media_type: mediaType,
     created_at: new Date().toISOString()
   })
+
+  // Broadcast in-app notification for new inbound message
+  try {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('first_name, last_name, assigned_to')
+      .eq('id', leadId)
+      .single()
+
+    if (lead) {
+      const senderName = `${lead.first_name} ${lead.last_name || ''}`.trim()
+      const preview = (content || 'Mensaje multimedia').substring(0, 60)
+      await broadcastNotification(
+        {
+          type: 'new_message',
+          title: `💬 Mensaje de ${senderName}`,
+          body: preview,
+          link: `/dashboard/chats?leadId=${leadId}`,
+          lead_id: leadId,
+        },
+        lead.assigned_to || null
+      )
+    }
+  } catch (notifErr) {
+    console.error('[storeMessage] Error broadcasting notification:', notifErr)
+  }
+
+  return result
 }
 
 // GET handler for Webhook verification (some providers like Meta require this)

@@ -1,10 +1,11 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Bell, HelpCircle, Radio, Power } from 'lucide-react'
+import { Radio } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getProfileStatus, updateProfileStatus } from '@/app/utils/actions/profiles'
 import { toast } from 'sonner'
+import { NotificationBell } from './NotificationBell'
 
 export function DashboardHeader({ userEmail }: { userEmail?: string }) {
   const pathname = usePathname();
@@ -67,8 +68,10 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
 
             <div className="h-6 w-[1px] bg-slate-100 mx-2"></div>
             
-            <button className="material-symbols-outlined p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-2xl transition-all">notifications</button>
-            <button className="material-symbols-outlined p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-2xl transition-all font-variation-fill">help</button>
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <button className="material-symbols-outlined p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-2xl transition-all font-variation-fill">help</button>
+            </div>
           </div>
           
           <div className="h-10 w-[1px] bg-slate-200 hidden md:block"></div>
