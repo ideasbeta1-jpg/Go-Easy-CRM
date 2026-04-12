@@ -1,4 +1,4 @@
-import { executeStageAutomation } from './src/utils/automation-engine';
+import { executeStageAutomation } from '../src/utils/automation-engine';
 
 async function test() {
   const leadId = '0877f133-85b1-479a-ae23-a81fe9338a34';
