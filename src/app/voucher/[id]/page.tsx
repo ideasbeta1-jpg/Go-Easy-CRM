@@ -23,10 +23,11 @@ import {
 import { VoucherActions } from './components/VoucherActions'
 
 export default async function VoucherPage({
-  params
+  params: paramsPromise
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await paramsPromise
   const supabase = createAdminClient()
   
   // Fetch voucher and associated lead
@@ -40,7 +41,7 @@ export default async function VoucherPage({
         provider:providers(*)
       )
     `)
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (error || !voucher) {
@@ -79,7 +80,7 @@ export default async function VoucherPage({
              </div>
           </div>
           
-          <VoucherActions voucherNumber={voucher.voucher_number} />
+          <VoucherActions voucherNumber={voucher.confirmation_number} />
        </div>
 
        {/* The Voucher Document */}
@@ -107,7 +108,7 @@ export default async function VoucherPage({
                 <div className="flex items-center gap-8 border-t border-white/10 pt-8">
                    <div className="space-y-1">
                       <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Número de Reserva</p>
-                      <p className="text-3xl font-black tracking-widest font-mono text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.3)]">{voucher.voucher_number}</p>
+                      <p className="text-3xl font-black tracking-widest font-mono text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.3)]">{voucher.confirmation_number}</p>
                    </div>
                    <div className="h-10 w-px bg-white/10" />
                    <div className="space-y-1">
@@ -236,9 +237,25 @@ export default async function VoucherPage({
                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Compañía Operadora</h4>
                        <div className="space-y-1">
                           <p className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{provider?.name || 'Local Partner Florida'}</p>
-                          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                             ID Confirmación: #{voucher.id.slice(-6).toUpperCase()}
-                          </div>
+                           <div className="flex flex-col gap-2">
+                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                                 ID Sistema: #{voucher.confirmation_number}
+                              </div>
+                              {voucher.provider_confirmation ? (
+                                <div className="inline-flex flex-col gap-1 p-4 bg-indigo-600 rounded-[1.5rem] shadow-xl shadow-indigo-600/20 border border-white/10 group-hover:scale-105 transition-transform">
+                                   <span className="text-[8px] font-black text-indigo-200 uppercase tracking-widest leading-none flex items-center gap-1.5">
+                                      <Hash className="w-3 h-3" /> Confirmación {provider?.name || 'Rentadora'}
+                                   </span>
+                                   <p className="text-xl font-mono font-black text-white tracking-widest uppercase leading-none">
+                                      {voucher.provider_confirmation}
+                                   </p>
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-100/50">
+                                   <Info className="w-3 h-3" /> Confirmación en proceso
+                                </div>
+                              )}
+                           </div>
                        </div>
                    </div>
 

@@ -27,14 +27,16 @@ import {
   Calculator,
   Mic,
   Square,
-  Volume2
+  Volume2,
+  Hash,
+  FileText
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { updateLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
-import { generateVoucherForLead } from '@/app/utils/actions/vouchers'
+import { generateVoucherForLead, updateProviderConfirmation } from '@/app/utils/actions/vouchers'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { uploadChatMedia } from '@/app/utils/actions/storage'
 
@@ -132,6 +134,11 @@ export default function LeadDetailClient({
   const [isPending, startTransition] = useTransition()
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [providerConfirmation, setProviderConfirmation] = useState(activeVoucher?.provider_confirmation || '')
+  const [isUpdatingConfirmation, setIsUpdatingConfirmation] = useState(false)
+  const [ctaProviderId, setCtaProviderId] = useState(lead.provider_id || '')
+  const [ctaProviderConfirmation, setCtaProviderConfirmation] = useState('')
+  const [ctaError, setCtaError] = useState<string | null>(null)
 
   // Audio Recording States
   const [isRecording, setIsRecording] = useState(false)
@@ -338,11 +345,11 @@ export default function LeadDetailClient({
   if (activeVoucher) {
      timelineEvents.push({
         id: 'voucher',
-        title: 'Voucher Emitido',
+        title: 'Voucher Enviado',
         date: activeVoucher.created_at,
-        icon: CheckCircle2,
-        color: 'bg-emerald-100 text-emerald-600',
-        desc: 'Reserva finalizada exitosamente'
+        icon: FileText,
+        color: 'bg-indigo-600 text-white shadow-lg shadow-indigo-200',
+        desc: `Voucher oficial generado (${activeVoucher.confirmation_number}) y enviado al cliente.`
      });
   }
   
@@ -1070,21 +1077,166 @@ export default function LeadDetailClient({
                         Genera el Voucher oficial inmediatamente para el cliente.
                      </p>
                   </div>
-                  <div className="flex flex-col sm:flex-row w-full sm:w-auto items-center justify-center gap-4 sm:gap-6">
-                       {activeVoucher ? (
-                          <Link href={`/voucher/${activeVoucher.id}`} target="_blank" className="bg-white text-primary px-10 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20">
-                             Ver Voucher
-                          </Link>
-                       ) : (
-                          <form action={async () => {
-                             await generateVoucherForLead(lead.id)
-                          }}>
-                             <button className="bg-white text-primary px-10 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20">
-                                Generar Voucher
-                             </button>
-                          </form>
-                       )}
-                  </div>
+                  <div className="flex flex-col w-full lg:w-auto gap-4">
+                        {activeVoucher ? (
+                           <div className="flex flex-col gap-4 items-center sm:items-end">
+                             <div className="flex flex-col gap-4 bg-white/5 p-6 rounded-[2rem] border border-white/10 w-full sm:min-w-[400px]">
+                                {/* Provider Selector for existing voucher */}
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
+                                     <Users className="w-3 h-3" /> Partner / Rentadora
+                                  </label>
+                                  <select 
+                                     value={formData.provider_id}
+                                     onChange={async (e) => {
+                                       const newPid = e.target.value;
+                                       setFormData({...formData, provider_id: newPid});
+                                       await updateLead(lead.id, { provider_id: newPid });
+                                     }}
+                                     className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-white/30"
+                                  >
+                                     <option value="" className="text-slate-900">Sin Proveedor</option>
+                                     {providers.map(p => (
+                                       <option key={p.id} value={p.id} className="text-slate-900">{p.name}</option>
+                                     ))}
+                                  </select>
+                                </div>
+
+                                {/* Confirmation Number */}
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
+                                     <Hash className="w-3 h-3" /> N° Confirmación Proveedor
+                                  </label>
+                                  <div className="flex gap-2">
+                                     <input 
+                                       type="text"
+                                       value={providerConfirmation}
+                                       onChange={(e) => setProviderConfirmation(e.target.value)}
+                                       placeholder="Ej: RC-20240412-001"
+                                       className="bg-white/10 border border-white/10 rounded-xl px-4 py-3 text-sm font-bold text-white placeholder:text-white/20 outline-none focus:border-white/30 flex-1"
+                                     />
+                                     <button 
+                                       onClick={async () => {
+                                         setIsUpdatingConfirmation(true)
+                                         try {
+                                           await updateProviderConfirmation(activeVoucher.id, providerConfirmation, lead.id)
+                                         } catch (err) {
+                                           console.error(err)
+                                           alert('Error al actualizar confirmación')
+                                         } finally {
+                                           setIsUpdatingConfirmation(false)
+                                         }
+                                       }}
+                                       disabled={isUpdatingConfirmation}
+                                       className="bg-white text-primary px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-colors disabled:opacity-50"
+                                     >
+                                       {isUpdatingConfirmation ? '...' : 'Guardar'}
+                                     </button>
+                                  </div>
+                                </div>
+
+                                {activeVoucher.provider_confirmation && (
+                                  <div className="flex items-center gap-2 pl-1 pt-1">
+                                     <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                                     <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Confirmado en sistema</span>
+                                  </div>
+                                )}
+                             </div>
+                             <Link href={`/voucher/${activeVoucher.id}`} target="_blank" className="bg-white text-primary px-10 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20 w-full text-center">
+                                Ver Voucher
+                             </Link>
+                           </div>
+                        ) : (
+                           <div className="flex flex-col gap-4 items-center sm:items-end w-full sm:min-w-[400px]">
+                              <div className="flex flex-col gap-4 bg-white/5 p-6 rounded-[2rem] border border-white/10 w-full">
+                                {/* Provider Selector - PRE CREATION */}
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
+                                     <Users className="w-3 h-3" /> 1. Seleccionar Proveedor
+                                  </label>
+                                  <select 
+                                     value={ctaProviderId}
+                                     onChange={(e) => {
+                                       setCtaProviderId(e.target.value);
+                                       setCtaError(null);
+                                     }}
+                                     className={`w-full bg-white/10 border ${ctaError?.includes('proveedor') ? 'border-rose-500/50' : 'border-white/10'} rounded-xl px-4 py-3 text-sm font-bold text-white outline-none focus:border-white/30`}
+                                  >
+                                     <option value="" className="text-slate-900">Seleccionar Rentadora...</option>
+                                     {providers.map(p => (
+                                       <option key={p.id} value={p.id} className="text-slate-900">{p.name}</option>
+                                     ))}
+                                  </select>
+                                </div>
+
+                                {/* Confirmation Number - PRE CREATION */}
+                                <div className="space-y-2">
+                                  <label className="text-[10px] font-black text-white/40 uppercase tracking-widest pl-1 flex items-center gap-2">
+                                     <Hash className="w-3 h-3" /> 2. N° Confirmación
+                                  </label>
+                                  <input 
+                                    type="text"
+                                    value={ctaProviderConfirmation}
+                                    onChange={(e) => {
+                                      setCtaProviderConfirmation(e.target.value);
+                                      setCtaError(null);
+                                    }}
+                                    placeholder="Ingrese código de reserva..."
+                                    className={`w-full bg-white/10 border ${ctaError?.includes('confirmación') ? 'border-rose-500/50' : 'border-white/10'} rounded-xl px-4 py-3 text-sm font-bold text-white placeholder:text-white/20 outline-none focus:border-white/30`}
+                                  />
+                                </div>
+
+                                {ctaError && (
+                                   <div className="bg-rose-500/20 border border-rose-500/30 rounded-xl p-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-1">
+                                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                                      <p className="text-[10px] font-black text-rose-200 uppercase tracking-widest leading-tight">{ctaError}</p>
+                                   </div>
+                                )}
+                              </div>
+
+                              <button 
+                                onClick={async () => {
+                                   if (!ctaProviderId && !ctaProviderConfirmation) {
+                                      setCtaError('Debes seleccionar un proveedor y añadir el n° de confirmación.');
+                                      return;
+                                   }
+                                   if (!ctaProviderId) {
+                                      setCtaError('Debes seleccionar un proveedor para generar el voucher.');
+                                      return;
+                                   }
+                                   if (!ctaProviderConfirmation) {
+                                      setCtaError('El n° de confirmación es obligatorio.');
+                                      return;
+                                   }
+                                   
+                                   setCtaError(null);
+                                   startTransition(async () => {
+                                      try {
+                                         await generateVoucherForLead(lead.id, ctaProviderId, ctaProviderConfirmation);
+                                      } catch (err) {
+                                         console.error(err);
+                                         alert('Error al generar voucher');
+                                      }
+                                   });
+                                }}
+                                disabled={isPending}
+                                className="bg-white text-primary px-10 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20 w-full flex items-center justify-center gap-3 disabled:opacity-50"
+                              >
+                                {isPending ? (
+                                   <>
+                                      <div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                      <span>Generando...</span>
+                                   </>
+                                ) : (
+                                   <>
+                                      <CheckCircle2 className="w-4 h-4" />
+                                      <span>Generar Voucher Oficial</span>
+                                   </>
+                                )}
+                              </button>
+                           </div>
+                        )}
+                   </div>
               </div>
            </div>
         </div>
@@ -1162,31 +1314,52 @@ export default function LeadDetailClient({
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center py-4">Sin notas registradas</p>
                         </div>
                       ) : (
-                        leadNotes.map((note) => (
-                          <div key={note.id} className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50 group relative">
-                            <p className="text-sm font-medium text-slate-700 whitespace-pre-wrap leading-relaxed mb-2 pr-6">{note.content}</p>
-                            <div className="flex items-center justify-between mt-2 pt-2 border-t border-amber-100/30">
-                               <div className="flex items-center gap-2">
-                                  {note.profiles?.avatar_url ? (
-                                    <img src={note.profiles.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                                  ) : (
-                                    <div className="w-4 h-4 bg-amber-200 rounded-full flex items-center justify-center text-[8px] font-bold text-amber-800">
-                                      {note.profiles?.full_name ? note.profiles.full_name[0] : '?'}
-                                    </div>
-                                  )}
-                                  <span className="text-[9px] font-bold text-amber-700 uppercase tracking-wider">{note.profiles?.full_name || 'Desconocido'}</span>
-                                  <span className="text-[9px] font-bold text-amber-500/50 capitalize">• {format(new Date(note.created_at), "h:mm a · MMM d", { locale: es })}</span>
-                               </div>
+                        leadNotes.map((note) => {
+                          const isVoucherNote = note.content?.includes('[VOUCHER_GENERATED]')
+                          
+                          return (
+                            <div key={note.id} className={`${isVoucherNote ? 'bg-indigo-50/50 border-indigo-100/50' : 'bg-amber-50/50 border-amber-100/50'} rounded-2xl p-4 border group relative`}>
+                              <div className="flex flex-col gap-3">
+                                <p className={`text-sm ${isVoucherNote ? 'font-black text-indigo-900' : 'font-medium text-slate-700'} whitespace-pre-wrap leading-relaxed pr-6`}>
+                                   {isVoucherNote ? note.content.replace('[VOUCHER_GENERATED] ', '') : note.content}
+                                </p>
+                                
+                                {isVoucherNote && activeVoucher && (
+                                   <Link 
+                                     href={`/voucher/${activeVoucher.id}`}
+                                     target="_blank"
+                                     className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all self-start shadow-lg shadow-indigo-600/20"
+                                   >
+                                      <FileText className="w-3 h-3" /> Ver Voucher Oficial
+                                   </Link>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100/30">
+                                 <div className="flex items-center gap-2">
+                                    {note.profiles?.avatar_url ? (
+                                      <img src={note.profiles.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
+                                    ) : (
+                                      <div className={`w-4 h-4 ${isVoucherNote ? 'bg-indigo-200 text-indigo-800' : 'bg-amber-200 text-amber-800'} rounded-full flex items-center justify-center text-[8px] font-bold`}>
+                                        {note.profiles?.full_name ? note.profiles.full_name[0] : '?'}
+                                      </div>
+                                    )}
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isVoucherNote ? 'text-indigo-700' : 'text-amber-700'}`}>
+                                       {note.profiles?.full_name || 'Sistema'}
+                                    </span>
+                                    <span className="text-[9px] font-bold text-slate-400 capitalize">• {format(new Date(note.created_at), "h:mm a · MMM d", { locale: es })}</span>
+                                 </div>
+                              </div>
+                              <button 
+                                 onClick={() => handleDeleteNote(note.id)}
+                                 className="absolute top-4 right-4 text-slate-900/10 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                                 title="Eliminar nota"
+                              >
+                                 <Trash2 className="w-4 h-4" />
+                              </button>
                             </div>
-                            <button 
-                               onClick={() => handleDeleteNote(note.id)}
-                               className="absolute top-4 right-4 text-amber-900/20 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                               title="Eliminar nota"
-                            >
-                               <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))
+                          )
+                        })
                       )}
                     </div>
 

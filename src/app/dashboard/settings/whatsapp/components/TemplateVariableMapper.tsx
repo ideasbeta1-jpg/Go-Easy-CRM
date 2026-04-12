@@ -30,7 +30,9 @@ const LEAD_FIELDS = [
   { id: 'stripe_link', label: 'Link de Pago' },
   { id: 'agent_name', label: 'Nombre Agente' },
   { id: 'agent_phone', label: 'Teléfono Agente' },
-  { id: 'voucher_url', label: 'Link de Voucher' }
+  { id: 'voucher_url', label: 'Link de Voucher' },
+  { id: 'voucher_number', label: 'Número de Voucher (Interno)' },
+  { id: 'provider_confirmation', label: 'Confirmación Proveedor (Externo)' }
 ];
 
 const STAGES = [

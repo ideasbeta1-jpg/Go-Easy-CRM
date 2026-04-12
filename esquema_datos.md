@@ -80,9 +80,12 @@ Historial de presupuestos enviados al cliente.
 
 ### **Vouchers (`vouchers`)**
 Documentación final una vez cerrada la venta.
-* **`confirmation_number`**: ID interno (Formato: `GEF-YYYY-XXXXXX`).
-* **`provider_confirmation`**: ID oficial de la rentadora final.
-* **`voucher_url`**: Link al PDF alojado en Supabase Storage.
+* **`id`**: `UUID` (PK).
+* **`lead_id`**: `UUID` (FK -> `leads`).
+* **`confirmation_number`**: ID interno Go Easy (Formato: `GF-XXXXXX`). Generado automáticamente.
+* **`provider_confirmation`**: ID oficial de la rentadora final (Ej: Hertz, Budget). Añadido manualmente por el agente.
+* **`voucher_url`**: Link a la landing del voucher.
+* **`created_at`**: Fecha de generación.
 
 ### **Mensajes / Chats (`messages`)**
 Historial de interacción por WhatsApp / WABA / Evolution API.

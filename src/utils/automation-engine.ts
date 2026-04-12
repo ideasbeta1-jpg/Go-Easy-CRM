@@ -131,6 +131,8 @@ function resolveLeadField(fieldId: string, lead: any, extraData: any): string {
     case 'agent_name': return lead.assigned_agent?.first_name || 'Tu Asesor';
     case 'agent_phone': return lead.assigned_agent?.phone || '';
     case 'voucher_url': return extraData.voucher_url || '—';
+    case 'voucher_number': return extraData.voucher_number || '—';
+    case 'provider_confirmation': return extraData.provider_confirmation || '—';
     default: return '—';
   }
 }
