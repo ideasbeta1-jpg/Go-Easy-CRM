@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { notFound } from 'next/navigation'
 import { 
   FileText, 
@@ -27,7 +27,7 @@ export default async function VoucherPage({
 }: {
   params: { id: string }
 }) {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   
   // Fetch voucher and associated lead
   const { data: voucher, error } = await supabase
@@ -79,11 +79,11 @@ export default async function VoucherPage({
              </div>
           </div>
           
-          <VoucherActions />
+          <VoucherActions voucherNumber={voucher.voucher_number} />
        </div>
 
        {/* The Voucher Document */}
-       <main className="max-w-4xl mx-auto bg-white border border-slate-200 shadow-[0_80px_160px_rgba(30,41,59,0.1)] rounded-[3rem] overflow-hidden relative group/voucher">
+       <main id="voucher-document" className="max-w-4xl mx-auto bg-white border border-slate-200 shadow-[0_80px_160px_rgba(30,41,59,0.1)] rounded-[3rem] overflow-hidden relative group/voucher">
           
           {/* Header Section */}
           <div className={`${isPremium ? 'bg-indigo-950' : 'bg-slate-950'} text-white p-12 lg:p-16 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden`}>

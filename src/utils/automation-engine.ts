@@ -1,5 +1,5 @@
 import { createAdminClient } from './supabase/admin';
-import { sendTemplateMessage } from './waba';
+import { sendTemplateMessage, sendWABATextMessage } from './waba';
 import { sendEmail, getStageEmailTemplate } from './email';
 import { sendLeadToN8n } from './n8n';
 
@@ -95,6 +95,15 @@ export async function executeStageAutomation(
 
     // 5. Fallback a n8n
     await sendLeadToN8n(leadId, stage, extraData);
+
+    // 6. Notificación al Vendedor (Si es reserva confirmada)
+    if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone) {
+      const depositAmount = typeof extraData.amount === 'number' ? extraData.amount.toFixed(2) : (extraData.amount || '—');
+      const agentMsg = `🎉 *¡Felicidades!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* ha pagado el depósito de *$${depositAmount}*. Ahora ayúdanos gestionando el voucher.`;
+      
+      console.log(`[AutomationEngine] Notificando al vendedor ${lead.assigned_agent.first_name} (${lead.assigned_agent.phone})`);
+      await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
+    }
 
   } catch (error: any) {
     console.error('[AutomationEngine] Error inesperado:', error);

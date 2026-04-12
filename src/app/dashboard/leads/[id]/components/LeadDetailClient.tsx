@@ -346,6 +346,17 @@ export default function LeadDetailClient({
      });
   }
   
+  if (lead.deposit_paid) {
+     timelineEvents.push({
+        id: 'payment',
+        title: 'Depósito Recibido',
+        date: lead.updated_at,
+        icon: DollarSign,
+        color: 'bg-emerald-600 text-white shadow-lg shadow-emerald-200',
+        desc: `Pago confirmado via Stripe (Ref: ${lead.stripe_payment_id || 'Confirmación Manual'})`
+     });
+  }
+  
   timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   // Shared calculation logic for daily rates and splits

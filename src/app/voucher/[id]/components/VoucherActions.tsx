@@ -1,16 +1,63 @@
 'use client'
 
-import { Printer, Download } from 'lucide-react'
+import { Printer, Download, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
-export function VoucherActions() {
+interface VoucherActionsProps {
+  voucherNumber: string
+}
+
+export function VoucherActions({ voucherNumber }: VoucherActionsProps) {
+  const [isDownloading, setIsDownloading] = useState(false)
+
   const handlePrint = () => {
     window.print()
   }
 
-  const handleDownload = () => {
-    // For now, since it's formatted for print, we can use print to save as PDF
-    // In a more advanced scenario, we could use jspdf/html2canvas, but print is very reliable for high-quality layouts
-    window.print()
+  const handleDownload = async () => {
+    try {
+      setIsDownloading(true)
+      const element = document.getElementById('voucher-document')
+      if (!element) return
+
+      // Pre-capture layout adjustment
+      const canvas = await html2canvas(element, {
+        scale: 2, // High resolution
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'px',
+        format: 'a4',
+      })
+
+      const pdfWidth = pdf.internal.pageSize.getWidth()
+      const pdfHeight = pdf.internal.pageSize.getHeight()
+      
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
+      
+      const targetWidth = imgWidth * ratio
+      const targetHeight = imgHeight * ratio
+      
+      const offsetX = (pdfWidth - targetWidth) / 2
+      const offsetY = (pdfHeight - targetHeight) / 2
+
+      pdf.addImage(imgData, 'PNG', offsetX, offsetY, targetWidth, targetHeight)
+      pdf.save(`voucher-${voucherNumber}.pdf`)
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert("Hubo un error al generar el PDF. Por favor intenta Imprimir y 'Guardar como PDF'.")
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   return (
@@ -23,9 +70,18 @@ export function VoucherActions() {
       </button>
       <button 
         onClick={handleDownload}
-        className="bg-slate-900 text-white font-black text-xs uppercase tracking-widest px-6 py-3 rounded-2xl shadow-xl shadow-slate-900/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 cursor-pointer group"
+        disabled={isDownloading}
+        className="bg-slate-900 text-white font-black text-xs uppercase tracking-widest px-6 py-3 rounded-2xl shadow-xl shadow-slate-900/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center gap-2 cursor-pointer group whitespace-nowrap"
       >
-        <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" /> Descargar PDF
+        {isDownloading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" /> Generando...
+          </>
+        ) : (
+          <>
+            <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" /> Descargar PDF
+          </>
+        )}
       </button>
     </div>
   )
