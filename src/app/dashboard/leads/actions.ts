@@ -7,13 +7,18 @@ import { executeStageAutomation } from '@/utils/automation-engine'
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
 
+  const pickupDate = formData.get('pickup_date') as string
+  const pickupTime = formData.get('pickup_time') as string
+  const returnDate = formData.get('return_date') as string
+  const returnTime = formData.get('return_time') as string
+
   const data = {
     first_name: formData.get('first_name') as string,
     last_name: formData.get('last_name') as string,
     phone: formData.get('phone') as string,
     email: formData.get('email') as string,
-    pickup_date: formData.get('pickup_date') as string,
-    return_date: formData.get('return_date') as string,
+    pickup_date: pickupDate && pickupTime ? `${pickupDate}T${pickupTime}` : pickupDate,
+    return_date: returnDate && returnTime ? `${returnDate}T${returnTime}` : returnDate,
     pickup_location: formData.get('pickup_location') as string,
     return_location: formData.get('return_location') as string,
     category_id: formData.get('category_id') as string || null,
@@ -51,4 +56,22 @@ export async function updateLeadStatus(id: string, status: string) {
   await executeStageAutomation(id, status)
 
   revalidatePath('/dashboard/leads')
+}
+
+export async function searchCustomerByContact(query: string) {
+  if (!query || query.length < 3) return null
+
+  const supabase = await createClient()
+
+  // Search by exact match for phone or email
+  const { data, error } = await supabase
+    .from('leads')
+    .select('first_name, last_name, email, phone')
+    .or(`email.eq.${query},phone.eq.${query}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error || !data) return null
+  return data
 }

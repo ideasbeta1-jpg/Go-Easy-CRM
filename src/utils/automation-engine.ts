@@ -15,18 +15,39 @@ export async function executeStageAutomation(
 ) {
   const supabase = createAdminClient();
   console.log(`[AutomationEngine] Procesando etapa ${stage} para Lead ${leadId}`);
+  
+  // Registro inicial para saber que el motor arrancó
+  await logAutomation(leadId, stage, 'system', 'engine_start', 'processing');
 
   try {
-    // 1. Obtener datos del lead y su agente si existe
+    // 1. Obtener datos del lead y su categoría
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('*, category:categories(name), assigned_agent:profiles!leads_assigned_to_fkey(first_name, phone, email)')
+      .select('*, category:categories(name)')
       .eq('id', leadId)
       .single();
 
     if (leadError || !lead) {
       console.error('[AutomationEngine] Error al obtener lead:', leadError);
+      await logAutomation(leadId, stage, 'system', 'fetch_lead_error', 'failed', leadError?.message || 'Lead not found');
       return;
+    }
+
+    // 1.1 Obtener datos del agente si existe (en consulta separada para evitar errores de join)
+    if (lead.assigned_to) {
+      try {
+        const { data: agent } = await supabase
+          .from('profiles')
+          .select('first_name, last_name, phone')
+          .eq('id', lead.assigned_to)
+          .single();
+        
+        if (agent) {
+          lead.assigned_agent = agent;
+        }
+      } catch (agentErr) {
+        console.warn('[AutomationEngine] Error al obtener agente (no crítico):', agentErr);
+      }
     }
 
     // 2. Configuración por defecto por etapa
@@ -49,49 +70,54 @@ export async function executeStageAutomation(
     
     if (!templateName) {
       console.log(`[AutomationEngine] No hay plantilla definida para la etapa: ${stage}`);
+      await logAutomation(leadId, stage, 'system', 'no_template', 'skipped');
     } else if (lead.phone) {
       // 3. Resolver parámetros de WhatsApp
       let params: string[] = [];
 
-      if (mapping && mapping.mappings) {
-        // Usar mapeo dinámico
-        const sortedKeys = Object.keys(mapping.mappings).sort((a, b) => parseInt(a) - parseInt(b));
-        params = sortedKeys.map(key => resolveLeadField(mapping.mappings[key], lead, extraData));
-      } else {
-        // Fallback a lógica cableada anterior si no hay mapping
-        switch(stage) {
-          case 'lead_nuevo': params = [lead.first_name || 'Cliente']; break;
-          case 'en_cotizacion': params = [lead.first_name || 'Cliente', extraData.stripe_link || 'pendiente']; break;
-          case 'reserva_confirmada': params = [lead.first_name || 'Cliente', formatValue(lead.pickup_date, 'date')]; break;
-          case 'voucher_enviado': params = [lead.first_name || 'Cliente', extraData.voucher_url || 'pendiente']; break;
-          default: params = [lead.first_name || 'Cliente'];
+      try {
+        if (mapping && mapping.mappings) {
+          const sortedKeys = Object.keys(mapping.mappings).sort((a, b) => parseInt(a) - parseInt(b));
+          params = sortedKeys.map(key => resolveLeadField(mapping.mappings[key], lead, extraData));
+        } else {
+          switch(stage) {
+            case 'lead_nuevo': params = [lead.first_name || 'Cliente']; break;
+            case 'en_cotizacion': params = [lead.first_name || 'Cliente', extraData.stripe_link || 'pendiente']; break;
+            case 'reserva_confirmada': params = [lead.first_name || 'Cliente', formatValue(lead.pickup_date, 'date')]; break;
+            case 'voucher_enviado': params = [lead.first_name || 'Cliente', extraData.voucher_url || 'pendiente']; break;
+            default: params = [lead.first_name || 'Cliente'];
+          }
         }
+
+        const components = [{
+          type: 'body',
+          parameters: params.map(p => ({ type: 'text', text: p }))
+        }];
+
+        const waSuccess = await sendTemplateMessage(lead.phone, templateName, mapping?.language_code || 'es', components);
+        await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed');
+      } catch (waErr: any) {
+        await logAutomation(leadId, stage, 'whatsapp', templateName, 'error', waErr.message);
       }
-
-      // Enviar WhatsApp
-      const components = [{
-        type: 'body',
-        parameters: params.map(p => ({ type: 'text', text: p }))
-      }];
-
-      const waSuccess = await sendTemplateMessage(lead.phone, templateName, mapping?.language_code || 'es', components);
-      await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed');
     }
 
     // 4. Ejecutar Email (si hay email)
-    const automationConfig = { email: true }; // Por ahora siempre activado
-    if (automationConfig.email && lead.email) {
-      const { subject, html } = await getStageEmailTemplate(stage, lead, extraData);
-      const emailResult = await sendEmail({ to: lead.email, subject, html });
-      
-      await logAutomation(
-        leadId, 
-        stage, 
-        'email', 
-        'html_template', 
-        emailResult.success ? 'sent' : 'failed', 
-        emailResult.error
-      );
+    if (lead.email) {
+      try {
+        const { subject, html } = await getStageEmailTemplate(stage, lead, extraData);
+        const emailResult = await sendEmail({ to: lead.email, subject, html });
+        
+        await logAutomation(
+          leadId, 
+          stage, 
+          'email', 
+          'html_template', 
+          emailResult.success ? 'sent' : 'failed', 
+          emailResult.error
+        );
+      } catch (emailErr: any) {
+        await logAutomation(leadId, stage, 'email', 'html_template', 'error', emailErr.message);
+      }
     }
 
     // 5. Fallback a n8n
@@ -101,57 +127,32 @@ export async function executeStageAutomation(
     if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone) {
       const depositAmount = typeof extraData.amount === 'number' ? extraData.amount.toFixed(2) : (extraData.amount || '—');
       const agentMsg = `🎉 *¡Felicidades!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* ha pagado el depósito de *$${depositAmount}*. Ahora ayúdanos gestionando el voucher.`;
-      
-      console.log(`[AutomationEngine] Notificando al vendedor ${lead.assigned_agent.first_name} (${lead.assigned_agent.phone})`);
       await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
     }
 
-    // 7. In-App Notifications (persisted to DB for the bell icon)
+    // 7. In-App Notifications
     const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim();
     const stageNotifications: Record<string, { title: string; body: string; type: any }> = {
-      'lead_nuevo': {
-        type: 'new_lead',
-        title: '🟢 Nuevo Lead Registrado',
-        body: `${leadName} ha sido registrado en el sistema.`,
-      },
-      'en_cotizacion': {
-        type: 'quote_generated',
-        title: '📄 Cotización Generada',
-        body: `Se generó una cotización para ${leadName}.`,
-      },
-      'reserva_confirmada': {
-        type: 'payment_confirmed',
-        title: '💰 ¡Pago Confirmado!',
-        body: `${leadName} ha confirmado su reserva con un depósito.`,
-      },
-      'voucher_enviado': {
-        type: 'voucher_sent',
-        title: '📋 Voucher Enviado',
-        body: `El voucher de ${leadName} fue enviado.`,
-      },
-      'cerrado': {
-        type: 'lead_closed',
-        title: '✅ Lead Cerrado',
-        body: `El alquiler de ${leadName} ha finalizado.`,
-      },
+      'lead_nuevo': { type: 'new_lead', title: '🟢 Nuevo Lead Registrado', body: `${leadName} ha sido registrado en el sistema.` },
+      'en_cotizacion': { type: 'quote_generated', title: '📄 Cotización Generada', body: `Se generó una cotización para ${leadName}.` },
+      'reserva_confirmada': { type: 'payment_confirmed', title: '💰 ¡Pago Confirmado!', body: `${leadName} ha confirmado su reserva con un depósito.` },
+      'voucher_enviado': { type: 'voucher_sent', title: '📋 Voucher Enviado', body: `El voucher de ${leadName} fue enviado.` },
+      'cerrado': { type: 'lead_closed', title: '✅ Lead Cerrado', body: `El alquiler de ${leadName} ha finalizado.` }
     };
 
     const notifConfig = stageNotifications[stage];
     if (notifConfig) {
       await broadcastNotification(
-        {
-          type: notifConfig.type,
-          title: notifConfig.title,
-          body: notifConfig.body,
-          link: `/dashboard/leads/${leadId}`,
-          lead_id: leadId,
-        },
+        { type: notifConfig.type, title: notifConfig.title, body: notifConfig.body, link: `/dashboard/leads/${leadId}`, lead_id: leadId },
         lead.assigned_to || null
       );
     }
 
+    await logAutomation(leadId, stage, 'system', 'engine_complete', 'success');
+
   } catch (error: any) {
     console.error('[AutomationEngine] Error inesperado:', error);
+    await logAutomation(leadId, stage, 'system', 'unexpected_error', 'failed', error.message);
   }
 }
 
@@ -199,20 +200,24 @@ function formatValue(val: any, type: 'date' | 'time'): string {
  * Registra el resultado en la tabla automation_logs
  */
 async function logAutomation(
-  leadId: string, 
+  lead_id: string, 
   stage: string, 
   channel: string, 
-  templateName: string, 
+  template_name: string, 
   status: string, 
-  error?: string
+  error_message?: string
 ) {
-  const supabase = createAdminClient();
-  await supabase.from('automation_logs').insert({
-    lead_id: leadId,
-    stage,
-    channel,
-    template_name: templateName,
-    status,
-    error_message: error
-  });
+  try {
+    const supabase = createAdminClient();
+    await supabase.from('automation_logs').insert({
+      lead_id,
+      stage,
+      channel,
+      template_name,
+      status,
+      error_message: error_message || null
+    });
+  } catch (err) {
+    console.error('CRITICAL: Error logging automation result:', err);
+  }
 }

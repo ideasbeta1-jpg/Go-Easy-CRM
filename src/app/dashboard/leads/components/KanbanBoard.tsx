@@ -3,8 +3,10 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Calendar, Car, Clock, Mail, CheckCircle2 } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
+import { useKanbanFilter } from './KanbanFilterContext'
+import { isToday, isThisWeek, isThisMonth } from 'date-fns'
+import { updateLeadStatus } from '../actions'
 
 interface KanbanBoardProps {
   initialLeads: any[];
@@ -25,8 +27,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
   const [leads, setLeads] = useState(initialLeads)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
-  const supabase = createClient()
   const router = useRouter()
+  const { searchTerm, sortBy, agentFilter, dateFilter } = useKanbanFilter()
 
   // Handle Drag Start
   const handleDragStart = (e: React.DragEvent, leadId: string) => {
@@ -76,31 +78,92 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
     )
     setLeads(updatedLeads)
 
-    // DB Update
+    // DB Update (Using Server Action to trigger automations)
     setIsUpdating(true)
-    const { error } = await supabase
-      .from('leads')
-      .update({ status: targetStatus })
-      .eq('id', leadId)
-
-    if (error) {
+    try {
+      await updateLeadStatus(leadId, targetStatus)
+    } catch (error: any) {
       console.error('Error updating lead status:', error)
       setLeads(oldLeads) // Rollback
       alert('Error al mover el lead: ' + error.message)
-    } else {
-        router.refresh() // Refresh the page to ensure server state matches
     }
+    
+    router.refresh()
     setIsUpdating(false)
   }
 
   const getGroupedLeads = (status: string) => {
-    return leads.filter(l => l.status?.trim().toLowerCase() === status.toLowerCase())
+    let filteredLeads = [...leads];
+    
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filteredLeads = filteredLeads.filter(l => {
+        const fullName = `${l.first_name || ''} ${l.last_name || ''}`.toLowerCase();
+        const email = (l.email || '').toLowerCase();
+        const phone = (l.phone || '').toLowerCase();
+        return fullName.includes(term) || email.includes(term) || phone.includes(term);
+      });
+    }
+
+    if (agentFilter) {
+      filteredLeads = filteredLeads.filter(l => l.assigned_to === agentFilter);
+    }
+
+    if (dateFilter !== 'all') {
+      filteredLeads = filteredLeads.filter(l => {
+        if (!l.created_at) return false;
+        const date = new Date(l.created_at);
+        switch (dateFilter) {
+          case 'today': return isToday(date);
+          case 'this_week': return isThisWeek(date, { weekStartsOn: 1 }); // Starts on Monday
+          case 'this_month': return isThisMonth(date);
+          default: return true;
+        }
+      });
+    }
+
+    // Apply sorting
+    filteredLeads.sort((a, b) => {
+      const valA = parseFloat(a.total_amount || 0);
+      const valB = parseFloat(b.total_amount || 0);
+      const dateA = new Date(a.created_at || 0).getTime();
+      const dateB = new Date(b.created_at || 0).getTime();
+
+      switch (sortBy) {
+        case 'highest_value': return valB - valA;
+        case 'lowest_value': return valA - valB;
+        case 'oldest': return dateA - dateB;
+        case 'newest': 
+        default: return dateB - dateA;
+      }
+    });
+
+    return filteredLeads.filter(l => l.status?.trim().toLowerCase() === status.toLowerCase())
+  }
+
+  const getReservationAmount = (lead: any) => {
+    let rentalDays = 1;
+    if (lead.pickup_date && lead.return_date) {
+      const p = new Date(lead.pickup_date);
+      const r = new Date(lead.return_date);
+      if (r >= p) {
+         rentalDays = Math.max(1, Math.ceil((r.getTime() - p.getTime()) / (1000 * 60 * 60 * 24)));
+      }
+    }
+    const margin = lead.agreed_daily_price !== null && lead.agreed_daily_price !== undefined
+      ? parseFloat(lead.agreed_daily_price) 
+      : parseFloat(lead.category?.daily_price || 0);
+    return margin * rentalDays;
   }
 
   return (
     <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide">
       <div className="flex gap-4 md:gap-8 h-full min-w-max pr-8 px-4 md:px-0">
-        {statuses.map((status) => (
+        {statuses.map((status) => {
+          const stageLeads = getGroupedLeads(status);
+          const totalRva = stageLeads.reduce((acc, lead) => acc + getReservationAmount(lead), 0);
+          
+          return (
           <div 
             key={status} 
             className="w-[85vw] sm:w-80 flex flex-col gap-4 md:gap-6 snap-center"
@@ -116,14 +179,19 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
                   {statusConfig[status]?.label || status}
                 </span>
                 <span className="bg-slate-200 text-slate-500 px-2 md:px-2.5 py-0.5 rounded-full text-[10px] md:text-[11px] font-black">
-                  {getGroupedLeads(status).length}
+                  {stageLeads.length}
+                </span>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest block leading-tight bg-emerald-50 px-2 py-0.5 rounded-full">
+                  Rva: ${Math.floor(totalRva).toLocaleString()}
                 </span>
               </div>
             </div>
 
             {/* Column Surface */}
             <div className="flex-1 flex flex-col gap-4 overflow-y-auto px-1 pb-10 scrollbar-hide rounded-[2.5rem] transition-colors duration-300">
-              {getGroupedLeads(status).map((lead) => (
+              {stageLeads.map((lead) => (
                 <div 
                   key={lead.id} 
                   draggable
@@ -136,9 +204,14 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
                       <span className="text-[9px] md:text-[10px] font-bold text-slate-400 bg-slate-100/50 px-2 md:px-2.5 py-1 rounded-full tracking-wider">
                         #{lead.id.slice(0, 4)}
                       </span>
-                      <span className="text-lg md:text-xl font-sans font-black text-primary tracking-tight">
-                        <span className="text-xs md:text-sm opacity-50 mr-0.5">$</span>{Math.floor(lead.total_amount || 0).toLocaleString()}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-lg md:text-xl font-sans font-black text-primary tracking-tight leading-none">
+                          <span className="text-xs md:text-sm opacity-50 mr-0.5">$</span>{Math.floor(lead.total_amount || 0).toLocaleString()}
+                        </span>
+                        <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-1">
+                          Rva: ${Math.floor(getReservationAmount(lead)).toLocaleString()}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-4">
@@ -205,7 +278,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig }: KanbanBoar
               )}
             </div>
           </div>
-        ))}
+        )})}
       </div>
       {isUpdating && (
         <div className="fixed bottom-12 right-12 bg-white px-6 py-3 rounded-full shadow-2xl border border-slate-100 flex items-center gap-3 animate-in slide-in-from-right-12">

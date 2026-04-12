@@ -77,13 +77,6 @@ export function NotificationBell() {
         const newNotif = payload.new as Notification
         setNotifications(prev => [newNotif, ...prev.slice(0, 29)])
         setUnreadCount(prev => prev + 1)
-
-        // Play a soft ping sound
-        try {
-          const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')
-          audio.volume = 0.3
-          audio.play().catch(() => {})
-        } catch {}
       })
       .on('postgres_changes', {
         event: 'UPDATE',

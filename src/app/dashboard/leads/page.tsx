@@ -16,6 +16,10 @@ import {
 } from 'lucide-react'
 
 import { KanbanBoard } from './components/KanbanBoard'
+import { NewLeadButton } from './components/NewLeadButton'
+import { NotificationBell } from '../components/NotificationBell'
+import { KanbanFilterProvider } from './components/KanbanFilterContext'
+import { KanbanSearchControls } from './components/KanbanSearchControls'
 
 // Map of status to friendly names and colors for the columns
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -48,7 +52,7 @@ export default async function LeadsPage() {
     .from('leads')
     .select(`
       *,
-      category:categories(name, image_url)
+      category:categories(name, image_url, daily_price)
     `)
     .order('created_at', { ascending: false })
 
@@ -82,7 +86,11 @@ export default async function LeadsPage() {
     return acc
   }, {} as Record<string, any>)
 
-  // 5. Build lookup map and group
+  // 5. Fetch categories and locations for the new lead modal
+  const { data: categories } = await supabase.from('categories').select('*').order('name')
+  const { data: locations } = await supabase.from('locations').select('*').order('name')
+
+  // 6. Build lookup map and group
   const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado']
   const processedLeads = (leads || []).map(l => ({
     ...l,
@@ -90,8 +98,9 @@ export default async function LeadsPage() {
   }))
 
   return (
-    <div className="flex flex-col h-full gap-5 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shrink-0 relative z-10">
+    <KanbanFilterProvider>
+      <div className="flex flex-col h-full gap-5 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shrink-0 relative z-10">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl md:text-3xl lg:text-4xl font-sans font-black text-slate-900 tracking-tighter leading-none uppercase">
             Pipeline de <span className="text-primary">Ventas</span>
@@ -102,33 +111,20 @@ export default async function LeadsPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3 md:gap-4 bg-white/40 p-1.5 md:p-2 rounded-[1.5rem] md:rounded-[2rem] border border-white/60 shadow-sm backdrop-blur-sm w-full lg:w-auto">
-          <div className="relative group flex-1 min-w-[200px] lg:w-64">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Buscar lead..." 
-              className="w-full pl-11 pr-4 py-2.5 md:py-3 bg-slate-100/50 rounded-full text-sm font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white transition-all"
-            />
-          </div>
-
-          <button className="flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 text-slate-500 hover:text-primary transition-colors font-bold text-sm">
-            <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Filtrar</span>
-          </button>
+          <KanbanSearchControls agents={profiles} />
 
           <div className="hidden sm:flex items-center gap-1 border-l border-slate-200 pl-3">
-            <button className="p-2 text-slate-400 hover:text-primary hover:bg-white rounded-full transition-all">
-              <Bell className="w-5 h-5" />
-            </button>
+            <NotificationBell />
             <button className="p-2 text-slate-400 hover:text-primary hover:bg-white rounded-full transition-all">
               <HelpCircle className="w-5 h-5" />
             </button>
           </div>
 
-          <button className="bg-primary hover:bg-primary-dim text-white font-black px-4 md:px-6 py-2.5 md:py-3.5 rounded-full shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 md:gap-3 text-[10px] md:text-xs uppercase tracking-widest ml-auto lg:ml-0">
-            <Plus className="w-4 h-4 md:w-5 md:h-5" />
-            <span>Nuevo Lead</span>
-          </button>
+          <NewLeadButton 
+            categories={categories || []} 
+            locations={locations || []} 
+            currentUserId={user.id} 
+          />
 
           <div className="flex items-center gap-3 pl-3 pr-2 md:pr-4 border-l border-slate-200 shrink-0">
             <div className="hidden sm:flex flex-col items-end">
@@ -148,5 +144,6 @@ export default async function LeadsPage() {
         statusConfig={statusConfig}
       />
     </div>
+    </KanbanFilterProvider>
   )
 }
