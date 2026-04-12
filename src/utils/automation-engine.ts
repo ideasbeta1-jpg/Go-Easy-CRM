@@ -148,6 +148,48 @@ export async function executeStageAutomation(
       );
     }
 
+    // 8. Meta CAPI tracking por etapa
+    try {
+      const { sendMetaEvent } = await import('./meta-capi');
+      
+      const eventMapping: Record<string, string> = {
+        'en_cotizacion': 'InitiateCheckout',
+        'reserva_confirmada': 'Purchase',
+        'voucher_enviado': 'Schedule'
+      };
+
+      const eventName = eventMapping[stage];
+      if (eventName) {
+        // Determinamos el valor basado en la etapa
+        let value = lead.total_amount || 0;
+        if (stage === 'reserva_confirmada') {
+          // Si es reserva confirmada, el valor es el depósito pagado (usualmente 30% o lo que diga extraData)
+          value = extraData.amount || (lead.total_amount * 0.3);
+        }
+
+        await sendMetaEvent({
+          eventName,
+          eventID: `${leadId}_${stage}`, // ID único por etapa para evitar deduplicación accidental entre etapas
+          userData: {
+            email: lead.email,
+            phone: lead.phone,
+            first_name: lead.first_name,
+            last_name: lead.last_name
+          },
+          customData: {
+            content_name: lead.category?.name || 'Alquiler de Auto',
+            value: parseFloat(value.toString()),
+            currency: 'USD'
+          }
+        });
+        
+        await logAutomation(leadId, stage, 'meta_capi', eventName, 'sent');
+      }
+    } catch (metaErr: any) {
+      console.error('[AutomationEngine] Error enviando Meta CAPI:', metaErr);
+      await logAutomation(leadId, stage, 'meta_capi', 'error', 'failed', metaErr.message);
+    }
+
     await logAutomation(leadId, stage, 'system', 'engine_complete', 'success');
 
   } catch (error: any) {

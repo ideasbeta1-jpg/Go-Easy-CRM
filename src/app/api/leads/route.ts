@@ -59,8 +59,40 @@ export async function POST(req: NextRequest) {
        await assignLeadToAgent(data.id)
     }
 
-    // Trigger n8n for lead_created (for Meta CAPI and general automation)
-    // We send personal data directly to n8n to facilitate SHA256 hashing
+    // Trigger direct Meta CAPI (Lead)
+    try {
+      const { cookies } = await import('next/headers')
+      const cookieStore = await cookies()
+      const fbp = cookieStore.get('_fbp')?.value
+      const fbc = cookieStore.get('_fbc')?.value
+      
+      const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '127.0.0.1'
+      const userAgent = req.headers.get('user-agent') || ''
+
+      const { sendMetaEvent } = await import('@/utils/meta-capi')
+      await sendMetaEvent({
+        eventName: 'Lead',
+        eventID: data.id,
+        userData: {
+          email,
+          phone,
+          first_name,
+          last_name,
+          client_ip_address: ip,
+          client_user_agent: userAgent,
+          fbp,
+          fbc
+        },
+        customData: {
+          content_name: 'Nuevo Lead CRM',
+          currency: 'USD'
+        }
+      })
+    } catch (metaError) {
+      console.error('Error sending event to Meta CAPI:', metaError)
+    }
+
+    // Trigger n8n for lead_created (legacy automation)
     try {
       await sendLeadToN8n(data.id, 'lead_created', {
         first_name,
@@ -68,11 +100,10 @@ export async function POST(req: NextRequest) {
         phone,
         email,
         category_id,
-        event_id: data.id // Vital for Meta CAPI Deduplication (Matching the Browser event)
+        event_id: data.id
       })
     } catch (n8nError) {
       console.error('Error sending lead to n8n:', n8nError)
-      // We don't return 500 here to not break the user experience if n8n is down
     }
 
     return NextResponse.json({ success: true, id: data.id }, { status: 201 })
