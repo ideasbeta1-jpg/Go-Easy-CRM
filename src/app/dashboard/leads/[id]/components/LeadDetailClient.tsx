@@ -322,7 +322,17 @@ export default function LeadDetailClient({
   const selectedProvider = providers.find(p => p.id === formData.provider_id)
   const selectedAgent = agents.find(a => a.id === formData.assigned_to)
 
-  const timelineEvents = [
+  interface TimelineEvent {
+    id: string;
+    title: string;
+    date: string | any;
+    icon: any;
+    color: string;
+    desc: string;
+    isMismatch?: boolean;
+  }
+
+  const timelineEvents: TimelineEvent[] = [
      {
         id: 'created',
         title: 'Lead Capturado',
