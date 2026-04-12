@@ -72,10 +72,13 @@ Centraliza toda la información del cliente y el ciclo de vida de la reserva.
 Tablas para el manejo de archivos dinámicos y confirmaciones.
 
 ### **Cotizaciones (`quotes`)**
-Historial de presupuestos enviados al cliente.
+Historial de presupuestos enviados al cliente. Actúa como snapshot de los valores pactados.
 * **`lead_id`**: Relación con el lead (Borrado en cascada).
 * **`stripe_link`**: Link de pago dinámico.
 * **`pdf_url`**: Enlace a la landing o PDF de cotización.
+* **`total_amount`**: `DECIMAL` - Monto total snapshot al momento de generar.
+* **`pickup_date`**: `TIMESTAMPTZ` - Fecha de entrega snapshot.
+* **`return_date`**: `TIMESTAMPTZ` - Fecha de devolución snapshot.
 * **`expires_at`**: Fecha de vencimiento de la oferta.
 
 ### **Vouchers (`vouchers`)**

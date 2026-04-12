@@ -13,6 +13,7 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 | :--- | :--- | :--- | :--- |
 | **Lead Nuevo** | Entrada por Webhook WA / Formulario | Bienvenida y asignación | Confirmación de contacto |
 | **En Cotización** | Generación de cotización manual | Link de pago y detalles | Presupuesto detallado |
+| **Cotización Modificada** | Detección de Mismatch (Cambio de precio) | Alerta Roja en Timeline | Advertencia de validación |
 | **Reserva Confirmada**| Webhook de pago (Stripe) | Confirmación y próximas instrucciones | Recibo y confirmación |
 | **Voucher Enviado** | Subida de voucher a la DB | Entrega de documento digital | Link de descarga de voucher |
 | **Cerrado** | Cierre de alquiler por el agente | Agradecimiento y solicitud feedback | Seguimiento post-alquiler |
@@ -31,14 +32,14 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
     *   **Propósito**: Dar una respuesta inmediata para mejorar la tasa de conversión.
 
 ### 2. En Cotización (`en_cotizacion`)
-*   **Qué sucede**: Se activa cuando el agente genera el enlace de pago (Stripe) para el cliente.
+*   **Qué sucede**: Se activa cuando el agente genera el enlace de pago (Stripe). Sistema toma un **Snapshot** de los valores actuales.
 *   **WhatsApp**:
     *   **Plantilla**: `cotizacion_enviada`
     *   **Variables**: `[Nombre]`, `[Link de Stripe]`
     *   **Contenido**: "Hola [Nombre], tu cotización está lista. Revisa y paga aquí: [Link]"
-*   **Email**:
-    *   **Asunto**: "Tu cotización está lista"
-    *   **Detalle**: Incluye el resumen del vehículo seleccionado y el botón de pago.
+*   **Validación de Integridad**:
+    *   Si el precio o fechas cambian sin regenerar la cotización, aparece una alerta en la línea de tiempo.
+    *   **Botón de Acción**: Permite al vendedor regenerar la propuesta para asegurar que el link de Stripe coincida con lo acordado.
 
 ### 3. Reserva Confirmada (`reserva_confirmada`)
 *   **Qué sucede**: Se dispara automáticamente cuando Stripe confirma que el pago de la reserva se ha completado.
@@ -84,12 +85,12 @@ El sistema puede inyectar los siguientes datos reales en cualquier plantilla:
 
 ---
 
-## 📊 Monitoreo y Logs
-Para garantizar la transparencia, cada acción automática se registra en la tabla `automation_logs`. 
-Puedes verificar en la base de datos:
-- Si el mensaje fue enviado con éxito (`status: sent`).
-- Si falló el envío (`status: failed`) y el motivo exacto.
-- El canal utilizado (`whatsapp` o `email`).
+## 📊 Monitoreo y Línea de Tiempo
+Cada paso crítico del proceso alimenta la **Línea de Tiempo** del lead:
+- **Lead Capturado**: Registro inicial.
+- **Cotización Generada**: Incluye botón directo **"Ver Propuesta"**.
+- **Alerta de Mismatch**: Aparece si hay cambios en precio/fechas sin regenerar.
+- **Depósito Recibido**: Confirmación automática vía Stripe.
 
 > [!TIP]
 > Si una automatización falla, el sistema todavía realiza un "fallback" enviando la notificación a **n8n** como respaldo de seguridad.

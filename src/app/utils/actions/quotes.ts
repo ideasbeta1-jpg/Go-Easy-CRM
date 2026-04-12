@@ -30,7 +30,10 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     .from('quotes')
     .insert({
       lead_id: leadId,
-      expires_at: expiresAt.toISOString()
+      expires_at: expiresAt.toISOString(),
+      total_amount: totalAmount,
+      pickup_date: lead.pickup_date,
+      return_date: lead.return_date
     })
     .select()
     .single()

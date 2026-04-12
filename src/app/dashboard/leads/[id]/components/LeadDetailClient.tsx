@@ -341,6 +341,25 @@ export default function LeadDetailClient({
         color: 'bg-amber-100 text-amber-600',
         desc: activeQuote.expires_at ? `Oferta válida hasta ${format(new Date(activeQuote.expires_at), 'dd MMM')}` : 'Cotización enviada al cliente'
      });
+
+     // Check for mismatch between lead data and quote snapshot
+     const quoteAmount = parseFloat(activeQuote.total_amount || 0);
+     const currentAmount = lead.total_amount;
+     
+     const hasMismatch = quoteAmount !== currentAmount || 
+                        (activeQuote.pickup_date && lead.pickup_date && new Date(activeQuote.pickup_date).getTime() !== new Date(lead.pickup_date).getTime());
+
+     if (hasMismatch && lead.status === 'en_cotizacion') {
+        timelineEvents.push({
+           id: 'quote-mismatch',
+           title: 'Cotización Desactualizada',
+           date: lead.updated_at || new Date().toISOString(),
+           icon: AlertCircle,
+           color: 'bg-red-500 text-white shadow-lg shadow-red-200',
+           desc: '¡Atención! Has editado el lead después de generar la cotización. El precio o las fechas ya no coinciden con lo enviado al cliente.',
+           isMismatch: true
+        });
+     }
   }
   if (activeVoucher) {
      timelineEvents.push({
@@ -480,17 +499,21 @@ export default function LeadDetailClient({
                     </Link>
                  )}
 
-                  <form action={async () => {
-                    await generateQuoteForLead(lead.id, formData.total_amount)
-                  }}>
                     <button 
+                      id="generate-quote-btn"
                       disabled={isPending}
+                      onClick={() => {
+                          startTransition(async () => {
+                              await generateQuoteForLead(lead.id, formData.total_amount)
+                              setFormData(prev => ({ ...prev, status: 'en_cotizacion' }))
+                              router.refresh()
+                          })
+                      }}
                       className="bg-oceanic hover:bg-primary-dim text-white font-black px-6 py-3 rounded-full shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 text-xs uppercase tracking-widest disabled:opacity-50"
                     >
                       <Zap className="w-4 h-4" />
                       <span>{isPending ? 'Generando...' : 'Generar Cotización'}</span>
                     </button>
-                 </form>
                </>
             )}
 
@@ -1057,7 +1080,33 @@ export default function LeadDetailClient({
                                    {event.date ? format(new Date(event.date), 'dd MMM yyyy · HH:mm', { locale: es }) : ''}
                                 </span>
                              </div>
-                             <p className="text-xs font-bold text-slate-500 mt-2">{event.desc}</p>
+                              <p className="text-xs font-bold text-slate-500 mt-2">{event.desc}</p>
+                              
+                              {event.id === 'quote' && activeQuote && (
+                                 <div className="mt-4 flex flex-wrap gap-3">
+                                    <Link 
+                                      href={`/cotizacion/${activeQuote.id}`}
+                                      target="_blank"
+                                      className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-200 transition-all border border-amber-200/50"
+                                    >
+                                       <Zap className="w-3" /> Ver Propuesta
+                                    </Link>
+                                 </div>
+                              )}
+
+                              {(event as any).isMismatch && (
+                                 <div className="mt-4">
+                                    <button 
+                                       onClick={() => {
+                                          const el = document.getElementById('generate-quote-btn');
+                                          if (el) el.scrollIntoView({ behavior: 'smooth' });
+                                       }}
+                                       className="inline-flex items-center gap-2 bg-white text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all border border-red-200 shadow-sm"
+                                    >
+                                       <Zap className="w-3" /> Regenerar Cotización con nuevos valores
+                                    </button>
+                                 </div>
+                              )}
                           </div>
                        </div>
                     )
