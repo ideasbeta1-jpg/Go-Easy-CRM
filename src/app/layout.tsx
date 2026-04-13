@@ -19,12 +19,14 @@ export async function generateMetadata(): Promise<Metadata> {
     .eq('id', 1)
     .single()
 
+  const v = settings?.updated_at ? `?v=${new Date(settings.updated_at).getTime()}` : ''
+
   return {
     title: settings?.seo_title || "Go Easy Florida CRM",
     description: settings?.seo_description || "Premium Car Rental CRM",
     keywords: settings?.seo_keywords,
     icons: {
-      icon: settings?.favicon_url || "/favicon.ico",
+      icon: settings?.favicon_url ? `${settings.favicon_url}${v}` : "/favicon.ico",
     }
   }
 }

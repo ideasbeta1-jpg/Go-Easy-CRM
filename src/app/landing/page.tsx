@@ -17,13 +17,22 @@ interface Location {
   code: string
 }
 
+interface SystemSettings {
+  crm_name: string
+  logo_url?: string
+  crm_tagline?: string
+  updated_at?: string
+}
+
 export default function LandingPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
+  const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+  const [step, setStep] = useState(1)
 
   const today = new Date().toISOString().split('T')[0]
   const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
@@ -52,6 +61,7 @@ export default function LandingPage() {
       .then(data => {
         setCategories(data.categories || [])
         setLocations(data.locations || [])
+        setSettings(data.settings || null)
         if (data.categories?.length) setForm(f => ({ ...f, category_id: data.categories[0].id }))
         if (data.locations?.length) {
           setForm(f => ({
@@ -69,6 +79,23 @@ export default function LandingPage() {
   const set = (field: string, value: any) => setForm(f => ({ ...f, [field]: value }))
 
   const selectedCategory = categories.find(c => c.id === form.category_id)
+
+  const validateStep1 = () => {
+    if (!form.category_id || !form.pickup_location_id || !form.return_location_id || !form.pickup_date || !form.pickup_time || !form.return_date || !form.return_time) {
+      setError('Por favor completa todos los datos de tu viaje.')
+      return false
+    }
+    setError('')
+    return true
+  }
+
+  const handleNext = () => {
+    if (validateStep1()) {
+      setStep(2)
+      // Scroll to form top for better UX on mobile
+      document.getElementById('form-container')?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -179,23 +206,28 @@ export default function LandingPage() {
       {/* BEGIN: MainHeader */}
       <header className="sticky top-0 z-50 bg-white w-full py-4 px-6 md:px-12 flex items-center justify-between shadow-sm">
         {/* Logo */}
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-sm">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" strokeLinecap="round" strokeLinejoin="round"></path>
-            </svg>
-          </div>
-          <span className="font-extrabold text-xl text-gray-900 tracking-tight">GoEasy Florida</span>
-        </div>
-        {/* Navigation */}
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
-          <a className="hover:text-gray-900 transition-colors" href="#">Presentación</a>
-          <a className="hover:text-gray-900 transition-colors" href="#">Estándares</a>
-          <a className="hover:text-gray-900 transition-colors" href="#">Contacto</a>
-        </nav>
+        <a href="/" className="flex items-center gap-2">
+          {settings?.logo_url ? (
+            <img 
+              src={`${settings.logo_url}?v=${settings.updated_at ? new Date(settings.updated_at).getTime() : Date.now()}`} 
+              alt={settings.crm_name || 'Logo'} 
+              className="h-10 w-auto object-contain"
+            />
+          ) : (
+            <>
+              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center text-white font-bold text-sm">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" strokeLinecap="round" strokeLinejoin="round"></path>
+                </svg>
+              </div>
+              <span className="font-extrabold text-xl text-gray-900 tracking-tight">
+                {settings?.crm_name || 'GoEasy Florida'}
+              </span>
+            </>
+          )}
+        </a>
         {/* Actions */}
         <div className="flex items-center gap-4">
-          <a className="text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors hidden sm:block" href="/login">Log in</a>
           <a className="bg-primary-yellow hover:bg-primary-yellow-hover text-gray-900 text-sm font-bold py-2.5 px-5 rounded-full shadow-sm transition-colors" href="#cotizar">
             Cotizar Ahora
           </a>
@@ -223,218 +255,256 @@ export default function LandingPage() {
                 Alquila fácil,<br/>sin trucos!
               </h1>
               <p className="text-lg md:text-xl font-medium leading-relaxed max-w-md">
-                Transparencia total. Atención 100% en español. Tu viaje en Florida empieza aquí.
+                {settings?.crm_tagline || 'Transparencia total. Atención 100% en español. Tu viaje en Florida empieza aquí.'}
               </p>
             </div>
             
-            <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-10 w-full max-w-lg mx-auto lg:ml-auto relative overflow-hidden">
+            <div id="form-container" className="bg-white rounded-2xl shadow-2xl p-6 md:p-10 w-full max-w-lg mx-auto lg:ml-auto relative overflow-hidden">
               <div className="bg-primary-blue h-2 w-full absolute top-0 left-0"></div>
-              <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-                {/* Tipo de vehiculo */}
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-bold text-gray-800">Tipo de vehículo</label>
-                  <select 
-                    required
-                    value={form.category_id}
-                    onChange={(e) => set('category_id', e.target.value)}
-                    className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
-                  >
-                    <option value="">Selecciona tipo</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Ciudades */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Ciudad de llegada</label>
-                    <select 
-                      required
-                      value={form.pickup_location_id}
-                      onChange={(e) => {
-                        const loc = locations.find(l => l.id === e.target.value)
-                        setForm(f => ({ ...f, pickup_location_id: e.target.value, pickup_location: loc?.name || '' }))
-                      }}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
-                    >
-                      <option value="">Ciudad</option>
-                      {locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Ciudad de devolución</label>
-                    <select 
-                      required
-                      value={form.return_location_id}
-                      onChange={(e) => {
-                        const loc = locations.find(l => l.id === e.target.value)
-                        setForm(f => ({ ...f, return_location_id: e.target.value, return_location: loc?.name || '' }))
-                      }}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
-                    >
-                      <option value="">Ciudad</option>
-                      {locations.map(loc => (
-                        <option key={loc.id} value={loc.id}>{loc.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {/* Fechas */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Fecha de llegada</label>
-                    <input 
-                      required
-                      type="date" 
-                      value={form.pickup_date}
-                      min={today}
-                      onChange={(e) => {
-                        const newPickup = e.target.value;
-                        const d = new Date(newPickup + 'T12:00:00');
-                        d.setDate(d.getDate() + 3);
-                        const newReturn = d.toISOString().split('T')[0];
-                        setForm(prev => ({ 
-                          ...prev, 
-                          pickup_date: newPickup,
-                          return_date: newReturn 
-                        }));
-                      }}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700" 
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Fecha de devolución</label>
-                    <input 
-                      required
-                      type="date" 
-                      value={form.return_date}
-                      min={form.pickup_date || today}
-                      onChange={(e) => set('return_date', e.target.value)}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700" 
-                    />
-                  </div>
-                </div>
-                {/* Horas */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Hora de llegada</label>
-                    <select 
-                      required
-                      value={form.pickup_time}
-                      onChange={(e) => set('pickup_time', e.target.value)}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
-                    >
-                      {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-bold text-gray-800">Hora de devolución</label>
-                    <select 
-                      required
-                      value={form.return_time}
-                      onChange={(e) => set('return_time', e.target.value)}
-                      className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
-                    >
-                      {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                {/* Datos Personales */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="Nombre" 
-                    value={form.first_name}
-                    onChange={(e) => set('first_name', e.target.value)}
-                    className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
-                  />
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="Apellido" 
-                    value={form.last_name}
-                    onChange={(e) => set('last_name', e.target.value)}
-                    className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
-                  />
-                </div>
-                <div>
-                  <input 
-                    required
-                    type="email" 
-                    placeholder="Email" 
-                    value={form.email}
-                    onChange={(e) => set('email', e.target.value)}
-                    className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <select 
-                    required
-                    value={form.country_code}
-                    onChange={(e) => set('country_code', e.target.value)}
-                    className="block w-24 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-2 text-gray-700 bg-gray-50"
-                  >
-                    <option value="+1">🇵🇷 +1</option>
-                    <option value="+1">🇺🇸 +1</option>
-                    <option value="+57">🇨🇴 +57</option>
-                    <option value="+52">🇲🇽 +52</option>
-                    <option value="+1">🇩🇴 +1</option>
-                    <option value="+54">🇦🇷 +54</option>
-                    <option value="+56">🇨🇱 +56</option>
-                    <option value="+34">🇪🇸 +34</option>
-                    <option value="+51">🇵🇪 +51</option>
-                    <option value="+507">🇵🇦 +507</option>
-                    <option value="+58">🇻🇪 +58</option>
-                  </select>
-                  <input 
-                    required
-                    type="tel" 
-                    placeholder="Teléfono/Whatsapp" 
-                    value={form.phone}
-                    onChange={(e) => set('phone', e.target.value)}
-                    className="block flex-1 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
-                  />
-                </div>
-                
-                {/* Terms and Conditions */}
-                <div className="flex items-start gap-3 py-2">
-                  <div className="flex items-center h-5">
-                    <input
-                      id="terms"
-                      name="terms"
-                      type="checkbox"
-                      required
-                      checked={form.terms_accepted}
-                      onChange={(e) => set('terms_accepted', e.target.checked)}
-                      className="h-5 w-5 rounded border-gray-300 text-primary-blue focus:ring-primary-blue cursor-pointer"
-                    />
-                  </div>
-                  <label htmlFor="terms" className="text-sm text-gray-600 leading-tight cursor-pointer">
-                    Acepto los <a href="#" className="text-primary-blue font-bold hover:underline">términos y condiciones</a> y la <a href="#" className="text-primary-blue font-bold hover:underline">política de privacidad</a>.
-                  </label>
-                </div>
+              
+              <div className="flex items-center gap-2 mb-6">
+                <div className={`flex-1 h-1.5 rounded-full transition-colors ${step >= 1 ? 'bg-primary-blue' : 'bg-gray-100'}`}></div>
+                <div className={`flex-1 h-1.5 rounded-full transition-colors ${step >= 2 ? 'bg-primary-blue' : 'bg-gray-100'}`}></div>
+              </div>
 
+              <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+                {step === 1 && (
+                  <>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Detalles de tu viaje</h2>
+                    {/* Tipo de vehiculo */}
+                    <div className="space-y-1.5">
+                      <label className="block text-sm font-bold text-gray-800">Tipo de vehículo</label>
+                      <select 
+                        required
+                        value={form.category_id}
+                        onChange={(e) => set('category_id', e.target.value)}
+                        className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
+                      >
+                        <option value="">Selecciona tipo</option>
+                        {categories.map(cat => (
+                          <option key={cat.id} value={cat.id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Ciudades */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Ciudad de llegada</label>
+                        <select 
+                          required
+                          value={form.pickup_location_id}
+                          onChange={(e) => {
+                            const loc = locations.find(l => l.id === e.target.value)
+                            setForm(f => ({ ...f, pickup_location_id: e.target.value, pickup_location: loc?.name || '' }))
+                          }}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
+                        >
+                          <option value="">Ciudad</option>
+                          {locations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Ciudad de devolución</label>
+                        <select 
+                          required
+                          value={form.return_location_id}
+                          onChange={(e) => {
+                            const loc = locations.find(l => l.id === e.target.value)
+                            setForm(f => ({ ...f, return_location_id: e.target.value, return_location: loc?.name || '' }))
+                          }}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4"
+                        >
+                          <option value="">Ciudad</option>
+                          {locations.map(loc => (
+                            <option key={loc.id} value={loc.id}>{loc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    {/* Fechas */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Fecha de llegada</label>
+                        <input 
+                          required
+                          type="date" 
+                          value={form.pickup_date}
+                          min={today}
+                          onChange={(e) => {
+                            const newPickup = e.target.value;
+                            const d = new Date(newPickup + 'T12:00:00');
+                            d.setDate(d.getDate() + 3);
+                            const newReturn = d.toISOString().split('T')[0];
+                            setForm(prev => ({ 
+                              ...prev, 
+                              pickup_date: newPickup,
+                              return_date: newReturn 
+                            }));
+                          }}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700" 
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Fecha de devolución</label>
+                        <input 
+                          required
+                          type="date" 
+                          value={form.return_date}
+                          min={form.pickup_date || today}
+                          onChange={(e) => set('return_date', e.target.value)}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700" 
+                        />
+                      </div>
+                    </div>
+                    {/* Horas */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Hora de llegada</label>
+                        <select 
+                          required
+                          value={form.pickup_time}
+                          onChange={(e) => set('pickup_time', e.target.value)}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
+                        >
+                          {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-sm font-bold text-gray-800">Hora de devolución</label>
+                        <select 
+                          required
+                          value={form.return_time}
+                          onChange={(e) => set('return_time', e.target.value)}
+                          className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
+                        >
+                          {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
+                            <option key={t} value={t}>{t}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      type="button" 
+                      onClick={handleNext}
+                      className="w-full bg-primary-blue text-white font-extrabold text-lg py-4 px-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] mt-4 flex justify-center items-center gap-2"
+                    >
+                      Siguiente paso
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
+                      </svg>
+                    </button>
+                  </>
+                )}
+
+                {step === 2 && (
+                  <>
+                    <div className="flex items-center gap-2 mb-2">
+                       <button 
+                         type="button" 
+                         onClick={() => setStep(1)}
+                         className="text-primary-blue flex items-center gap-1 text-sm font-bold hover:underline"
+                       >
+                         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                           <path d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" strokeLinecap="round" strokeLinejoin="round"></path>
+                         </svg>
+                         Atrás
+                       </button>
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Tus datos de contacto</h2>
+                    {/* Datos Personales */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <input 
+                        required
+                        type="text" 
+                        placeholder="Nombre" 
+                        value={form.first_name}
+                        onChange={(e) => set('first_name', e.target.value)}
+                        className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
+                      />
+                      <input 
+                        required
+                        type="text" 
+                        placeholder="Apellido" 
+                        value={form.last_name}
+                        onChange={(e) => set('last_name', e.target.value)}
+                        className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
+                      />
+                    </div>
+                    <div>
+                      <input 
+                        required
+                        type="email" 
+                        placeholder="Email" 
+                        value={form.email}
+                        onChange={(e) => set('email', e.target.value)}
+                        className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <select 
+                        required
+                        value={form.country_code}
+                        onChange={(e) => set('country_code', e.target.value)}
+                        className="block w-24 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-2 text-gray-700 bg-gray-50"
+                      >
+                        <option value="+1">🇵🇷 +1</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+57">🇨🇴 +57</option>
+                        <option value="+52">🇲🇽 +52</option>
+                        <option value="+1">🇩🇴 +1</option>
+                        <option value="+54">🇦🇷 +54</option>
+                        <option value="+56">🇨🇱 +56</option>
+                        <option value="+34">🇪🇸 +34</option>
+                        <option value="+51">🇵🇪 +51</option>
+                        <option value="+507">🇵🇦 +507</option>
+                        <option value="+58">🇻🇪 +58</option>
+                      </select>
+                      <input 
+                        required
+                        type="tel" 
+                        placeholder="Teléfono/Whatsapp" 
+                        value={form.phone}
+                        onChange={(e) => set('phone', e.target.value)}
+                        className="block flex-1 border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 placeholder-gray-400" 
+                      />
+                    </div>
+                    
+                    {/* Terms and Conditions */}
+                    <div className="flex items-start gap-3 py-2">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="terms"
+                          name="terms"
+                          type="checkbox"
+                          required
+                          checked={form.terms_accepted}
+                          onChange={(e) => set('terms_accepted', e.target.checked)}
+                          className="h-5 w-5 rounded border-gray-300 text-primary-blue focus:ring-primary-blue cursor-pointer"
+                        />
+                      </div>
+                      <label htmlFor="terms" className="text-sm text-gray-600 leading-tight cursor-pointer">
+                        Acepto los <a href="#" className="text-primary-blue font-bold hover:underline">términos y condiciones</a> y la <a href="#" className="text-primary-blue font-bold hover:underline">política de privacidad</a>.
+                      </label>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      disabled={submitting}
+                      className="w-full bg-primary-yellow hover:bg-primary-yellow-hover text-gray-900 font-extrabold text-lg py-4 px-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] mt-4 flex justify-center items-center gap-2 disabled:opacity-50"
+                    >
+                      {submitting ? 'Enviando...' : 'Finalizar Cotización'}
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
+                      </svg>
+                    </button>
+                  </>
+                )}
                 {error && <p className="text-red-600 text-sm font-bold bg-red-50 p-2 rounded">{error}</p>}
-                
-                {/* Submit Button */}
-                <button 
-                  type="submit" 
-                  disabled={submitting}
-                  className="w-full bg-primary-yellow hover:bg-primary-yellow-hover text-gray-900 font-extrabold text-lg py-4 px-4 rounded-xl shadow-lg transition-all transform hover:scale-[1.02] active:scale-[0.98] mt-4 flex justify-center items-center gap-2 disabled:opacity-50"
-                >
-                  {submitting ? 'Enviando...' : 'Finalizar Cotización'}
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                    <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" strokeLinecap="round" strokeLinejoin="round"></path>
-                  </svg>
-                </button>
               </form>
             </div>
           </div>
@@ -544,11 +614,15 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-gray-200 bg-white py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-6 md:px-12 text-center">
-          <p className="text-gray-500 text-sm font-medium">
-            © GoEasy Florida 2023 - 2026
-          </p>
+      <footer className="border-t border-gray-200 bg-white py-12 mt-auto">
+        <div className="max-w-7xl mx-auto px-6 md:px-12 flex flex-col items-center gap-6">
+          <div className="flex items-center gap-6 text-sm font-medium text-gray-500">
+            <a href="/login" className="hover:text-gray-900 transition-colors">Acceso Staff</a>
+            <span className="text-gray-300">|</span>
+            <p>
+              © {settings?.crm_name || 'GoEasy Florida'} {new Date().getFullYear()}
+            </p>
+          </div>
         </div>
       </footer>
     </div>
