@@ -1,6 +1,6 @@
 import { config } from 'dotenv'
 config({ path: '.env.local' })
-import { getTemplates } from './src/utils/waba.ts'
+import { getTemplates } from './src/utils/waba'
 
 async function fetch() {
    const templates = await getTemplates()
