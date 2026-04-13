@@ -460,7 +460,7 @@ export default function ChatInboxClient({
                              </div>
                            )}
                            <div className="flex flex-col gap-2">
-                            <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md ${
+                            <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md whitespace-pre-wrap break-words ${
                                 msg.direction === 'outbound' 
                                   ? 'bg-primary text-white rounded-br-none' 
                                   : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'

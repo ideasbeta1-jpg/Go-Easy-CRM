@@ -33,7 +33,7 @@ export async function executeStageAutomation(
       return;
     }
 
-    // 1.1 Obtener datos del agente si existe (en consulta separada para evitar errores de join)
+    // 1.1 Obtener datos del agente y la cotización activa
     if (lead.assigned_to) {
       try {
         const { data: agent } = await supabase
@@ -48,6 +48,36 @@ export async function executeStageAutomation(
       } catch (agentErr) {
         console.warn('[AutomationEngine] Error al obtener agente (no crítico):', agentErr);
       }
+    }
+
+    // Obtener la cotización más reciente si estamos en etapa de cotización o si se requiere
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (quote) {
+      lead.active_quote = quote;
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+      lead.quote_url = `${appUrl}/cotizacion/${quote.id}`;
+    }
+
+    // Obtener el voucher más reciente si existe
+    const { data: voucher } = await supabase
+      .from('vouchers')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (voucher) {
+      lead.active_voucher = voucher;
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+      lead.voucher_url = `${appUrl}/v/${voucher.id}`;
     }
 
     // 2. Configuración por defecto por etapa
@@ -94,7 +124,7 @@ export async function executeStageAutomation(
                 lead.first_name || 'Cliente', 
                 formatValue(lead.pickup_date, 'date'),
                 lead.pickup_location || '—',
-                extraData.stripe_link || lead.stripe_link || 'pendiente'
+                lead.quote_url || extraData.stripe_link || lead.stripe_link || 'pendiente'
               ]; 
               break;
             case 'reserva_confirmada': 
@@ -276,6 +306,7 @@ function resolveLeadField(fieldId: string, lead: any, extraData: any): string {
     case 'total_amount': return `$${lead.total_amount || '0'}`;
     case 'deposit_amount': return `$${((lead.total_amount || 0) * 0.3).toFixed(2)}`;
     case 'stripe_link': return extraData.stripe_link || lead.stripe_link || '—';
+    case 'quote_url': return lead.quote_url || '—';
     case 'agent_name': return lead.assigned_agent?.first_name || 'Tu Asesor';
     case 'agent_phone': return lead.assigned_agent?.phone || '';
     case 'voucher_url': return extraData.voucher_url || '—';

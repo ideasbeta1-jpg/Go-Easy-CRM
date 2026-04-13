@@ -43,6 +43,7 @@ export default function LandingPage() {
     email: '',
     first_name: '',
     last_name: '',
+    terms_accepted: false,
   })
 
   useEffect(() => {
@@ -65,7 +66,7 @@ export default function LandingPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const set = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }))
+  const set = (field: string, value: any) => setForm(f => ({ ...f, [field]: value }))
 
   const selectedCategory = categories.find(c => c.id === form.category_id)
 
@@ -74,6 +75,11 @@ export default function LandingPage() {
     setError('')
     if (!form.category_id || !form.pickup_location_id || !form.return_location_id || !form.pickup_date || !form.pickup_time || !form.return_date || !form.return_time || !form.first_name || !form.last_name || !form.phone || !form.email) {
       setError('Por favor completa todos los campos obligatorios.')
+      return
+    }
+
+    if (!form.terms_accepted) {
+      setError('Debes aceptar los términos y condiciones para continuar.')
       return
     }
     setSubmitting(true)
@@ -100,6 +106,7 @@ export default function LandingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          phone: finalPhone, // Enviamos el teléfono con el código de país formateado
           pickup_date,
           return_date,
         }),
@@ -397,6 +404,24 @@ export default function LandingPage() {
                   />
                 </div>
                 
+                {/* Terms and Conditions */}
+                <div className="flex items-start gap-3 py-2">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="terms"
+                      name="terms"
+                      type="checkbox"
+                      required
+                      checked={form.terms_accepted}
+                      onChange={(e) => set('terms_accepted', e.target.checked)}
+                      className="h-5 w-5 rounded border-gray-300 text-primary-blue focus:ring-primary-blue cursor-pointer"
+                    />
+                  </div>
+                  <label htmlFor="terms" className="text-sm text-gray-600 leading-tight cursor-pointer">
+                    Acepto los <a href="#" className="text-primary-blue font-bold hover:underline">términos y condiciones</a> y la <a href="#" className="text-primary-blue font-bold hover:underline">política de privacidad</a>.
+                  </label>
+                </div>
+
                 {error && <p className="text-red-600 text-sm font-bold bg-red-50 p-2 rounded">{error}</p>}
                 
                 {/* Submit Button */}

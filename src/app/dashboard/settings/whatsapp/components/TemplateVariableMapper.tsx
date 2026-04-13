@@ -28,6 +28,7 @@ const LEAD_FIELDS = [
   { id: 'total_amount', label: 'Monto Total' },
   { id: 'deposit_amount', label: 'Monto Depósito (30%)' },
   { id: 'stripe_link', label: 'Link de Pago' },
+  { id: 'quote_url', label: 'Link de Cotización' },
   { id: 'agent_name', label: 'Nombre Agente' },
   { id: 'agent_phone', label: 'Teléfono Agente' },
   { id: 'voucher_url', label: 'Link de Voucher' },
