@@ -16,7 +16,12 @@ export async function POST(req: Request) {
       if (fromMe === false) {
         const remoteJid = msgData.key?.remoteJid
         const phoneNumber = remoteJid?.split('@')[0]
-        const content = msgData.message?.conversation || msgData.message?.extendedTextMessage?.text || 'MMS/Media/Otro'
+        const content = msgData.message?.conversation || 
+                        msgData.message?.extendedTextMessage?.text || 
+                        msgData.message?.templateButtonReplyMessage?.selectedDisplayText ||
+                        msgData.message?.buttonsResponseMessage?.selectedDisplayText ||
+                        msgData.message?.listResponseMessage?.title ||
+                        'MMS/Media/Otro'
         const pushName = msgData.pushName || 'WhatsApp Contact'
         
         if (phoneNumber) {
@@ -75,7 +80,11 @@ async function handleWabaMedia(mediaId: string, leadId: string) {
 async function handleWabaMessage(message: any, contact: any) {
   const phoneNumber = message.from
   const pushName = contact?.profile?.name || 'WABA Contact'
-  let content = message.text?.body || '[Multimedia]'
+  let content = message.text?.body || 
+                message.interactive?.button_reply?.title || 
+                message.interactive?.list_reply?.title || 
+                message.button?.text || 
+                '[Multimedia]'
   let mediaUrl = null
   let mediaType = null
 

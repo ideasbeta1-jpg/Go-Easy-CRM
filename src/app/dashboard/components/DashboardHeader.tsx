@@ -7,20 +7,25 @@ import { getProfileStatus, updateProfileStatus } from '@/app/utils/actions/profi
 import { toast } from 'sonner'
 import { NotificationBell } from './NotificationBell'
 
-export function DashboardHeader({ userEmail }: { userEmail?: string }) {
+export function DashboardHeader({ userProfile }: { userProfile: any }) {
   const pathname = usePathname();
   const isLeadsPage = pathname === '/dashboard/leads';
-  const [isActive, setIsActive] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [isActive, setIsActive] = useState(userProfile?.is_active ?? false)
+  const [loading, setLoading] = useState(userProfile ? false : true)
 
   useEffect(() => {
+    if (userProfile) {
+      setIsActive(userProfile.is_active)
+      setLoading(false)
+      return
+    }
     async function fetchStatus() {
       const { isActive } = await getProfileStatus()
       setIsActive(isActive)
       setLoading(false)
     }
     fetchStatus()
-  }, [])
+  }, [userProfile])
 
   const handleToggle = async () => {
     const newStatus = !isActive
@@ -40,7 +45,7 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
     <header className="w-full h-24 shrink-0 flex justify-between items-center px-12 bg-white/50 backdrop-blur-md z-40 border-b border-slate-100/30">
       <div className="flex flex-col">
           <h1 className="font-sans text-2xl font-black text-slate-900 tracking-tight uppercase">
-            ¡Bienvenido de nuevo! <span className="text-primary">Florida</span> 🌴
+            ¡Bienvenido de nuevo! <span className="text-primary">{userProfile?.first_name || userProfile?.full_name?.split(' ')[0] || 'Usuario'}</span> 🌴
           </h1>
           <div className="flex items-center gap-2 mt-1">
              <div className={`w-2 h-2 rounded-full animate-pulse ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
@@ -76,13 +81,27 @@ export function DashboardHeader({ userEmail }: { userEmail?: string }) {
           
           <div className="h-10 w-[1px] bg-slate-200 hidden md:block"></div>
 
-          <div className="flex items-center gap-4 px-3 py-1.5 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group">
+          <div className="flex items-center gap-4 px-3 py-1.5 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group" title={userProfile?.email}>
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-black text-primary uppercase tracking-wider">Admin Panel</span>
-              <span className="text-[10px] font-bold text-slate-400 truncate max-w-[120px]">{userEmail}</span>
+              <span className="text-[11px] font-black text-primary uppercase tracking-tight">
+                {userProfile?.first_name && userProfile?.last_name 
+                  ? `${userProfile.first_name} ${userProfile.last_name}`
+                  : userProfile?.full_name || 'Cargando...'}
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                {userProfile?.role === 'admin' ? 'Administrador' : 'Agente'}
+              </span>
             </div>
             <div className="w-11 h-11 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-              <img src={`https://ui-avatars.com/api/?name=${userEmail?.split('@')[0]}&background=4052b6&color=fff`} className="w-full h-full object-cover" alt="Profile" />
+              <img 
+                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  (userProfile?.first_name && userProfile?.last_name) 
+                    ? `${userProfile.first_name} ${userProfile.last_name}` 
+                    : userProfile?.full_name || 'U'
+                )}&background=4052b6&color=fff&bold=true`} 
+                className="w-full h-full object-cover" 
+                alt="Profile" 
+              />
             </div>
           </div>
       </div>

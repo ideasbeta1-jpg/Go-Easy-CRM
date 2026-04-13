@@ -81,10 +81,37 @@ export async function executeStageAutomation(
           params = sortedKeys.map(key => resolveLeadField(mapping.mappings[key], lead, extraData));
         } else {
           switch(stage) {
-            case 'lead_nuevo': params = [lead.first_name || 'Cliente']; break;
-            case 'en_cotizacion': params = [lead.first_name || 'Cliente', extraData.stripe_link || 'pendiente']; break;
-            case 'reserva_confirmada': params = [lead.first_name || 'Cliente', formatValue(lead.pickup_date, 'date')]; break;
-            case 'voucher_enviado': params = [lead.first_name || 'Cliente', extraData.voucher_url || 'pendiente']; break;
+            case 'lead_nuevo': 
+              params = [
+                lead.first_name || 'Cliente', 
+                lead.assigned_agent?.first_name || 'Tu Asesor',
+                formatValue(lead.pickup_date, 'date'),
+                lead.pickup_location || '—'
+              ]; 
+              break;
+            case 'en_cotizacion': 
+              params = [
+                lead.first_name || 'Cliente', 
+                formatValue(lead.pickup_date, 'date'),
+                lead.pickup_location || '—',
+                extraData.stripe_link || lead.stripe_link || 'pendiente'
+              ]; 
+              break;
+            case 'reserva_confirmada': 
+              params = [
+                lead.first_name || 'Cliente', 
+                formatValue(lead.pickup_date, 'date'),
+                lead.pickup_location || '—'
+              ]; 
+              break;
+            case 'voucher_enviado': 
+              params = [
+                lead.first_name || 'Cliente', 
+                lead.assigned_agent?.first_name || 'Tu Asesor',
+                lead.pickup_location || '—',
+                extraData.voucher_url || 'pendiente'
+              ]; 
+              break;
             default: params = [lead.first_name || 'Cliente'];
           }
         }
@@ -96,6 +123,39 @@ export async function executeStageAutomation(
 
         const waSuccess = await sendTemplateMessage(lead.phone, templateName, mapping?.language_code || 'es', components);
         await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed');
+        
+        if (waSuccess) {
+          let previewText = `📄 [Plantilla: ${templateName}]`;
+          try {
+            const { getTemplates } = await import('./waba');
+            const templates = await getTemplates();
+            const matchedTemplate = templates.find(t => t.name === templateName && t.language === (mapping?.language_code || 'es'));
+            if (matchedTemplate) {
+              const bodyComponent = matchedTemplate.components.find((c: any) => c.type === 'BODY');
+              if (bodyComponent && bodyComponent.text) {
+                let interpolatedText = bodyComponent.text;
+                params.forEach((paramVal, index) => {
+                  interpolatedText = interpolatedText.replace(`{{${index + 1}}}`, paramVal || '');
+                });
+                previewText = interpolatedText;
+                
+                const buttonsComponent = matchedTemplate.components.find((c: any) => c.type === 'BUTTONS');
+                if (buttonsComponent && buttonsComponent.buttons) {
+                  const btnTexts = buttonsComponent.buttons.map((b: any) => `[ ${b.text} ]`).join(' ');
+                  previewText += `\n\n${btnTexts}`;
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[AutomationEngine] Could not generate detailed template preview, using fallback.');
+          }
+
+          await supabase.from('messages').insert({
+            lead_id: leadId,
+            content: previewText,
+            direction: 'outbound'
+          });
+        }
       } catch (waErr: any) {
         await logAutomation(leadId, stage, 'whatsapp', templateName, 'error', waErr.message);
       }

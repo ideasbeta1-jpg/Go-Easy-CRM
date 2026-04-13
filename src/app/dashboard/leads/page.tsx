@@ -40,7 +40,7 @@ export default async function LeadsPage() {
   // 2. Get user profile and role
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, full_name, avatar_url')
+    .select('role, full_name, first_name, last_name, avatar_url')
     .eq('id', user.id)
     .single()
 
@@ -126,13 +126,23 @@ export default async function LeadsPage() {
             currentUserId={user.id} 
           />
 
-          <div className="flex items-center gap-3 pl-3 pr-2 md:pr-4 border-l border-slate-200 shrink-0">
+          <div className="flex items-center gap-3 pl-3 pr-2 md:pr-4 border-l border-slate-200 shrink-0" title={user?.email || ''}>
             <div className="hidden sm:flex flex-col items-end">
-              <span className="text-[9px] font-black text-slate-900 uppercase leading-none mb-1">{isAdmin ? 'Admin' : 'Agente'}</span>
-              <span className="text-[9px] font-bold text-slate-400 truncate max-w-[80px]">{profile?.full_name?.split(' ')[0] || user?.email?.split('@')[0]}</span>
+              <span className="text-[9px] font-black text-primary uppercase leading-none mb-1">
+                {profile?.first_name && profile?.last_name 
+                  ? `${profile.first_name} ${profile.last_name}`
+                  : profile?.full_name || 'Cargando...'}
+              </span>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                {profile?.role === 'admin' ? 'Administrador' : 'Agente'}
+              </span>
             </div>
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100">
-               <img src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || user?.email?.split('@')[0] || 'User'}&background=4052b6&color=fff`} className="w-full h-full object-cover" alt="Profile" />
+               <img src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                 (profile?.first_name && profile?.last_name) 
+                   ? `${profile.first_name} ${profile.last_name}` 
+                   : profile?.full_name || 'U'
+               )}&background=4052b6&color=fff&bold=true`} className="w-full h-full object-cover" alt="Profile" />
             </div>
           </div>
         </div>

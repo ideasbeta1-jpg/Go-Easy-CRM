@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { MapPin, Settings2, ShieldCheck, ChevronRight, User, Mail } from 'lucide-react'
+import { MapPin, Settings2, ShieldCheck, ChevronRight, User, Mail, Users } from 'lucide-react'
 
 const SETTINGS_CATEGORIES = [
   {
@@ -14,6 +14,15 @@ const SETTINGS_CATEGORIES = [
     badge: 'Cuenta'
   },
   {
+    id: 'users',
+    title: 'Usuarios y Roles',
+    description: 'Gestiona los accesos del equipo, crea nuevos usuarios y asigna permisos de administrador o agente.',
+    icon: Users,
+    href: '/dashboard/settings/users',
+    color: 'bg-amber-50 text-amber-600 border-amber-100',
+    badge: 'Seguridad'
+  },
+  {
     id: 'locations',
     title: 'Sitios y Ubicaciones',
     description: 'Gestiona aeropuertos, oficinas centrales y otros puntos de recogida para tus partners.',
@@ -22,7 +31,7 @@ const SETTINGS_CATEGORIES = [
     color: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     badge: 'Logística'
   },
-   {
+  {
     id: 'whatsapp',
     title: 'WhatsApp Business API',
     description: 'Configura la conexión oficial con Meta, gestiona tus plantillas y automatiza mensajes.',

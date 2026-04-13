@@ -8,6 +8,7 @@ import { logout } from '@/app/login/actions'
 import { NotificationProvider } from './components/NotificationProvider'
 import { Toaster } from 'sonner'
 import { ActiveStatusTracker } from './components/ActiveStatusTracker'
+import { getUserProfile } from '@/app/utils/actions/profiles'
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +21,8 @@ export default async function DashboardLayout({
   if (!user) {
     redirect('/login')
   }
+
+  const userProfile = await getUserProfile()
 
   // Sidebar navigation items data
   const menuItems = [
@@ -74,7 +77,7 @@ export default async function DashboardLayout({
 
         {/* Main Content Canvas */}
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-          <DashboardHeader userEmail={user?.email} />
+          <DashboardHeader userProfile={userProfile} />
 
           {/* Dynamic Content Surface */}
           <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 bg-[#f8fafc] relative">

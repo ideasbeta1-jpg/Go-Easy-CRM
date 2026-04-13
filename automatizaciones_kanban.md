@@ -29,7 +29,7 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 *   **Qué sucede**: Se activa inmediatamente cuando un cliente potencial escribe por primera vez por WhatsApp o se registra.
 *   **WhatsApp**:
     *   **Plantilla**: `bienvenida_lead`
-    *   **Contenido**: "Hola [Nombre], gracias por contactar a Go Easy Florida 🚗. Un asesor te contactará pronto."
+    *   **Contenido**: "¡Hola [Nombre_Cliente]! 🌴 Te saluda [Nombre_Asesor] de Goeasy Florida. Acabo de recibir tu solicitud y ya estoy reservando un espacio en mi agenda para ayudarte con tu renta. Antes de enviarte las mejores opciones, quiero confirmar que tengo todo bien: Veo que llegas el [Fecha_Llegada] a [Ciudad]. ¿Es correcto o hubo algún cambio en tus planes?"
 *   **Email**:
     *   **Asunto**: "¡Bienvenido a Go Easy Florida!"
     *   **Propósito**: Dar una respuesta inmediata para mejorar la tasa de conversión.
@@ -38,8 +38,8 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 *   **Qué sucede**: Se activa cuando el agente genera el enlace de pago (Stripe). Sistema toma un **Snapshot** de los valores actuales.
 *   **WhatsApp**:
     *   **Plantilla**: `cotizacion_enviada`
-    *   **Variables**: `[Nombre]`, `[Link de Stripe]`
-    *   **Contenido**: "Hola [Nombre], tu cotización está lista. Revisa y paga aquí: [Link]"
+    *   **Variables**: `[Nombre]`, `[Fecha_Llegada]`, `[Ciudad]`, `[Enlace_Cotización]`
+    *   **Contenido**: "¡Listo, [Nombre_Cliente]! Ya tengo tu propuesta personalizada. 🚗✨ Seleccioné las opciones que mejor se adaptan a tu llegada el [Fecha_Llegada] a [Ciudad], priorizando comodidad, espacio y, por supuesto, el mejor precio. Puedes revisar el detalle de los autos y confirmar tu reserva de una vez realizando el pago de forma segura aquí: 🔗 [Enlace_Cotización] ¿Tienes alguna duda con el proceso de pago?"
 *   **Validación de Integridad**:
     *   Si el precio o fechas cambian sin regenerar la cotización, aparece una alerta en la línea de tiempo.
     *   **Botón de Acción**: Permite al vendedor regenerar la propuesta para asegurar que el link de Stripe coincida con lo acordado.
@@ -48,8 +48,8 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 *   **Qué sucede**: Se dispara automáticamente cuando Stripe confirma que el pago de la reserva se ha completado.
 *   **WhatsApp**:
     *   **Plantilla**: `pago_confirmado`
-    *   **Variables**: `[Nombre]`, `[Fecha de recogida]`
-    *   **Contenido**: "¡[Nombre], tu reserva está confirmada! 🎉 Entrega: [Fecha]. Recibirás tu voucher pronto."
+    *   **Variables**: `[Nombre]`, `[Fecha_Llegada]`, `[Ciudad]`
+    *   **Contenido**: "¡Excelente noticia, [Nombre_Cliente]! 🥳 Acabamos de recibir tu pago correctamente. ¡Tu auto en Goeasy Florida ya está oficialmente reservado para tu llegada el [Fecha_Llegada]! 🚗💨 Ya estoy preparando tu Voucher de Confirmación con todos los detalles de la entrega en [Ciudad]. Te lo enviaré por este mismo chat en tan solo unos minutos. ¡Prepárate para disfrutar el camino! 🌴☀️"
 *   **Email**:
     *   **Asunto**: "¡Reserva confirmada!"
 
@@ -57,8 +57,8 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 *   **Qué sucede**: Se activa cuando el agente sube el PDF del voucher al lead en el panel de control.
 *   **WhatsApp**:
     *   **Plantilla**: `voucher_disponible`
-    *   **Variables**: `[Nombre]`, `[URL del Voucher]`
-    *   **Contenido**: "[Nombre], tu voucher está listo. Descárgalo aquí: [URL]"
+    *   **Variables**: `[Nombre]`, `[Nombre_Asesor]`, `[Ciudad]`, `[URL_Voucher]`
+    *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Soy [Nombre_Asesor]. Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF para llevarla en tu celular (muy útil si no tienes señal al aterrizar) aquí: 📄 [Enlace_Voucher] ¿Deseas que te explique cómo será el proceso de recogida en el aeropuerto o prefieres leerlo en el documento?"
 *   **Email**:
     *   **Asunto**: "Tu voucher de reserva"
 

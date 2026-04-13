@@ -19,7 +19,7 @@ import {
   PlayIcon,
   PauseIcon
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -431,38 +431,60 @@ export default function ChatInboxClient({
                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">No hay historial de mensajes</p>
                 </div>
               ) : (
-                selectedMessages.map((msg, idx) => (
-                  <div key={idx} className={`flex flex-col ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-2`}>
-                    <div className="flex items-end gap-3 max-w-[80%]">
-                       {msg.direction === 'inbound' && (
-                         <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0 mb-3 ring-4 ring-white shadow-sm">
-                            {selectedLead.first_name?.[0]}
-                         </div>
-                       )}
-                       <div className="flex flex-col gap-2">
-                        <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md ${
-                            msg.direction === 'outbound' 
-                              ? 'bg-primary text-white rounded-br-none' 
-                              : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                        }`}>
-                            {msg.media_url && msg.media_type?.startsWith('audio/') ? (
-                              <div className="flex flex-col gap-2 min-w-[200px]">
-                                <audio src={msg.media_url} controls className={`w-full h-8 ${msg.direction === 'outbound' ? 'brightness-200' : ''}`} />
-                                {msg.content && msg.content !== `Media: ${msg.media_type}` && (
-                                  <p className="mt-2">{msg.content}</p>
-                                )}
-                              </div>
-                            ) : (
-                              msg.content
-                            )}
+                selectedMessages.map((msg, idx) => {
+                  const currentMsgDate = new Date(msg.created_at)
+                  const prevMsgDate = idx > 0 ? new Date(selectedMessages[idx - 1].created_at) : null
+                  const isNewDay = !prevMsgDate || currentMsgDate.toDateString() !== prevMsgDate.toDateString()
+                  
+                  let dateLabel = ''
+                  if (isNewDay) {
+                    if (isToday(currentMsgDate)) dateLabel = 'Hoy'
+                    else if (isYesterday(currentMsgDate)) dateLabel = 'Ayer'
+                    else dateLabel = format(currentMsgDate, "d 'de' MMMM", { locale: es })
+                  }
+
+                  return (
+                    <React.Fragment key={idx}>
+                      {isNewDay && (
+                        <div className="flex justify-center my-6">
+                           <span className="px-4 py-1.5 bg-slate-100/80 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm backdrop-blur-sm">
+                             {dateLabel}
+                           </span>
                         </div>
-                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 ${msg.direction === 'outbound' ? 'text-right' : 'text-left'} text-slate-300`}>
-                            {format(new Date(msg.created_at), 'hh:mm a', { locale: es })}
-                        </span>
-                       </div>
-                    </div>
-                  </div>
-                ))
+                      )}
+                      <div className={`flex flex-col ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-2`}>
+                        <div className="flex items-end gap-3 max-w-[80%]">
+                           {msg.direction === 'inbound' && (
+                             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0 mb-3 ring-4 ring-white shadow-sm">
+                                {selectedLead.first_name?.[0]}
+                             </div>
+                           )}
+                           <div className="flex flex-col gap-2">
+                            <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md ${
+                                msg.direction === 'outbound' 
+                                  ? 'bg-primary text-white rounded-br-none' 
+                                  : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
+                            }`}>
+                                {msg.media_url && msg.media_type?.startsWith('audio/') ? (
+                                  <div className="flex flex-col gap-2 min-w-[200px]">
+                                    <audio src={msg.media_url} controls className={`w-full h-8 ${msg.direction === 'outbound' ? 'brightness-200' : ''}`} />
+                                    {msg.content && msg.content !== `Media: ${msg.media_type}` && (
+                                      <p className="mt-2">{msg.content}</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  msg.content
+                                )}
+                            </div>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 ${msg.direction === 'outbound' ? 'text-right' : 'text-left'} text-slate-300`}>
+                                {format(currentMsgDate, 'hh:mm a', { locale: es })}
+                            </span>
+                           </div>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  )
+                })
               )}
               <div ref={messagesEndRef} />
             </div>

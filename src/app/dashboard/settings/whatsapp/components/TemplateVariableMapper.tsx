@@ -51,7 +51,7 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
   const [error, setError] = useState<string | null>(null)
   
   // Detect variables in template body
-  const bodyComponent = template.components?.find(c => c.type === 'BODY');
+  const bodyComponent = template.components?.find(c => c.type?.toUpperCase() === 'BODY');
   const bodyText = bodyComponent?.text || '';
   const variables = (Array.from(bodyText.matchAll(/\{\{(\d+)\}\}/g)) as RegExpMatchArray[]).map(m => m[1]);
   const uniqueVariables = Array.from(new Set(variables)).sort((a, b) => parseInt(a) - parseInt(b));
@@ -90,8 +90,9 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
   }
 
   return (
-    <div className="bg-white border border-slate-200 p-8 rounded-[2.5rem] shadow-2xl animate-in fade-in zoom-in-95 duration-300 max-w-lg w-full">
-      <div className="flex items-center justify-between mb-6">
+    <div className="bg-white border border-slate-200 rounded-[2.5rem] shadow-2xl animate-in fade-in zoom-in-95 duration-300 max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+      {/* Fixed Header */}
+      <div className="p-8 pb-4 flex items-center justify-between border-b border-slate-50">
         <div className="space-y-1">
           <h3 className="text-xl font-black text-slate-900 tracking-tight">Mapear Variables</h3>
           <p className="text-xs font-bold text-blue-600 uppercase tracking-widest">{template.name}</p>
@@ -101,7 +102,8 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
         </button>
       </div>
 
-      <div className="space-y-6">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
         <div className="space-y-2">
           <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Etapa de Automatización</label>
           <select 
@@ -155,8 +157,46 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
         <div className="bg-amber-50/50 border border-amber-100 p-4 rounded-2xl flex gap-3">
           <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
           <p className="text-[10px] text-amber-700 font-bold leading-relaxed">
-            Asegúrate de que el orden de las variables coincida con el que pusiste en el administrador de Meta para que los mensajes tengan sentido.
+            Asegúrate de que el orden de las variables coincida con el que pusiste en el administrador de Meta.
           </p>
+        </div>
+
+        {/* Real-time Message Preview */}
+        <div className="space-y-4 pt-4 border-t border-slate-100">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Previsualización</h4>
+            <div className="h-px flex-1 bg-slate-100" />
+          </div>
+          
+          <div className="bg-[#f0f2f5] p-6 rounded-[2rem] border border-slate-200 relative overflow-hidden group">
+            {/* WhatsApp Bubble Style */}
+            <div className="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm relative z-10 max-w-[95%] border border-slate-100/50">
+              <p className="text-[12px] text-slate-700 leading-relaxed whitespace-pre-wrap font-medium">
+                {bodyText.split(/(\{\{\d+\}\})/).map((part: string, i: number) => {
+                  const match = part.match(/\{\{(\d+)\}\}/);
+                  if (match) {
+                    const vNum = match[1];
+                    const fieldId = mappings[vNum];
+                    const field = LEAD_FIELDS.find(f => f.id === fieldId);
+                    return (
+                      <span key={i} className={`font-black tracking-tight ${field ? 'text-blue-600' : 'text-slate-300'}`}>
+                        {field ? `[${field.label}]` : part}
+                      </span>
+                    );
+                  }
+                  return part;
+                })}
+              </p>
+              <div className="flex justify-end mt-1">
+                <span className="text-[9px] font-bold text-slate-300 uppercase tracking-tighter">12:00 PM</span>
+              </div>
+            </div>
+            
+            {/* Background Decoration */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+              <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#25d366_1px,transparent_1px)] [background-size:20px_20px]" />
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -164,23 +204,24 @@ export default function TemplateVariableMapper({ template, onClose, onSuccess }:
             {error}
           </div>
         )}
+      </div>
 
-        <div className="flex items-center gap-3 pt-4">
-           <button 
-             onClick={onClose}
-             className="flex-1 px-5 py-4 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition-all active:scale-95"
-           >
-             Cancelar
-           </button>
-           <button 
-             onClick={handleSave}
-             disabled={saving}
-             className="flex-[2] px-5 py-4 bg-blue-600 text-white rounded-2xl text-sm font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-           >
-             {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-             Guardar Mapeo
-           </button>
-        </div>
+      {/* Fixed Footer Actions */}
+      <div className="p-8 pt-4 border-t border-slate-50 flex items-center gap-3 bg-white">
+         <button 
+           onClick={onClose}
+           className="flex-1 px-5 py-4 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black hover:bg-slate-200 transition-all active:scale-95"
+         >
+           Cancelar
+         </button>
+         <button 
+           onClick={handleSave}
+           disabled={saving}
+           className="flex-[2] px-5 py-4 bg-blue-600 text-white rounded-2xl text-sm font-black hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+         >
+           {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+           Guardar Mapeo
+         </button>
       </div>
     </div>
   )
