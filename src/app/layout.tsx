@@ -4,16 +4,30 @@ import type { Metadata } from 'next'
 import { Radio_Canada_Big } from 'next/font/google'
 import React from 'react'
 import "./globals.css";
+import { createClient } from '@/utils/supabase/server'
 
 const radioCanada = Radio_Canada_Big({
   subsets: ['latin'],
   variable: '--font-radio-canada',
 });
 
-export const metadata: Metadata = {
-  title: "Go Easy Florida CRM",
-  description: "Premium Car Rental CRM",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const supabase = await createClient()
+  const { data: settings } = await supabase
+    .from('system_settings')
+    .select('*')
+    .eq('id', 1)
+    .single()
+
+  return {
+    title: settings?.seo_title || "Go Easy Florida CRM",
+    description: settings?.seo_description || "Premium Car Rental CRM",
+    keywords: settings?.seo_keywords,
+    icons: {
+      icon: settings?.favicon_url || "/favicon.ico",
+    }
+  }
+}
 
 export default function RootLayout({
   children,

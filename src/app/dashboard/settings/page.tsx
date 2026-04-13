@@ -48,6 +48,15 @@ const SETTINGS_CATEGORIES = [
     href: '/dashboard/settings/emails',
     color: 'bg-purple-50 text-purple-600 border-purple-100',
     badge: 'Automatización'
+  },
+  {
+    id: 'system',
+    title: 'Configuracion General',
+    description: 'Personaliza la identidad del CRM, logo, favicon, SEO y parámetros globales del sistema.',
+    icon: Settings2,
+    href: '/dashboard/settings/system',
+    color: 'bg-rose-50 text-rose-600 border-rose-100',
+    badge: 'Admin Only'
   }
 ]
 

@@ -9,6 +9,7 @@ import { NotificationProvider } from './components/NotificationProvider'
 import { Toaster } from 'sonner'
 import { ActiveStatusTracker } from './components/ActiveStatusTracker'
 import { getUserProfile } from '@/app/utils/actions/profiles'
+import { getSystemSettings } from '@/app/utils/actions/settings'
 
 export default async function DashboardLayout({
   children,
@@ -23,6 +24,7 @@ export default async function DashboardLayout({
   }
 
   const userProfile = await getUserProfile()
+  const settings = await getSystemSettings()
 
   // Sidebar navigation items data
   const menuItems = [
@@ -44,8 +46,18 @@ export default async function DashboardLayout({
         <aside className="hidden lg:flex flex-col h-screen w-72 rounded-r-[3rem] sticky left-0 top-0 bg-white py-12 px-8 justify-between shrink-0 z-50 overflow-y-auto border-r border-slate-100/50 shadow-xl shadow-slate-200/20">
           <div className="flex flex-col gap-12">
             <div className="px-2">
-              <Link href="/dashboard" className="text-2xl font-black text-primary font-sans leading-none tracking-tight block hover:opacity-80 transition-opacity">Go Easy Florida</Link>
-              <div className="text-[0.625rem] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">Premium Car Rental CRM</div>
+              <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                {settings?.logo_url ? (
+                  <img src={settings.logo_url} alt={settings.crm_name || 'CRM'} className="h-10 w-auto" />
+                ) : (
+                  <span className="text-2xl font-black text-primary font-sans leading-none tracking-tight">
+                    {settings?.crm_name || 'Go Easy CRM'}
+                  </span>
+                )}
+              </Link>
+              <div className="text-[0.625rem] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">
+                {settings?.crm_tagline || 'Premium Car Rental CRM'}
+              </div>
             </div>
             
             <SidebarNav menuItems={menuItems} />

@@ -1,10 +1,13 @@
 import { login } from './actions'
+import { getSystemSettings } from '@/app/utils/actions/settings'
 
-export default function LoginPage({
+export default async function LoginPage({
   searchParams,
 }: {
   searchParams: { error?: string }
 }) {
+  const settings = await getSystemSettings()
+
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 bg-[grid-slate-200_1px_1px] [mask-image:linear-gradient(to_bottom,white,transparent)] dark:bg-slate-950 dark:bg-[grid-slate-800_1px_1px]">
       <div className="w-full max-w-md relative">
@@ -14,12 +17,16 @@ export default function LoginPage({
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 shadow-2xl rounded-3xl p-8 space-y-8 overflow-hidden relative">
           
           {/* Header */}
-          <div className="text-center space-y-2">
-            <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Go Easy <span className="text-indigo-600">CRM</span>
-            </h1>
+          <div className="text-center space-y-4">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt={settings.crm_name} className="h-16 w-auto mx-auto mb-4" />
+            ) : (
+              <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
+                {settings?.crm_name?.split(' ')[0] || 'Go'} <span className="text-indigo-600">{settings?.crm_name?.split(' ').slice(1).join(' ') || 'Easy CRM'}</span>
+              </h1>
+            )}
             <p className="text-slate-500 dark:text-slate-400 font-medium">
-              Ventas y Renta de Autos Florida
+              {settings?.crm_tagline || 'Ventas y Renta de Autos Florida'}
             </p>
           </div>
 
