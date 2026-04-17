@@ -82,8 +82,8 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
       },
     ],
     mode: 'payment',
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/cotizacion/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/cotizacion/${quote.id}`,
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}`,
     metadata: {
        lead_id: leadId,
        quote_id: quote.id

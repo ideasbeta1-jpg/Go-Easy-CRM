@@ -17,14 +17,18 @@ export interface WABATemplate {
  * Fetch all message templates from WABA
  */
 export async function getTemplates(): Promise<WABATemplate[]> {
-  if (!WABA_ID || !ACCESS_TOKEN) {
-    console.error('WABA credentials missing');
+  const wabaId = process.env.WABA_ID;
+  const token = process.env.WABA_ACCESS_TOKEN;
+  const version = process.env.WABA_VERSION || 'v21.0';
+
+  if (!wabaId || !token) {
+    console.error('[getTemplates] WABA credentials missing (WABA_ID or ACCESS_TOKEN)');
     return [];
   }
 
   try {
     const response = await fetch(
-      `${BASE_URL}/${WABA_ID}/message_templates?access_token=${ACCESS_TOKEN}`,
+      `https://graph.facebook.com/${version}/${wabaId}/message_templates?access_token=${token}`,
       { method: 'GET' }
     );
 
@@ -50,8 +54,12 @@ export async function sendTemplateMessage(
   languageCode: string = 'es',
   components: any[] = []
 ) {
-  if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-    console.error('WABA credentials missing');
+  const pId = process.env.WABA_PHONE_NUMBER_ID;
+  const token = process.env.WABA_ACCESS_TOKEN;
+  const version = process.env.WABA_VERSION || 'v21.0';
+
+  if (!pId || !token) {
+    console.error('[sendTemplateMessage] WABA credentials missing');
     return false;
   }
 
@@ -61,11 +69,11 @@ export async function sendTemplateMessage(
 
   try {
     const response = await fetch(
-      `${BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/${version}/${pId}/messages`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -83,11 +91,11 @@ export async function sendTemplateMessage(
 
     const data = await response.json();
     if (!response.ok) {
-      console.error('WABA Template Error:', data);
+      console.error('[sendTemplateMessage] META API ERROR:', JSON.stringify(data, null, 2));
     }
     return response.ok;
   } catch (error) {
-    console.error('Error sending WABA message:', error);
+    console.error('[sendTemplateMessage] EXCEPTION:', error);
     return false;
   }
 }
@@ -96,9 +104,14 @@ export async function sendTemplateMessage(
  * Send a simple text message via WABA (requires an open 24h window)
  */
 export async function sendWABATextMessage(recipient: string, message: string) {
-  console.log('[sendWABATextMessage] Starting with recipient:', recipient);
-  if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-    console.error('[sendWABATextMessage] WABA credentials missing');
+  const pId = process.env.WABA_PHONE_NUMBER_ID;
+  const token = process.env.WABA_ACCESS_TOKEN;
+  const version = process.env.WABA_VERSION || 'v21.0';
+
+  console.log('[sendWABATextMessage] Attempting send to:', recipient);
+  
+  if (!pId || !token) {
+    console.error('[sendWABATextMessage] CRITICAL: WABA credentials missing (PHONE_NUMBER_ID or ACCESS_TOKEN)');
     return false;
   }
 
@@ -118,15 +131,13 @@ export async function sendWABATextMessage(recipient: string, message: string) {
     }
   };
 
-  console.log('[sendWABATextMessage] Sending payload:', JSON.stringify(payload, null, 2));
-
   try {
     const response = await fetch(
-      `${BASE_URL}/${PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/${version}/${pId}/messages`,
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
@@ -134,14 +145,16 @@ export async function sendWABATextMessage(recipient: string, message: string) {
     );
 
     const data = await response.json();
-    console.log('[sendWABATextMessage] Response status:', response.status, 'data:', data);
     
     if (!response.ok) {
-       console.error('[sendWABATextMessage] Error from WABA text message:', data);
+       console.error('[sendWABATextMessage] META API ERROR:', JSON.stringify(data, null, 2));
+       return false;
     }
-    return response.ok;
+
+    console.log('[sendWABATextMessage] SUCCESS:', data.messages?.[0]?.id);
+    return true;
   } catch (error) {
-    console.error('[sendWABATextMessage] Error sending WABA text message:', error);
+    console.error('[sendWABATextMessage] FETCH EXCEPTION:', error);
     return false;
   }
 }

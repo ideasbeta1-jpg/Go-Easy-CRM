@@ -49,7 +49,7 @@ export async function generateVoucherForLead(leadId: string, providerId: string,
   // 5. Trigger Automation (Includes n8n fallback)
   await executeStageAutomation(leadId, 'voucher_enviado', {
      voucher_number: voucherNumber,
-     voucher_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/voucher/${voucher.id}`,
+     voucher_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/v/${voucher.id}`,
      provider_confirmation: providerConfirmation
   })
 

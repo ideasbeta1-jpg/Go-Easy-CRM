@@ -61,8 +61,8 @@ export async function executeStageAutomation(
 
     if (quote) {
       lead.active_quote = quote;
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
-      lead.quote_url = `${appUrl}/cotizacion/${quote.id}`;
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '');
+      lead.quote_url = `${appUrl}/q/${quote.id}`;
     }
 
     // Obtener el voucher más reciente si existe
@@ -76,7 +76,7 @@ export async function executeStageAutomation(
     
     if (voucher) {
       lead.active_voucher = voucher;
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '');
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '');
       lead.voucher_url = `${appUrl}/v/${voucher.id}`;
     }
 
