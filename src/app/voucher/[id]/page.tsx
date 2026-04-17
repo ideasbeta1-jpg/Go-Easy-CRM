@@ -18,7 +18,10 @@ import {
   Zap,
   Globe,
   Mail,
-  ShieldCheck as Shield
+  ShieldCheck as Shield,
+  Navigation,
+  Fuel,
+  Gauge
 } from 'lucide-react'
 import { VoucherActions } from './components/VoucherActions'
 
@@ -289,47 +292,75 @@ export default async function VoucherPage({
              {/* Protection & Benefits Row */}
              <div className="pt-20 border-t border-slate-100">
                 <div className="flex flex-wrap items-center justify-center gap-y-10 gap-x-16">
-                    <div className={`group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] transition-all hover:scale-105 ${isPremium ? 'text-indigo-600' : 'text-slate-900'}`}>
-                       <div className={`p-4 rounded-2xl ${isPremium ? 'bg-indigo-50 text-indigo-600 shadow-xl shadow-indigo-600/10' : 'bg-slate-100 text-slate-600'} transition-all group-hover:rotate-12`}>
-                          <Shield className="w-6 h-6" />
-                       </div> 
-                       <div className="space-y-1">
-                          <p className="leading-none">{isPremium ? 'Full Cover Platinum' : 'Seguro Estándar'}</p>
-                          <p className={`text-[9px] font-bold ${isPremium ? 'text-indigo-400' : 'text-slate-400'}`}>{isPremium ? '$0 Deducible / Total' : 'CDW & TP Incluidos'}</p>
-                       </div>
-                    </div>
-
-                    <div className="group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] text-slate-900 transition-all hover:scale-105">
-                       <div className="p-4 bg-slate-100 text-slate-600 rounded-2xl transition-all group-hover:rotate-12">
-                          <UserPlus className="w-6 h-6" />
-                       </div>
-                       <div className="space-y-1">
-                          <p className="leading-none">2do Conductor</p>
-                          <p className="text-[9px] font-bold text-slate-400">Gratis (Mayores de 25)</p>
-                       </div>
-                    </div>
-
-                    <div className="group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] text-slate-900 transition-all hover:scale-105">
-                       <div className="p-4 bg-slate-100 text-slate-600 rounded-2xl transition-all group-hover:rotate-12">
-                          <Zap className="w-6 h-6" />
-                       </div>
-                       <div className="space-y-1">
-                          <p className="leading-none">Kilometraje</p>
-                          <p className="text-[9px] font-bold text-slate-400">Ilimitado Florida</p>
-                       </div>
-                    </div>
-
-                    {isPremium && (
-                      <div className="group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] text-amber-600 transition-all hover:scale-105">
-                         <div className="p-4 bg-amber-50 text-amber-600 shadow-xl shadow-amber-600/10 rounded-2xl transition-all group-hover:rotate-12">
-                            <Zap className="w-6 h-6 fill-amber-600" />
-                         </div>
-                         <div className="space-y-1">
-                            <p className="leading-none">SunPass</p>
-                            <p className="text-[9px] font-bold text-amber-500">Ilimitado Prepago</p>
-                         </div>
-                      </div>
-                    )}
+                     {/* Logic-driven Benefits Row */}
+                     {[
+                        { 
+                          show: true,
+                          label: isPremium ? 'Protección Total' : 'Protección Básica', 
+                          desc: isPremium ? 'Robo y Choque $0 Deducible' : 'Con Deducible / Básica',
+                          icon: Shield,
+                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
+                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: isPremium ? 'Terceros ($1M)' : 'Terceros Básico', 
+                          desc: isPremium ? 'Cobertura Ampliada' : 'Protección Obligatoria',
+                          icon: Zap,
+                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
+                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: '2do Conductor', 
+                          desc: 'Sin Costo Extra',
+                          icon: UserPlus,
+                          color: 'text-slate-600',
+                          bg: 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: 'Kilometraje', 
+                          desc: isPremium ? 'Ilimitado (USA)' : 'Ilimitado (Florida)',
+                          icon: Gauge,
+                          color: 'text-slate-600',
+                          bg: 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: 'Asistencia 24/7', 
+                          desc: 'Vía WhatsApp VIP',
+                          icon: Phone,
+                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
+                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: 'GPS Incluido', 
+                          desc: 'Sistema Satelital',
+                          icon: Navigation,
+                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
+                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
+                        },
+                        { 
+                          show: true,
+                          label: 'Combustible', 
+                          desc: 'Lleno / Lleno',
+                          icon: Fuel,
+                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
+                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
+                        }
+                     ].filter(b => b.show).map((benefit, i) => (
+                        <div key={i} className="group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] text-slate-900 transition-all hover:scale-105">
+                           <div className={`p-4 rounded-2xl ${benefit.bg} ${benefit.color} shadow-lg shadow-slate-200/5 transition-all group-hover:rotate-12`}>
+                              <benefit.icon className="w-5 h-5" />
+                           </div>
+                           <div className="space-y-1">
+                              <p className={`leading-none ${benefit.color}`}>{benefit.label}</p>
+                              <p className="text-[9px] font-bold text-slate-400">{benefit.desc}</p>
+                           </div>
+                        </div>
+                     ))}
                 </div>
              </div>
           </div>

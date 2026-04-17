@@ -1277,6 +1277,8 @@ export default function LeadDetailClient({
                                    startTransition(async () => {
                                       try {
                                          await generateVoucherForLead(lead.id, ctaProviderId, ctaProviderConfirmation);
+                                         setFormData(prev => ({ ...prev, status: 'voucher_enviado' }));
+                                         router.refresh();
                                       } catch (err) {
                                          console.error(err);
                                          alert('Error al generar voucher');

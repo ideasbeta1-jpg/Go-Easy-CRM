@@ -152,10 +152,26 @@ export default async function QuoteLandingPage({
                          </p>
                          
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
-                            {(isPremium 
-                              ? ['Millas Ilimitadas (USA)', 'Full Cover $0 Deducible', 'SunPass Prepago', 'Conductor Adicional', 'Asistencia 24/7 VIP'] 
-                              : ['Millas Sólo Florida', 'Seguro CDW (Básico)', 'Asistencia 24/7', 'Conductor Adicional']
-                            ).map(item => (
+                             {(isPremium 
+                               ? [
+                                   'Protección Total (Robo y Choque)', 
+                                   'Seguro a Terceros ($1M)', 
+                                   'Asistencia Carretera 24/7', 
+                                   'GPS Incluido', 
+                                   'Conductor Adicional', 
+                                   'Kilometraje Ilimitado', 
+                                   'Combustible: Lleno/Lleno'
+                                 ] 
+                               : [
+                                   'Protección Básica (Deducible)', 
+                                   'Seguro a Terceros Básico', 
+                                   'Asistencia Carretera 24/7', 
+                                   'GPS Incluido', 
+                                   'Conductor Adicional', 
+                                   'Millas Sólo Florida', 
+                                   'Combustible: Lleno/Lleno'
+                                 ]
+                             ).map(item => (
                                <div key={item} className="flex items-center gap-3 px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl group/item hover:bg-white hover:shadow-sm transition-all duration-300">
                                   <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
                                      {isPremium ? <Sparkles className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
@@ -169,8 +185,8 @@ export default async function QuoteLandingPage({
 
                    <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pt-12 border-t border-slate-50">
                       {[ 
-                        { label: 'Entrega', val: lead.pickup_location, icon: MapPin, color: 'text-blue-500' },
-                        { label: 'Devolución', val: lead.return_location, icon: MapPin, color: 'text-indigo-500' },
+                        { label: 'Entrega', val: lead.pickup_location, date: lead.pickup_date, icon: MapPin, color: 'text-blue-500' },
+                        { label: 'Devolución', val: lead.return_location, date: lead.return_date, icon: MapPin, color: 'text-indigo-500' },
                         { label: 'Duración', val: `${diffDays} días`, icon: Calendar, color: 'text-emerald-500' },
                         { label: 'Protección', val: isPremium ? 'Premium VIP' : 'Estándar', icon: ShieldCheck, color: 'text-amber-500' }
                        ].map(item => (
@@ -178,7 +194,14 @@ export default async function QuoteLandingPage({
                             <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] flex items-center gap-2">
                                <item.icon className={`w-3.5 h-3.5 ${item.color}`} /> {item.label}
                             </span>
-                            <p className="font-extrabold text-slate-900 tracking-tight leading-tight md:text-lg group-hover:text-indigo-600 transition-colors">{item.val}</p>
+                            <div className="space-y-1">
+                               <p className="font-extrabold text-slate-900 tracking-tight leading-tight md:text-lg group-hover:text-indigo-600 transition-colors">{item.val}</p>
+                               {item.date && (
+                                 <p className="text-xs font-black text-indigo-600 uppercase tracking-tight">
+                                   {new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', weekday: 'short' })} • {new Date(item.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                                 </p>
+                               )}
+                            </div>
                          </div>
                        ))}
                    </div>
@@ -198,7 +221,7 @@ export default async function QuoteLandingPage({
                             <div className="space-y-4 text-center md:text-left">
                                <h3 className="text-4xl font-black tracking-tight leading-none italic uppercase">Premium Full Cover 👑</h3>
                                <p className="text-indigo-100 text-lg font-medium leading-relaxed max-w-2xl opacity-90">
-                                  Viaja con absoluta tranquilidad. Cobertura total sin deducible, SunPass prepago incluido y libertad total de movimiento en cualquier estado de USA.
+                                  Viaja con absoluta tranquilidad. Protección total contra robo y choque, seguro a terceros de $1M, asistencia 24/7 y kilometraje ilimitado. Sin costos ocultos.
                                </p>
                                <div className="flex items-center justify-center md:justify-start gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">
                                   <CheckCircle2 className="w-4 h-4 text-white" /> 100% Sin Costos Ocultos en el Counter
@@ -215,7 +238,7 @@ export default async function QuoteLandingPage({
                             <div className="space-y-3 text-center md:text-left">
                                <h3 className="text-3xl font-black tracking-tight leading-none italic uppercase">Protección Estándar</h3>
                                <p className="text-slate-500 font-medium leading-relaxed max-w-2xl">
-                                  Incluye cobertura CDW (daños). Millas limitadas a Florida, asistencia 24/7 y conductor adicional (+25). Ideal para recorridos locales.
+                                  Cobertura básica contra robo y choque con deducible. Incluye asistencia 24/7, GPS, conductor adicional y kilometraje ilimitado en Florida. Política de combustible lleno/lleno.
                                </p>
                             </div>
                          </div>

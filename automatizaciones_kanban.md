@@ -47,7 +47,7 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 ### 3. Reserva Confirmada (`reserva_confirmada`)
 *   **Qué sucede**: Se dispara automáticamente cuando Stripe confirma que el pago de la reserva se ha completado.
 *   **WhatsApp**:
-    *   **Plantilla**: `pago_confirmado`
+    *   **Plantilla**: `reserva_confirmada`
     *   **Variables**: `[Nombre]`, `[Fecha_Llegada]`, `[Ciudad]`
     *   **Contenido**: "¡Excelente noticia, [Nombre_Cliente]! 🥳 Acabamos de recibir tu pago correctamente. ¡Tu auto en Goeasy Florida ya está oficialmente reservado para tu llegada el [Fecha_Llegada]! 🚗💨 Ya estoy preparando tu Voucher de Confirmación con todos los detalles de la entrega en [Ciudad]. Te lo enviaré por este mismo chat en tan solo unos minutos. ¡Prepárate para disfrutar el camino! 🌴☀️"
 *   **Email**:
@@ -57,8 +57,8 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
 *   **Qué sucede**: Se activa cuando el agente sube el PDF del voucher al lead en el panel de control.
 *   **WhatsApp**:
     *   **Plantilla**: `voucher_disponible`
-    *   **Variables**: `[Nombre]`, `[Nombre_Asesor]`, `[Ciudad]`, `[URL_Voucher]`
-    *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Soy [Nombre_Asesor]. Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF para llevarla en tu celular (muy útil si no tienes señal al aterrizar) aquí: 📄 [Enlace_Voucher] ¿Deseas que te explique cómo será el proceso de recogida en el aeropuerto o prefieres leerlo en el documento?"
+    *   **Variables**: `[Nombre]`, `[Ciudad]`, `[URL_Voucher]`
+    *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF para llevarla en tu celular (muy útil si no tienes señal al aterrizar) aquí: 📄 [Enlace_Voucher] ¿Deseas que te explique cómo será el proceso de recogida en el aeropuerto o prefieres leerlo en el documento?"
 *   **Email**:
     *   **Asunto**: "Tu voucher de reserva"
 

@@ -84,7 +84,7 @@ export async function executeStageAutomation(
     const defaultTemplates: Record<string, string> = {
       'lead_nuevo': 'bienvenida_lead',
       'en_cotizacion': 'cotizacion_enviada',
-      'reserva_confirmada': 'pago_confirmado',
+      'reserva_confirmada': 'reserva_confirmada',
       'voucher_enviado': 'voucher_disponible',
       'cerrado': 'gracias_feedback'
     };
@@ -137,7 +137,6 @@ export async function executeStageAutomation(
             case 'voucher_enviado': 
               params = [
                 lead.first_name || 'Cliente', 
-                lead.assigned_agent?.first_name || 'Tu Asesor',
                 lead.pickup_location || '—',
                 extraData.voucher_url || 'pendiente'
               ]; 
