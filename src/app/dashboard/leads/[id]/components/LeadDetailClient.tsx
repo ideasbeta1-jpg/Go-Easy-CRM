@@ -140,6 +140,20 @@ export default function LeadDetailClient({
   const [ctaProviderConfirmation, setCtaProviderConfirmation] = useState('')
   const [ctaError, setCtaError] = useState<string | null>(null)
 
+  const handleRegenerateQuote = async () => {
+    startTransition(async () => {
+      try {
+        await generateQuoteForLead(lead.id, formData.total_amount)
+        setFormData(prev => ({ ...prev, status: 'en_cotizacion' }))
+        router.refresh()
+      } catch (err) {
+        console.error(err)
+        alert('Error al regenerar cotización')
+      }
+    })
+  }
+
+
   // Audio Recording States
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -512,13 +526,7 @@ export default function LeadDetailClient({
                     <button 
                       id="generate-quote-btn"
                       disabled={isPending}
-                      onClick={() => {
-                          startTransition(async () => {
-                              await generateQuoteForLead(lead.id, formData.total_amount)
-                              setFormData(prev => ({ ...prev, status: 'en_cotizacion' }))
-                              router.refresh()
-                          })
-                      }}
+                      onClick={handleRegenerateQuote}
                       className="bg-oceanic hover:bg-primary-dim text-white font-black px-6 py-3 rounded-full shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-3 text-xs uppercase tracking-widest disabled:opacity-50"
                     >
                       <Zap className="w-4 h-4" />
@@ -1107,10 +1115,7 @@ export default function LeadDetailClient({
                               {(event as any).isMismatch && (
                                  <div className="mt-4">
                                     <button 
-                                       onClick={() => {
-                                          const el = document.getElementById('generate-quote-btn');
-                                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                                       }}
+                                       onClick={handleRegenerateQuote}
                                        className="inline-flex items-center gap-2 bg-white text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all border border-red-200 shadow-sm"
                                     >
                                        <Zap className="w-3" /> Regenerar Cotización con nuevos valores
