@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { sendGAEvent } from '@next/third-parties/google'
+import { useRouter } from 'next/navigation'
 
 interface Category {
   id: string
@@ -33,6 +34,7 @@ export default function LandingPage() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
+  const router = useRouter()
 
   const today = new Date().toISOString().split('T')[0]
   const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
@@ -156,7 +158,8 @@ export default function LandingPage() {
         });
       }
 
-      setSuccess(true)
+      // Redirect to Thank You Page
+      router.push(`/typ?name=${encodeURIComponent(form.first_name)}`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')
     } finally {
@@ -164,30 +167,8 @@ export default function LandingPage() {
     }
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 max-w-lg w-full text-center">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-8">
-            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 mb-4">¡Solicitud Enviada!</h1>
-          <p className="text-gray-600 mb-8 text-lg">
-            Gracias {form.first_name}. Hemos recibido tu solicitud correctamente. Un asesor se pondrá en contacto contigo muy pronto por WhatsApp.
-          </p>
-          <button 
-            onClick={() => setSuccess(false)}
-            className="w-full bg-primary-blue text-white font-bold py-4 rounded-xl hover:bg-blue-800 transition-colors"
-          >
-            Volver al inicio
-          </button>
-        </div>
-      </div>
-    )
-  }
-
+  // Success state handled by redirection to /typ
+  
   return (
     <div className="bg-gray-50 text-gray-900 antialiased flex flex-col min-h-screen font-inter">
       <style jsx global>{`
