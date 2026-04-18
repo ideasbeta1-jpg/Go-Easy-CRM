@@ -1,5 +1,5 @@
 import { createAdminClient } from './supabase/admin';
-import { sendTemplateMessage, sendWABATextMessage } from './waba';
+import { sendTemplateMessage, sendTemplateMessageWithError, sendWABATextMessage } from './waba';
 import { sendEmail, getStageEmailTemplate } from './email';
 import { sendLeadToN8n } from './n8n';
 import { broadcastNotification } from '@/app/utils/actions/notifications';
@@ -150,15 +150,18 @@ export async function executeStageAutomation(
           parameters: params.map(p => ({ type: 'text', text: p }))
         }];
 
-        const waSuccess = await sendTemplateMessage(lead.phone, templateName, mapping?.language_code || 'es', components);
-        await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed');
+        const langCode = mapping?.language_code || 'es_CO';
+        const waResult = await sendTemplateMessageWithError(lead.phone, templateName, langCode, components);
+        const waSuccess = waResult.ok;
+        await logAutomation(leadId, stage, 'whatsapp', templateName, waSuccess ? 'sent' : 'failed', waSuccess ? undefined : waResult.error);
         
         if (waSuccess) {
           let previewText = `📄 [Plantilla: ${templateName}]`;
           try {
             const { getTemplates } = await import('./waba');
             const templates = await getTemplates();
-            const matchedTemplate = templates.find(t => t.name === templateName && t.language === (mapping?.language_code || 'es'));
+            const langCode = mapping?.language_code || 'es_CO';
+            const matchedTemplate = templates.find(t => t.name === templateName && (t.language === langCode || t.language === langCode.split('_')[0]));
             if (matchedTemplate) {
               const bodyComponent = matchedTemplate.components.find((c: any) => c.type === 'BODY');
               if (bodyComponent && bodyComponent.text) {

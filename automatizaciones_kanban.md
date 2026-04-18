@@ -58,14 +58,16 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
     *   **CRM In-App**: Trigger del evento `payment_confirmed` (💰 ¡Pago Confirmado!) que impacta en el Activity Feed de la plataforma.
 
 ### 4. Voucher Enviado (`voucher_enviado`)
-*   **Qué sucede**: Se activa cuando el agente genera el voucher oficial desde el Lead Detail. Esto crea un registro en la tabla `vouchers` y genera un número de confirmación único (GF-XXXXXX).
+*   **Qué sucede**: Se activa cuando el agente genera el voucher oficial desde el Lead Detail. Esto crea un registro en la tabla `vouchers` y genera un número de confirmación único (GF-XXXXXX). El agente también puede **Regenerar el Voucher** usando el botón dedicado si hubo cambio de proveedor o datos incorrectos — esto crea un nuevo registro y re-dispara todas las automatizaciones con el nuevo enlace.
 *   **WhatsApp al Cliente**:
     *   **Plantilla**: `voucher_disponible`
+    *   **Código de Idioma**: `es_CO` ⚠️ (obligatorio — la plantilla está aprobada bajo este código en Meta)
     *   **Variables**: `[Nombre]`, `[Pickup_Location]`, `[Enlace_Corto_Voucher]`
     *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF... 📄 [Enlace_Voucher]"
 *   **Email al Cliente**:
     *   **Asunto**: "Tu voucher de reserva - Go Easy Florida 📄"
-    *   **Contenido**: HTML profesional con botón de acceso directo al voucher.
+    *   **Contenido**: HTML profesional con botón de acceso directo al voucher (fallback automático si no hay plantilla en DB).
+*   **In-App**: Notificación `voucher_sent` al agente asignado (📋 Voucher Enviado).
 *   **Gestión de Enlaces**: El sistema utiliza el formato `/v/{id}` que actúa como un enlace recortado y redirecciona automáticamente a la vista detallada del voucher.
 *   **Línea de Tiempo**: Se añade una nota automática marcando la fecha y hora exacta de la generación del documento.
 
@@ -103,5 +105,8 @@ Cada paso crítico del proceso alimenta la **Línea de Tiempo** del lead:
 - **Depósito Recibido**: Confirmación automática vía Stripe.
 - **Notificaciones In-App**: Registro persistente de cada evento para consulta rápida desde el header.
 
-> [!TIP]
-> Si una automatización falla, el sistema todavía realiza un "fallback" enviando la notificación a **n8n** como respaldo de seguridad.
+> [!NOTE]
+> **n8n como fallback pasivo**: El motor interno (`automation-engine.ts`) es el ejecutor principal de TODAS las automatizaciones. n8n (`sendLeadToN8n`) se llama después como un bus de eventos secundario — solo actúa si la variable de entorno `N8N_WEBHOOK_URL` tiene un valor configurado. Si no está configurada, la llamada no hace nada. El motor nativo (WhatsApp WABA + Resend + In-App) siempre tiene prioridad.
+
+> [!IMPORTANT]
+> **Código de Idioma de Plantillas**: Las plantillas de WhatsApp deben usar el mismo código de idioma con el que fueron aprobadas en Meta Business Manager. Actualmente todas las plantillas activas usan `es_CO`. El motor usa `es_CO` por defecto. Si creas una nueva plantilla con un idioma diferente, configura el `language_code` en la tabla `whatsapp_template_mappings` de Supabase.

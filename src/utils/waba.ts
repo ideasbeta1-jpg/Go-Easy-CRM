@@ -101,6 +101,62 @@ export async function sendTemplateMessage(
 }
 
 /**
+ * Send a template message and return { ok, error } for detailed logging
+ */
+export async function sendTemplateMessageWithError(
+  recipient: string,
+  templateName: string,
+  languageCode: string = 'es_CO',
+  components: any[] = []
+): Promise<{ ok: boolean; error?: string }> {
+  const pId = process.env.WABA_PHONE_NUMBER_ID;
+  const token = process.env.WABA_ACCESS_TOKEN;
+  const version = process.env.WABA_VERSION || 'v21.0';
+
+  if (!pId || !token) {
+    return { ok: false, error: 'WABA credentials missing (PHONE_NUMBER_ID or ACCESS_TOKEN)' };
+  }
+
+  const cleanRecipient = (recipient.includes(':') || /[a-zA-Z]/.test(recipient))
+    ? recipient
+    : recipient.replace(/\D/g, '');
+
+  try {
+    const response = await fetch(
+      `https://graph.facebook.com/${version}/${pId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: cleanRecipient,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: languageCode },
+            components: components
+          }
+        }),
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMsg = data?.error?.message || JSON.stringify(data);
+      console.error('[sendTemplateMessageWithError] META API ERROR:', errorMsg);
+      return { ok: false, error: errorMsg };
+    }
+    return { ok: true };
+  } catch (error: any) {
+    console.error('[sendTemplateMessageWithError] EXCEPTION:', error);
+    return { ok: false, error: error.message || 'Unknown exception' };
+  }
+}
+
+/**
  * Send a simple text message via WABA (requires an open 24h window)
  */
 export async function sendWABATextMessage(recipient: string, message: string) {
