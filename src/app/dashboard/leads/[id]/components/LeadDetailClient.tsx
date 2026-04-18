@@ -153,6 +153,20 @@ export default function LeadDetailClient({
     })
   }
 
+  const handleRegenerateVoucher = async () => {
+    if (!confirm('¿Estás seguro de que deseas anular el voucher anterior y generar uno nuevo? Se le enviará un nuevo enlace al cliente.')) return;
+    
+    startTransition(async () => {
+      try {
+        await generateVoucherForLead(lead.id, formData.provider_id || ctaProviderId, providerConfirmation || ctaProviderConfirmation);
+        router.refresh()
+      } catch (err) {
+        console.error(err)
+        alert('Error al regenerar voucher')
+      }
+    })
+  }
+
 
   // Audio Recording States
   const [isRecording, setIsRecording] = useState(false)
@@ -1206,9 +1220,18 @@ export default function LeadDetailClient({
                                   </div>
                                 )}
                              </div>
-                             <Link href={`/voucher/${activeVoucher.id}`} target="_blank" className="bg-white text-primary px-10 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20 w-full text-center">
-                                Ver Voucher
-                             </Link>
+                             <div className="flex flex-col sm:flex-row gap-4 w-full">
+                                <Link href={`/voucher/${activeVoucher.id}`} target="_blank" className="bg-white/10 text-white border border-white/20 px-8 py-5 rounded-[2rem] font-sans font-black hover:bg-white/20 transition-all text-xs uppercase tracking-[0.2em] flex-1 text-center">
+                                   Ver Voucher Actual
+                                </Link>
+                                <button 
+                                  onClick={handleRegenerateVoucher}
+                                  disabled={isPending}
+                                  className="bg-white text-primary px-8 py-5 rounded-[2rem] font-sans font-black hover:scale-105 transition-all text-xs uppercase tracking-[0.2em] shadow-2xl shadow-black/20 flex-1 text-center flex items-center justify-center gap-2"
+                                >
+                                   {isPending ? '...' : <><Zap className="w-4 h-4" /> Regenerar Voucher</>}
+                                </button>
+                             </div>
                            </div>
                         ) : (
                            <div className="flex flex-col gap-4 items-center sm:items-end w-full sm:min-w-[400px]">
