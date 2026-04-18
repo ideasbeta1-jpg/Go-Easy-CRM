@@ -78,6 +78,31 @@ export default function LandingPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (settings?.favicon_url) {
+      const v = settings.updated_at ? new Date(settings.updated_at).getTime() : Date.now();
+      const faviconUrl = `${settings.favicon_url}?v=${v}`;
+      
+      // Update or create favicon link
+      let link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = faviconUrl;
+
+      // Update apple touch icon
+      let appleLink: HTMLLinkElement | null = document.querySelector("link[rel='apple-touch-icon']");
+      if (!appleLink) {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        document.getElementsByTagName('head')[0].appendChild(appleLink);
+      }
+      appleLink.href = faviconUrl;
+    }
+  }, [settings])
+
   const set = (field: string, value: any) => setForm(f => ({ ...f, [field]: value }))
 
   const selectedCategory = categories.find(c => c.id === form.category_id)
@@ -171,6 +196,9 @@ export default function LandingPage() {
   
   return (
     <div className="bg-gray-50 text-gray-900 antialiased flex flex-col min-h-screen font-inter">
+      {settings?.favicon_url && (
+        <link rel="icon" href={`${settings.favicon_url}?v=${settings.updated_at ? new Date(settings.updated_at).getTime() : Date.now()}`} />
+      )}
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         :root {
