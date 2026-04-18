@@ -1,52 +1,35 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
-import dotenv from 'dotenv';
-import path from 'path';
+import { getTemplates } from '../src/utils/waba';
+import { createAdminClient } from '../src/utils/supabase/admin';
 
-// Load .env.local
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-
-const WABA_ID = process.env.WABA_ID;
-const ACCESS_TOKEN = process.env.WABA_ACCESS_TOKEN;
-const VERSION = process.env.WABA_VERSION || 'v21.0';
-const BASE_URL = `https://graph.facebook.com/${VERSION}`;
-
-async function checkTemplates() {
-  console.log('Using WABA_ID:', WABA_ID);
-  console.log('Using VERSION:', VERSION);
+async function debug() {
+  console.log('--- Checking WABA Templates ---');
+  const templates = await getTemplates();
+  const voucherTemplate = templates.find(t => t.name === 'voucher_disponible');
   
-  if (!WABA_ID || !ACCESS_TOKEN) {
-    console.error('Credentials missing');
-    return;
+  if (voucherTemplate) {
+    console.log('Template found:', JSON.stringify(voucherTemplate, null, 2));
+  } else {
+    console.log('CRITICAL: Template "voucher_disponible" NOT found in WABA.');
+    console.log('Available templates:', templates.map(t => t.name).join(', '));
   }
 
-  try {
-    const url = `${BASE_URL}/${WABA_ID}/message_templates?access_token=${ACCESS_TOKEN}`;
-    console.log('Fetching from URL:', url.replace(ACCESS_TOKEN, '[REDACTED]'));
-    
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('API Error:', JSON.stringify(data, null, 2));
-      return;
-    }
-    
-    console.log('Success! Found', data.data.length, 'templates:');
-    data.data.forEach((t: any) => {
-      console.log(`- ${t.name} (${t.status}) [${t.category}]`);
-    });
+  console.log('\n--- Checking Automation Logs for last voucher_enviado ---');
+  const supabase = createAdminClient();
+  const { data: logs, error } = await supabase
+    .from('automation_logs')
+    .select('*')
+    .eq('stage', 'voucher_enviado')
+    .order('created_at', { ascending: false })
+    .limit(5);
 
-    // Also check the WABA metadata to see if it's the right account
-    const metaUrl = `${BASE_URL}/${WABA_ID}?access_token=${ACCESS_TOKEN}`;
-    const metaResponse = await fetch(metaUrl);
-    const metaData = await metaResponse.json();
-    console.log('\nWABA Account Metadata:', JSON.stringify(metaData, null, 2));
-
-  } catch (error) {
-    console.error('Fetch error:', error);
+  if (error) {
+    console.error('Error fetching logs:', error);
+  } else {
+    console.log('Recent logs:', JSON.stringify(logs, null, 2));
   }
 }
 
-checkTemplates();
-
-export {};
+debug().catch(console.error);
