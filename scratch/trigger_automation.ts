@@ -1,14 +1,29 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+// Registrando paths para que soporte @/ imports de Next
+import * as tsConfigPaths from 'tsconfig-paths';
+const tsConfig = require('../tsconfig.json');
+tsConfigPaths.register({
+  baseUrl: './',
+  paths: tsConfig.compilerOptions.paths
+});
+
 import { executeStageAutomation } from '../src/utils/automation-engine';
 
-async function test() {
-  const leadId = '0877f133-85b1-479a-ae23-a81fe9338a34';
-  console.log('Triggering automation for lead:', leadId);
+async function run() {
+  const leadId = 'fb8406fe-fc86-4777-a187-8f9df3c4bfda';
+  const paymentIntentId = 'pi_3TNXscFYhCcugkeF0fxN0EKD';
+  
+  console.log('Ejecutando motor de automatizacion para reserva confirmada...');
+  
   await executeStageAutomation(leadId, 'reserva_confirmada', {
-    stripe_payment_id: 'pi_test_manual_update',
-    amount: 880,
-    currency: 'USD'
+    stripe_payment_id: paymentIntentId,
+    amount: 100, // asume 100 de ejemplo
+    currency: 'USD',
+    event_id: 'manual_trigger'
   });
-  console.log('Automation triggered!');
+  
+  console.log('Motor finalizado');
 }
-
-test();
+run().catch(console.error);

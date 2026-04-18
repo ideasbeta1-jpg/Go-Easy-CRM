@@ -45,22 +45,29 @@ Las automatizaciones han sido migradas de n8n a un **motor interno (`automation-
     *   **Botón de Acción**: Permite al vendedor regenerar la propuesta para asegurar que el link de Stripe coincida con lo acordado.
 
 ### 3. Reserva Confirmada (`reserva_confirmada`)
-*   **Qué sucede**: Se dispara automáticamente cuando Stripe confirma que el pago de la reserva se ha completado.
-*   **WhatsApp**:
+*   **Qué sucede**: Se dispara automáticamente cuando el webhook de Stripe (`checkout.session.completed`) confirma que el pago del depósito se ha completado.
+*   **Cara al Cliente**: La URL de la cotización desactiva automáticamente el botón de Stripe (con el fin de evitar pagos duplicados) y mostrará un banner superior de *¡Reserva Asegurada!* en conjunto con una etiqueta fija de "RESERVA PAGADA".
+*   **WhatsApp al Cliente**:
     *   **Plantilla**: `reserva_confirmada`
     *   **Variables**: `[Nombre]`, `[Fecha_Llegada]`, `[Ciudad]`
-    *   **Contenido**: "¡Excelente noticia, [Nombre_Cliente]! 🥳 Acabamos de recibir tu pago correctamente. ¡Tu auto en Goeasy Florida ya está oficialmente reservado para tu llegada el [Fecha_Llegada]! 🚗💨 Ya estoy preparando tu Voucher de Confirmación con todos los detalles de la entrega en [Ciudad]. Te lo enviaré por este mismo chat en tan solo unos minutos. ¡Prepárate para disfrutar el camino! 🌴☀️"
-*   **Email**:
+    *   **Contenido**: "¡Excelente noticia, [Nombre_Cliente]! 🥳 Acabamos de recibir tu pago correctamente. ¡Tu auto en Goeasy Florida ya está oficialmente reservado..."
+*   **Email al Cliente**:
     *   **Asunto**: "¡Reserva confirmada!"
+*   **Notificaciones al Vendedor**:
+    *   **WhatsApp Interno**: Inmediatamente el sistema le envía un texto al agente asignado: *"🎉 ¡Felicidades! Tu cliente [Nombre] ha pagado el depósito de $[Monto]. Ahora ayúdanos gestionando el voucher."*
+    *   **CRM In-App**: Trigger del evento `payment_confirmed` (💰 ¡Pago Confirmado!) que impacta en el Activity Feed de la plataforma.
 
 ### 4. Voucher Enviado (`voucher_enviado`)
-*   **Qué sucede**: Se activa cuando el agente sube el PDF del voucher al lead en el panel de control.
-*   **WhatsApp**:
+*   **Qué sucede**: Se activa cuando el agente genera el voucher oficial desde el Lead Detail. Esto crea un registro en la tabla `vouchers` y genera un número de confirmación único (GF-XXXXXX).
+*   **WhatsApp al Cliente**:
     *   **Plantilla**: `voucher_disponible`
-    *   **Variables**: `[Nombre]`, `[Ciudad]`, `[URL_Voucher]`
-    *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF para llevarla en tu celular (muy útil si no tienes señal al aterrizar) aquí: 📄 [Enlace_Voucher] ¿Deseas que te explique cómo será el proceso de recogida en el aeropuerto o prefieres leerlo en el documento?"
-*   **Email**:
-    *   **Asunto**: "Tu voucher de reserva"
+    *   **Variables**: `[Nombre]`, `[Pickup_Location]`, `[Enlace_Corto_Voucher]`
+    *   **Contenido**: "¡Aquí tienes la llave virtual de tu viaje, [Nombre_Cliente]! 🔑🌴 Ya tengo listo tu voucher oficial de confirmación para tu renta en [Ciudad]. Puedes verlo y descargar la versión en PDF... 📄 [Enlace_Voucher]"
+*   **Email al Cliente**:
+    *   **Asunto**: "Tu voucher de reserva - Go Easy Florida 📄"
+    *   **Contenido**: HTML profesional con botón de acceso directo al voucher.
+*   **Gestión de Enlaces**: El sistema utiliza el formato `/v/{id}` que actúa como un enlace recortado y redirecciona automáticamente a la vista detallada del voucher.
+*   **Línea de Tiempo**: Se añade una nota automática marcando la fecha y hora exacta de la generación del documento.
 
 ### 5. Cerrado (`cerrado`)
 *   **Qué sucede**: Cuando el alquiler finaliza y el agente marca el lead como cerrado.

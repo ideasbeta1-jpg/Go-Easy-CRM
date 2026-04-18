@@ -80,15 +80,17 @@ Historial de presupuestos enviados al cliente. Actúa como snapshot de los valor
 * **`pickup_date`**: `TIMESTAMPTZ` - Fecha de entrega snapshot.
 * **`return_date`**: `TIMESTAMPTZ` - Fecha de devolución snapshot.
 * **`expires_at`**: Fecha de vencimiento de la oferta.
+* **Comportamiento en UI Cliente**: Cuando el estado del `lead` vinculado pasa a `reserva_confirmada`, la interfaz de cotización en vivo (`QuoteLandingPage`) bloqueará dinámicamente el botón de pago y exhibirá notificaciones de "RESERVA PAGADA" para evitar pagos duplicados.
 
 ### **Vouchers (`vouchers`)**
-Documentación final una vez cerrada la venta.
+Documentación final una vez cerrada la venta. Generado por el agente desde el panel de control.
 * **`id`**: `UUID` (PK).
 * **`lead_id`**: `UUID` (FK -> `leads`).
-* **`confirmation_number`**: ID interno Go Easy (Formato: `GF-XXXXXX`). Generado automáticamente.
-* **`provider_confirmation`**: ID oficial de la rentadora final (Ej: Hertz, Budget). Añadido manualmente por el agente.
-* **`voucher_url`**: Link a la landing del voucher.
-* **`created_at`**: Fecha de generación.
+* **`confirmation_number`**: ID interno Go Easy (Formato: `GF-XXXXXX`). Generado aleatoriamente al crear el voucher.
+* **`provider_confirmation`**: ID o Código de confirmación oficial de la rentadora (Ej: Hertz, Budget). Capturado en el momento de la generación.
+* **`voucher_url`**: No es una columna física (se genera dinámicamente o se guarda el slug). El sistema usa redirección `/v/{id}` para proporcionar un **enlace recortado** en comunicaciones.
+* **`created_at`**: Fecha de generación automática.
+* **Comportamiento**: Al generarse, el lead cambia automáticamente a estatus `voucher_enviado` y se disparan las automatizaciones de salida.
 
 ### **Mensajes / Chats (`messages`)**
 Historial de interacción por WhatsApp / WABA / Evolution API.

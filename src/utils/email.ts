@@ -150,6 +150,19 @@ export async function getStageEmailTemplate(stage: string, leadData: any, extraD
           <p>Un asesor se pondrá en contacto contigo muy pronto para brindarte atención personalizada.</p>
         `;
         break;
+      case 'voucher_enviado':
+        subject = 'Tu voucher de reserva - Go Easy Florida 📄';
+        const vUrl = extraData.voucher_url || '';
+        content = `
+          <h1 style="color: #4052b6; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Hola ${name}!</h1>
+          <p>Ya tenemos listo tu <strong>Voucher Oficial de Confirmación</strong> para tu renta en ${leadData.pickup_location || 'Florida'}.</p>
+          <p>Puedes acceder a tu documento digital y descargarlo en PDF haciendo clic en el siguiente enlace:</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${vUrl}" style="background-color: #4052b6; color: white; padding: 16px 32px; border-radius: 12px; font-weight: bold; text-decoration: none; display: inline-block;">Ver mi Voucher</a>
+          </div>
+          <p style="font-size: 14px; color: #64748b;">Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador: ${vUrl}</p>
+        `;
+        break;
       default:
         subject = 'Aviso de Go Easy Florida';
         content = `<p>Hola ${name}, hay una actualización en tu solicitud.</p>`;
