@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
       const userAgent = req.headers.get('user-agent') || ''
 
       const { sendMetaEvent } = await import('@/utils/meta-capi')
-      await sendMetaEvent({
-        eventName: 'Lead',
+      
+      const eventPayload = {
         eventID: data.id,
         userData: {
           email,
@@ -87,6 +87,18 @@ export async function POST(req: NextRequest) {
           content_name: 'Nuevo Lead CRM',
           currency: 'USD'
         }
+      }
+
+      // 1. Enviar Evento Estándar (Recomendado por Meta para optimización genérica)
+      await sendMetaEvent({
+        eventName: 'Lead',
+        ...eventPayload
+      })
+
+      // 2. Enviar Evento Personalizado (Solicitado)
+      await sendMetaEvent({
+        eventName: 'Lead_renta',
+        ...eventPayload
       })
     } catch (metaError) {
       console.error('Error sending event to Meta CAPI:', metaError)

@@ -54,12 +54,17 @@ function ThankYouContent() {
     let attempts = 0;
     const fireLead = () => {
       if (typeof window !== 'undefined' && typeof (window as any).fbq === 'function') {
-        (window as any).fbq('track', 'Lead', {
+        const payload = {
           content_name: 'Registro Exitoso TYP',
           currency: 'USD',
           ...(id ? { eventID: id } : {})
-        })
-        console.log('Meta Lead Event fired', id ? `with ID: ${id}` : '(No ID found)')
+        };
+        // 1. Meta Evento Estándar
+        (window as any).fbq('track', 'Lead', payload);
+        // 2. Meta Evento Personalizado
+        (window as any).fbq('trackCustom', 'Lead_renta', payload);
+        
+        console.log('Meta Events (Lead, Lead_renta) fired', id ? `with ID: ${id}` : '(No ID found)')
       } else if (attempts < 10) {
         attempts++
         setTimeout(fireLead, 500)
