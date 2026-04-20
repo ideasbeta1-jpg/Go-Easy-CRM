@@ -47,6 +47,17 @@ function ThankYouContent() {
       appleLink.href = faviconUrl;
     }
   }, [settings])
+  useEffect(() => {
+    const id = searchParams.get('id')
+    if (id && typeof window !== 'undefined' && (window as any).fbq) {
+      (window as any).fbq('track', 'Lead', {
+        content_name: 'Registro Exitoso TYP',
+        currency: 'USD',
+        eventID: id
+      })
+      console.log('Meta Lead Event fired with ID:', id)
+    }
+  }, [searchParams])
 
   return (
     <div className="bg-[#f5f7f8] min-h-screen flex flex-col antialiased items-center" style={{ fontFamily: '"Plus Jakarta Sans", sans-serif' }}>

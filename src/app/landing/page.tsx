@@ -169,22 +169,14 @@ export default function LandingPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Error enviando solicitud.')
       
-      // Tracking
+      // Tracking Google (se mantiene en la acción inmediata)
       sendGAEvent('event', 'generate_lead', {
         category: selectedCategory?.name,
         currency: 'USD'
       })
 
-      if (typeof window !== 'undefined' && (window as any).fbq) {
-        (window as any).fbq('track', 'Lead', {
-          content_name: selectedCategory?.name,
-          currency: 'USD',
-          eventID: data.id
-        });
-      }
-
-      // Redirect to Thank You Page
-      router.push(`/typ?name=${encodeURIComponent(form.first_name)}`)
+      // Redirección a Thank You Page con ID para tracking en el cliente
+      router.push(`/typ?name=${encodeURIComponent(form.first_name)}&id=${data.id}`)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Error inesperado.')
     } finally {
