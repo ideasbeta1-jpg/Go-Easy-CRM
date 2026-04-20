@@ -50,14 +50,23 @@ function ThankYouContent() {
   }, [settings])
   useEffect(() => {
     const id = searchParams.get('id')
-    if (id && typeof window !== 'undefined' && (window as any).fbq) {
-      (window as any).fbq('track', 'Lead', {
-        content_name: 'Registro Exitoso TYP',
-        currency: 'USD',
-        eventID: id
-      })
-      console.log('Meta Lead Event fired with ID:', id)
+    
+    let attempts = 0;
+    const fireLead = () => {
+      if (typeof window !== 'undefined' && typeof (window as any).fbq === 'function') {
+        (window as any).fbq('track', 'Lead', {
+          content_name: 'Registro Exitoso TYP',
+          currency: 'USD',
+          ...(id ? { eventID: id } : {})
+        })
+        console.log('Meta Lead Event fired', id ? `with ID: ${id}` : '(No ID found)')
+      } else if (attempts < 10) {
+        attempts++
+        setTimeout(fireLead, 500)
+      }
     }
+
+    fireLead()
   }, [searchParams])
 
   return (
