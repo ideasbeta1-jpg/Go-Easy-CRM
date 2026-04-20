@@ -7,6 +7,7 @@ import Link from 'next/link'
 interface SystemSettings {
   crm_name: string
   logo_url?: string
+  favicon_url?: string
   updated_at?: string
 }
 

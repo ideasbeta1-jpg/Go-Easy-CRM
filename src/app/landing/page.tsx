@@ -21,6 +21,7 @@ interface Location {
 interface SystemSettings {
   crm_name: string
   logo_url?: string
+  favicon_url?: string
   crm_tagline?: string
   updated_at?: string
 }
