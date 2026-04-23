@@ -47,10 +47,10 @@ function LandingContent() {
     pickup_location_id: '',
     return_location: '',
     return_location_id: '',
-    pickup_date: today,
-    pickup_time: '10:00 AM',
-    return_date: nextWeek,
-    return_time: '10:00 AM',
+    pickup_date: '',
+    pickup_time: '',
+    return_date: '',
+    return_time: '',
     country_code: '+1',
     phone: '',
     email: '',
@@ -70,16 +70,6 @@ function LandingContent() {
         setCategories(data.categories || [])
         setLocations(data.locations || [])
         setSettings(data.settings || null)
-        if (data.categories?.length) setForm(f => ({ ...f, category_id: data.categories[0].id }))
-        if (data.locations?.length) {
-          setForm(f => ({
-            ...f,
-            pickup_location: data.locations[0].name,
-            pickup_location_id: data.locations[0].id,
-            return_location: data.locations[0].name,
-            return_location_id: data.locations[0].id,
-          }))
-        }
       })
       .finally(() => setLoading(false))
   }, [])
@@ -354,6 +344,7 @@ function LandingContent() {
                           onChange={(e) => set('pickup_time', e.target.value)}
                           className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#FFD200] focus:border-[#FFD200] py-3 px-4 bg-gray-50"
                         >
+                          <option value="">Hora</option>
                           {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
@@ -367,6 +358,7 @@ function LandingContent() {
                           onChange={(e) => set('return_time', e.target.value)}
                           className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#FFD200] focus:border-[#FFD200] py-3 px-4 bg-gray-50"
                         >
+                          <option value="">Hora</option>
                           {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
