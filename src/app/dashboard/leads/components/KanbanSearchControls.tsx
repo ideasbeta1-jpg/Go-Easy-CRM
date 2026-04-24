@@ -10,6 +10,53 @@ interface Agent {
   avatar_url: string | null;
 }
 
+export function KanbanFilterChips({ agents = [] }: { agents?: Agent[] }) {
+  const { sortBy, setSortBy, agentFilter, setAgentFilter, dateFilter, setDateFilter } = useKanbanFilter()
+
+  const chips: { label: string; onRemove: () => void }[] = []
+
+  if (sortBy !== 'newest') {
+    const labels: Record<string, string> = {
+      oldest: 'Más Antiguos',
+      highest_value: 'Mayor Valor',
+      lowest_value: 'Menor Valor',
+    }
+    chips.push({ label: labels[sortBy] || sortBy, onRemove: () => setSortBy('newest') })
+  }
+
+  if (dateFilter !== 'all') {
+    const labels: Record<string, string> = {
+      today: 'Hoy',
+      this_week: 'Esta Semana',
+      this_month: 'Este Mes',
+    }
+    chips.push({ label: labels[dateFilter] || dateFilter, onRemove: () => setDateFilter('all') })
+  }
+
+  if (agentFilter) {
+    const agent = agents.find(a => a.id === agentFilter)
+    chips.push({ label: agent?.full_name || 'Agente', onRemove: () => setAgentFilter(null) })
+  }
+
+  if (chips.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros:</span>
+      {chips.map((chip, i) => (
+        <button
+          key={i}
+          onClick={chip.onRemove}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-[11px] font-black rounded-full hover:bg-primary/20 transition-colors group"
+        >
+          {chip.label}
+          <X className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function KanbanSearchControls({ agents = [] }: { agents?: Agent[] }) {
   const { 
     searchTerm, setSearchTerm, 

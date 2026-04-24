@@ -3,11 +3,9 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import ChatInboxClient from './components/ChatInboxClient'
 
 export default async function ChatsPage() {
-  // Use regular client to get the current user session
   const supabase = await createClient()
   const adminSupabase = createAdminClient()
 
-  // 1. Get current user and their role
   const { data: { user } } = await supabase.auth.getUser()
 
   const { data: profile } = await adminSupabase
@@ -18,24 +16,25 @@ export default async function ChatsPage() {
 
   const isAdmin = profile?.role === 'admin'
 
-  // 2. Fetch ALL leads using admin client (bypasses RLS)
-  const { data: leads, error: leadsError } = await adminSupabase
+  const { data: leads } = await adminSupabase
     .from('leads')
     .select('*')
     .order('created_at', { ascending: false })
 
-  // 3. Fetch ALL messages using admin client (bypasses RLS)
-  const { data: messages, error: messagesError } = await adminSupabase
+  // Only load the last 50 messages per lead for sidebar preview — NOT all messages
+  // Full conversation is loaded on-demand when a lead is selected
+  const { data: recentMessages } = await adminSupabase
     .from('messages')
-    .select('*')
+    .select('id, lead_id, content, direction, media_url, media_type, is_read, status, created_at')
     .order('created_at', { ascending: false })
+    .limit(500)
 
-  console.log('[ChatsPage] leads:', leads?.length, 'messages:', messages?.length, 'leadsError:', leadsError, 'messagesError:', messagesError)
+  console.log('[ChatsPage] leads:', leads?.length, 'preview messages:', recentMessages?.length)
 
   return (
-    <ChatInboxClient 
+    <ChatInboxClient
       initialLeads={leads || []}
-      initialMessages={messages || []}
+      initialMessages={recentMessages || []}
       currentUserId={user?.id || ''}
       isAdmin={isAdmin}
     />
