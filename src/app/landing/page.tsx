@@ -37,8 +37,11 @@ export default function LandingPage() {
   const [step, setStep] = useState(1)
   const router = useRouter()
 
-  const today = new Date().toISOString().split('T')[0]
-  const nextWeek = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+  const _d = new Date()
+  const _pad = (n: number) => String(n).padStart(2, '0')
+  const _toDateStr = (date: Date) => `${date.getFullYear()}-${_pad(date.getMonth() + 1)}-${_pad(date.getDate())}`
+  const today = _toDateStr(_d)
+  const nextWeek = _toDateStr(new Date(_d.getFullYear(), _d.getMonth(), _d.getDate() + 7))
 
   const [form, setForm] = useState({
     category_id: '',

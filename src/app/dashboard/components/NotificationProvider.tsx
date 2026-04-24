@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { MessageSquare, UserPlus, DollarSign } from 'lucide-react'
+import { MessageSquare, UserPlus, DollarSign, Bell } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface NotificationContextType {
@@ -54,15 +54,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [router])
 
   const fetchUnreadCount = useCallback(async () => {
-    const { count, error } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('direction', 'inbound')
-      .eq('is_read', false)
-    
-    if (!error && count !== null) {
-      setUnreadCount(count)
-    }
+    const [messagesResult, notificationsResult] = await Promise.all([
+      supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('direction', 'inbound')
+        .eq('is_read', false),
+      supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_read', false)
+    ])
+
+    const total = (messagesResult.count ?? 0) + (notificationsResult.count ?? 0)
+    setUnreadCount(total)
   }, [supabase])
 
   useEffect(() => {
@@ -194,9 +199,53 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       })
       .subscribe()
 
+    // 3. Notifications Table Subscription (quote_generated, voucher_sent, lead_closed, etc.)
+    const notificationsChannel = supabase
+      .channel('notifications-realtime')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: currentUser ? `user_id=eq.${currentUser.id}` : undefined
+      }, (payload) => {
+        const notif = payload.new as any
+
+        const typeIcons: Record<string, string> = {
+          quote_generated: '📄',
+          voucher_sent: '📋',
+          lead_closed: '✅',
+          new_lead: '🟢',
+          payment_confirmed: '💰',
+          lead_assigned: '👤',
+          new_message: '💬',
+          status_changed: '🔄',
+        }
+        const icon = typeIcons[notif.type] || '🔔'
+
+        playNotificationSound()
+
+        toast.message(`${icon} ${notif.title}`, {
+          description: notif.body || undefined,
+          icon: <Bell className="w-4 h-4 text-primary" />,
+          action: notif.link ? {
+            label: 'Ver',
+            onClick: () => router.push(notif.link)
+          } : undefined,
+          duration: 8000,
+        })
+
+        if (notif.title && notif.body) {
+          showDesktopNotification(notif.title, notif.body, notif.link || '/dashboard')
+        }
+
+        setUnreadCount(prev => prev + 1)
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(messagesChannel)
       supabase.removeChannel(leadsChannel)
+      supabase.removeChannel(notificationsChannel)
     }
   }, [supabase, playNotificationSound, router, showDesktopNotification, fetchUnreadCount, currentUser])
 

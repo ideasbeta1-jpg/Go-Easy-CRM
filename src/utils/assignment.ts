@@ -3,38 +3,24 @@ import { broadcastNotification } from '@/app/utils/actions/notifications'
 
 /**
  * Lógica centralizada de asignación de leads (Round Robin)
- * 1. Desactiva agentes inactivos (según su inactivity_timeout)
- * 2. Busca al agente activo con la asignación más antigua
- * 3. Asigna el lead y actualiza la marca de tiempo del agente
+ * Asigna al agente con la asignación más antigua, sin importar si está conectado.
  */
 export async function assignLeadToAgent(leadId: string) {
   const supabase = createAdminClient()
 
   try {
-    // 1. Limpieza de agentes inactivos (Batch update)
-    // Desactivamos a cualquiera que haya superado su timeout de inactividad
-    await supabase.rpc('cleanup_stale_agents') 
-    // Si el RPC no existe aún (lo crearemos en un momento), podemos usar SQL directo
-    // Pero por ahora usemos una lógica simple de "sweep" de 1 hora si falla el RPC
-    const { error: sweepError } = await supabase
-      .from('profiles')
-      .update({ is_active: false })
-      .match({ is_active: true })
-      .filter('last_active_at', 'lt', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-
-    // 2. Selección de agente (Round Robin)
-    // Buscamos el agente activo que recibió un lead hace más tiempo
+    // Selección de agente (Round Robin) — todos los asesores, conectados o no
     const { data: agents, error: agentsError } = await supabase
       .from('profiles')
       .select('id, full_name')
-      .eq('is_active', true)
-      .order('last_assigned_at', { ascending: true })
+      .eq('role', 'agent')
+      .order('last_assigned_at', { ascending: true, nullsFirst: true })
       .limit(1)
 
     if (agentsError) throw agentsError
 
     if (!agents || agents.length === 0) {
-      console.log(`[Assignment] No hay agentes activos para asignar el lead ${leadId}`)
+      console.log(`[Assignment] No hay asesores registrados para asignar el lead ${leadId}`)
       return null
     }
 

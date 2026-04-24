@@ -150,17 +150,63 @@ export async function getStageEmailTemplate(stage: string, leadData: any, extraD
           <p>Un asesor se pondrá en contacto contigo muy pronto para brindarte atención personalizada.</p>
         `;
         break;
-      case 'voucher_enviado':
-        subject = 'Tu voucher de reserva - Go Easy Florida 📄';
+      case 'en_cotizacion': {
+        const quoteLink = extraData.stripe_link || extraData.quote_url || '';
+        subject = 'Tu propuesta personalizada de renta - Go Easy Florida 🚗';
+        content = `
+          <h1 style="color: #4052b6; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Listo, ${name}!</h1>
+          <p>Ya tengo tu <strong>propuesta personalizada</strong> lista para tu llegada el <strong>${formatDate(leadData.pickup_date)}</strong> en <strong>${leadData.pickup_location || 'Florida'}</strong>.</p>
+          <p>Seleccioné las opciones que mejor se adaptan a tus planes, priorizando comodidad, espacio y el mejor precio.</p>
+          ${quoteLink ? `
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${quoteLink}" style="background-color: #4052b6; color: white; padding: 16px 32px; border-radius: 12px; font-weight: bold; text-decoration: none; display: inline-block;">Ver mi Cotización ✨</a>
+          </div>
+          <p style="font-size: 14px; color: #64748b;">Si no puedes hacer clic en el botón, copia este enlace: ${quoteLink}</p>
+          ` : ''}
+          <p>¿Tienes alguna duda? Responde a este correo o escríbenos por WhatsApp.</p>
+        `;
+        break;
+      }
+      case 'reserva_confirmada': {
+        const depositAmt = extraData.amount ? `$${parseFloat(extraData.amount).toFixed(2)}` : '';
+        subject = '¡Reserva confirmada! Tu auto en Go Easy Florida está asegurado 🥳';
+        content = `
+          <h1 style="color: #059669; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Excelente noticia, ${name}!</h1>
+          <p>Acabamos de recibir tu pago${depositAmt ? ` de <strong>${depositAmt}</strong>` : ''} correctamente.</p>
+          <p>🎉 <strong>Tu auto en Go Easy Florida ya está oficialmente reservado.</strong></p>
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14px; color: #166534;"><strong>Detalles de tu reserva:</strong></p>
+            <p style="margin: 8px 0 0; font-size: 14px; color: #166534;">📅 Recogida: ${formatDate(leadData.pickup_date)} — ${leadData.pickup_location || 'Florida'}</p>
+            ${leadData.return_date ? `<p style="margin: 4px 0 0; font-size: 14px; color: #166534;">🔄 Devolución: ${formatDate(leadData.return_date)} — ${leadData.return_location || leadData.pickup_location || 'Florida'}</p>` : ''}
+          </div>
+          <p>Nuestro equipo estará preparando tu voucher oficial. Te lo enviaremos muy pronto.</p>
+          <p>¿Tienes alguna pregunta sobre tu reserva? Responde a este correo, estamos para ayudarte.</p>
+        `;
+        break;
+      }
+      case 'voucher_enviado': {
         const vUrl = extraData.voucher_url || '';
+        subject = 'Tu voucher de reserva - Go Easy Florida 📄';
         content = `
           <h1 style="color: #4052b6; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Hola ${name}!</h1>
           <p>Ya tenemos listo tu <strong>Voucher Oficial de Confirmación</strong> para tu renta en ${leadData.pickup_location || 'Florida'}.</p>
           <p>Puedes acceder a tu documento digital y descargarlo en PDF haciendo clic en el siguiente enlace:</p>
+          ${vUrl ? `
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${vUrl}" style="background-color: #4052b6; color: white; padding: 16px 32px; border-radius: 12px; font-weight: bold; text-decoration: none; display: inline-block;">Ver mi Voucher</a>
+            <a href="${vUrl}" style="background-color: #4052b6; color: white; padding: 16px 32px; border-radius: 12px; font-weight: bold; text-decoration: none; display: inline-block;">Ver mi Voucher 📄</a>
           </div>
           <p style="font-size: 14px; color: #64748b;">Si no puedes hacer clic en el botón, copia y pega este enlace en tu navegador: ${vUrl}</p>
+          ` : ''}
+        `;
+        break;
+      }
+      case 'cerrado':
+        subject = 'Gracias por confiar en Go Easy Florida ⭐';
+        content = `
+          <h1 style="color: #4052b6; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Gracias, ${name}!</h1>
+          <p>Fue un placer acompañarte durante tu renta. Esperamos que hayas disfrutado la experiencia con <strong>Go Easy Florida</strong>.</p>
+          <p>Tu opinión es muy importante para nosotros. Si tuvieras un momento, nos encantaría saber cómo te fue.</p>
+          <p>¡Esperamos verte de regreso pronto! 🌴</p>
         `;
         break;
       default:

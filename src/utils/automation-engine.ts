@@ -134,12 +134,12 @@ export async function executeStageAutomation(
                 lead.pickup_location || '—'
               ]; 
               break;
-            case 'voucher_enviado': 
+            case 'voucher_enviado':
               params = [
-                lead.first_name || 'Cliente', 
+                lead.first_name || 'Cliente',
                 lead.pickup_location || '—',
-                extraData.voucher_url || 'pendiente'
-              ]; 
+                extraData.voucher_url || lead.voucher_url || 'pendiente'
+              ];
               break;
             default: params = [lead.first_name || 'Cliente'];
           }

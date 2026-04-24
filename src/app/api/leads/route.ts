@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendLeadToN8n } from '@/utils/n8n'
 import { assignLeadToAgent } from '@/utils/assignment'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,8 +56,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (data?.id) {
-       // Intentar asignación automática
-       await assignLeadToAgent(data.id)
+      // Asignar agente primero para que el nombre aparezca en el WhatsApp de bienvenida
+      await assignLeadToAgent(data.id)
+      // Disparar automatización después de la asignación
+      await executeStageAutomation(data.id, 'lead_nuevo')
     }
 
     // Trigger direct Meta CAPI (Lead)

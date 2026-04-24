@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { assignLeadToAgent } from '@/utils/assignment'
 
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
@@ -32,16 +33,40 @@ export async function createLead(formData: FormData) {
     throw new Error(error.message)
   }
 
-  // Trigger automation (this will create the in-app notification)
   if (newLead) {
+    // Asignar agente primero para que el nombre aparezca en el WhatsApp de bienvenida
+    await assignLeadToAgent(newLead.id)
     await executeStageAutomation(newLead.id, 'lead_nuevo')
   }
 
   revalidatePath('/dashboard/leads')
 }
 
+// Valid forward-only transitions to avoid re-triggering automations on backward drags
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  lead_nuevo:          ['en_cotizacion', 'cerrado'],
+  en_cotizacion:       ['reserva_confirmada', 'lead_nuevo', 'cerrado'],
+  reserva_confirmada:  ['voucher_enviado', 'cerrado'],
+  voucher_enviado:     ['cerrado'],
+  cerrado:             [],
+}
+
 export async function updateLeadStatus(id: string, status: string) {
   const supabase = await createClient()
+
+  // Fetch current status to check if transition is valid
+  const { data: current, error: fetchError } = await supabase
+    .from('leads')
+    .select('status')
+    .eq('id', id)
+    .single()
+
+  if (fetchError || !current) {
+    throw new Error(fetchError?.message || 'Lead no encontrado')
+  }
+
+  // Skip update + automation if status didn't change
+  if (current.status === status) return
 
   const { error } = await supabase
     .from('leads')
@@ -52,8 +77,11 @@ export async function updateLeadStatus(id: string, status: string) {
     throw new Error(error.message)
   }
 
-  // Trigger automation
-  await executeStageAutomation(id, status)
+  // Only fire automation for allowed transitions to prevent accidental re-triggers
+  const allowedNext = VALID_TRANSITIONS[current.status] ?? []
+  if (allowedNext.includes(status)) {
+    await executeStageAutomation(id, status)
+  }
 
   revalidatePath('/dashboard/leads')
 }
