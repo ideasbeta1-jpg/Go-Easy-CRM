@@ -7,7 +7,9 @@ const withPWA = withPWAInit({
   // We don't disable in dev if we want to test PWA, but it's usually better to disable it to avoid caching issues during development.
   // We'll set it to false for now so the user can test it during dev
   register: true,
-  skipWaiting: false,
+  workboxOptions: {
+    skipWaiting: false,
+  },
 });
 
 const nextConfig: NextConfig = {
