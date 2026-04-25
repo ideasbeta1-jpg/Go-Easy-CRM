@@ -33,7 +33,7 @@ import {
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { updateLead } from '@/app/utils/actions/leads'
+import { updateLead, deleteLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
 import { generateVoucherForLead, updateProviderConfirmation } from '@/app/utils/actions/vouchers'
@@ -350,6 +350,24 @@ export default function LeadDetailClient({
       }
   }
 
+  const handleDeleteLead = async () => {
+    const confirmation = window.prompt(`Para confirmar que deseas ELIMINAR este lead de forma permanente, escribe "ELIMINAR" a continuación:`)
+    if (confirmation !== 'ELIMINAR') {
+      if (confirmation !== null) {
+        alert('Palabra clave incorrecta. El lead no fue eliminado.')
+      }
+      return
+    }
+
+    try {
+      await deleteLead(lead.id)
+      router.push('/dashboard/leads')
+    } catch (error: any) {
+      console.error('Error deleting lead:', error)
+      alert(`Error al eliminar el lead: ${error.message || 'Unknown error'}`)
+    }
+  }
+
   const selectedProvider = providers.find(p => p.id === formData.provider_id)
   const selectedAgent = agents.find(a => a.id === formData.assigned_to)
 
@@ -557,6 +575,14 @@ export default function LeadDetailClient({
                  <img src={selectedAgent?.avatar_url || `https://ui-avatars.com/api/?name=${selectedAgent?.full_name || 'Admin'}&background=4052b6&color=fff`} className="w-full h-full object-cover" alt="Profile" />
               </div>
             </div>
+
+            <button
+                onClick={handleDeleteLead}
+                className="ml-2 p-2.5 text-slate-400 hover:text-white hover:bg-red-500 rounded-full transition-all border border-transparent hover:border-red-600 hover:shadow-sm"
+                title="Eliminar Lead Permanente"
+            >
+                <Trash2 className="w-4 h-4" />
+            </button>
           </div>
       </div>
 

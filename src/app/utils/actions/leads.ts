@@ -45,3 +45,18 @@ export async function updateLeadStatus(id: string, status: string) {
     revalidatePath(`/dashboard/leads/${id}`)
     revalidatePath('/dashboard/leads')
 }
+
+export async function deleteLead(id: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard/leads')
+}

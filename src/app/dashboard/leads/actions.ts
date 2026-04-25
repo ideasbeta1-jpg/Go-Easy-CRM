@@ -103,3 +103,18 @@ export async function searchCustomerByContact(query: string) {
   if (error || !data) return null
   return data
 }
+
+export async function deleteLead(id: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .delete()
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard/leads')
+}
