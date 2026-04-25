@@ -12,8 +12,8 @@ export async function assignLeadToAgent(leadId: string) {
     // Selección de agente (Round Robin) — todos los asesores, conectados o no
     const { data: agents, error: agentsError } = await supabase
       .from('profiles')
-      .select('id, full_name, first_name, last_name, phone')
-      .eq('role', 'agent')
+      .select('id, full_name, first_name, last_name')
+      .eq('role', 'agente')
       .order('last_assigned_at', { ascending: true, nullsFirst: true })
       .limit(1)
 

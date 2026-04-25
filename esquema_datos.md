@@ -1,178 +1,356 @@
-# 📊 Esquema de Base de Datos - Sistema de Reservas
+# 📊 Esquema de Base de Datos - Go Easy CRM
 
-Este documento detalla la estructura relacional, los tipos de datos y la lógica de estados para el CRM de renta de vehículos.
+> **Verificado contra Supabase** · Proyecto `oupphpttipkedntaxizk` · PostgreSQL 17.6 · `2026-04-25`
+
+Este documento detalla la estructura relacional, los tipos de datos y la lógica de estados del CRM de renta de vehículos Go Easy Florida. **15 tablas activas.**
 
 ---
 
-## 1. Extensiones y Tipos Personalizados (Enums)
-
-Definen los estados del embudo de ventas y los roles de acceso al sistema.
+## 1. Tipos Personalizados (Enums)
 
 | Tipo | Valores Permitidos |
 | :--- | :--- |
 | **`lead_status`** | `lead_nuevo`, `en_cotizacion`, `reserva_confirmada`, `voucher_enviado`, `cerrado` |
-| **`user_role`** | `admin`, `agente` |
+| **`user_role`** | `admin`, `agente` (Default: `agente`) |
 
 ---
 
 ## 2. Tablas Maestras (Catálogos)
 
-Estas tablas alimentan los selectores del CRM y del formulario público de reservación.
+### **`categories`** — Categorías de Vehículos
+Define la flota disponible y sus precios base. RLS: ✅
 
-### **Categorías de Vehículos (`categories`)**
-Define la flota disponible y sus precios base.
-* **`id`**: `UUID` (PK)
-* **`name`**: `TEXT` (Ej: Económico, SUV, Minivan)
-* **`daily_price`**: `DECIMAL(10, 2)` (Precio de venta público / sugerido)
-* **`base_daily_cost`**: `DECIMAL(10, 2)` (Costo real dictado por el proveedor)
-* **`image_url`**: `TEXT` (URL de imagen en Storage)
-* **`description`**: `TEXT`
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `name` | `text` | Ej: Económico, SUV, Minivan |
+| `daily_price` | `numeric` | Precio de venta público / sugerido |
+| `base_daily_cost` | `numeric` | Costo real dictado por el proveedor (Nullable) |
+| `image_url` | `text` | URL de imagen en Storage (Nullable) |
+| `description` | `text` | Descripción del vehículo (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
 
-### **Proveedores (`providers`)**
-Rentadoras aliadas para la gestión de flota externa.
-* **`id`**: `UUID` (PK)
-* **`name`**: `TEXT`
-* **`contact_name`**: `TEXT`
-* **`email`**: `TEXT`
-* **`whatsapp_group_id`**: `TEXT` (Integración con n8n / Evolution API)
+---
+
+### **`providers`** — Proveedores / Rentadoras
+Rentadoras aliadas para gestión de flota externa. RLS: ✅
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `name` | `text` | Nombre del proveedor |
+| `contact_name` | `text` | Nombre del contacto (Nullable) |
+| `email` | `text` | Email de contacto (Nullable) |
+| `whatsapp_group_id` | `text` | Integración con n8n / Evolution API (Nullable) |
+| `logo_url` | `text` | Logo del proveedor en Storage (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
+
+---
+
+### **`locations`** — Ubicaciones / Aeropuertos
+Puntos de pickup y devolución disponibles. RLS: ✅
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `name` | `text` | **UNIQUE** — Nombre del aeropuerto o punto |
+| `code` | `text` | Código IATA u otro (Nullable) |
+| `type` | `text` | Tipo de sitio: `airport`, `downtown`, `terminal`, etc. (Nullable) |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+### **`provider_offices`** — Oficinas por Ubicación
+Mapea las oficinas de cada proveedor en cada ubicación. RLS: ✅
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `provider_id` | `uuid` (FK) | → `providers.id` |
+| `location_id` | `uuid` (FK) | → `locations.id` |
+| `address` | `text` | Dirección física (Nullable) |
+| `phone` | `text` | Teléfono de la oficina (Nullable) |
+| `hours` | `text` | Horario de atención (Nullable) |
+| `notes` | `text` | Notas internas (Nullable) |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
 
 ---
 
 ## 3. Tabla Principal: Gestión de Leads
 
-Centraliza toda la información del cliente y el ciclo de vida de la reserva.
+### **`leads`** — Pipeline de Ventas
+Centraliza toda la información del cliente y el ciclo de vida de la reserva. RLS: ✅ · **23 registros**
 
-### **`leads`**
-| Campo | Tipo | Notas |
+| Columna | Tipo | Notas |
 | :--- | :--- | :--- |
-| `id` | UUID | Identificador único |
-| `first_name` | TEXT | Nombre del cliente |
-| `last_name` | TEXT | Apellido del cliente |
-| `phone` | TEXT | Teléfono de contacto |
-| `email` | TEXT | Correo electrónico |
-| `pickup_date` | TIMESTAMPTZ | Fecha/Hora entrega |
-| `return_date` | TIMESTAMPTZ | Fecha/Hora devolución |
-| `pickup_location` | TEXT | Lugar de entrega |
-| `return_location` | TEXT | Lugar de devolución |
-| `category_id` | UUID (FK) | Relación con `categories` |
-| `status` | lead_status | Estado actual del proceso |
-| `assigned_to` | UUID (FK) | Relación con `auth.users` |
-| `provider_id` | UUID (FK) | Proveedor asignado al confirmar |
-| `rate_plan` | TEXT | Tarifa seleccionada ('base' o 'premium') |
-| `agreed_daily_price` | DECIMAL | Ganancia Go Easy acordada ($/día). Base para el depósito. |
-| `total_amount` | DECIMAL | Monto total final (Costo Prov + Ganancia * días). |
-| `deposit_paid` | BOOLEAN | Indica si el depósito fue abonado |
-| `stripe_payment_id`| TEXT | ID de transacción de Stripe |
-| `notes` | TEXT | Notas internas (solo agentes) |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `first_name` | `text` | Nombre del cliente |
+| `last_name` | `text` | Apellido del cliente |
+| `phone` | `text` | Teléfono de contacto (Nullable) |
+| `email` | `text` | Correo electrónico (Nullable) |
+| `pickup_date` | `timestamptz` | Fecha/Hora de entrega (Nullable) |
+| `return_date` | `timestamptz` | Fecha/Hora de devolución (Nullable) |
+| `pickup_location` | `text` | Nombre de lugar de entrega — texto libre (Nullable) |
+| `pickup_location_id` | `uuid` (FK) | → `locations.id` (Nullable) |
+| `return_location` | `text` | Nombre de lugar de devolución — texto libre (Nullable) |
+| `return_location_id` | `uuid` (FK) | → `locations.id` (Nullable) |
+| `category_id` | `uuid` (FK) | → `categories.id` (Nullable) |
+| `status` | `lead_status` | Estado del pipeline. Default: `lead_nuevo` |
+| `assigned_to` | `uuid` (FK) | → `auth.users.id` — Agente asignado (Nullable) |
+| `provider_id` | `uuid` (FK) | → `providers.id` — Proveedor asignado (Nullable) |
+| `rate_plan` | `text` | Tarifa seleccionada. Default: `'base'`. Valores: `base`, `premium` (Nullable) |
+| `agreed_daily_price` | `numeric` | Ganancia Go Easy acordada ($/día). Base para el depósito Stripe. (Nullable) |
+| `total_amount` | `numeric` | Monto total final = (Costo Prov + Ganancia) × días (Nullable) |
+| `deposit_paid` | `boolean` | Indica si el depósito fue abonado. Default: `false` |
+| `stripe_payment_id` | `text` | ID de transacción de Stripe (Nullable) |
+| `source` | `text` | Canal de origen del lead: `web`, `whatsapp`, etc. (Nullable) |
+| `utm_source` | `text` | UTM tracking (Nullable) |
+| `utm_medium` | `text` | UTM tracking (Nullable) |
+| `utm_campaign` | `text` | UTM tracking (Nullable) |
+| `utm_term` | `text` | UTM tracking (Nullable) |
+| `utm_content` | `text` | UTM tracking (Nullable) |
+| `notes` | `text` | Notas internas — solo visibles para agentes (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
+| `updated_at` | `timestamptz` | Default: `now()` |
 
 ---
 
-## 4. Documentación y Salidas
+## 4. Tablas de Documentación y Salidas
 
-Tablas para el manejo de archivos dinámicos y confirmaciones.
+### **`quotes`** — Cotizaciones
+Historial de presupuestos enviados al cliente. Actúa como snapshot de los valores pactados. RLS: ✅ · **26 registros**
 
-### **Cotizaciones (`quotes`)**
-Historial de presupuestos enviados al cliente. Actúa como snapshot de los valores pactados.
-* **`lead_id`**: Relación con el lead (Borrado en cascada).
-* **`stripe_link`**: Link de pago dinámico.
-* **`pdf_url`**: Enlace a la landing o PDF de cotización.
-* **`total_amount`**: `DECIMAL` - Monto total snapshot al momento de generar.
-* **`pickup_date`**: `TIMESTAMPTZ` - Fecha de entrega snapshot.
-* **`return_date`**: `TIMESTAMPTZ` - Fecha de devolución snapshot.
-* **`expires_at`**: Fecha de vencimiento de la oferta.
-* **Comportamiento en UI Cliente**: Cuando el estado del `lead` vinculado pasa a `reserva_confirmada`, la interfaz de cotización en vivo (`QuoteLandingPage`) bloqueará dinámicamente el botón de pago y exhibirá notificaciones de "RESERVA PAGADA" para evitar pagos duplicados.
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` |
+| `stripe_link` | `text` | Link de pago dinámico de Stripe (Nullable) |
+| `pdf_url` | `text` | Enlace a la landing o PDF de cotización (Nullable) |
+| `total_amount` | `numeric` | Monto total snapshot al momento de generar (Nullable) |
+| `pickup_date` | `timestamptz` | Fecha de entrega snapshot (Nullable) |
+| `return_date` | `timestamptz` | Fecha de devolución snapshot (Nullable) |
+| `expires_at` | `timestamptz` | Fecha de vencimiento de la oferta (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
 
-### **Vouchers (`vouchers`)**
-Documentación final una vez cerrada la venta. Generado por el agente desde el panel de control.
-* **`id`**: `UUID` (PK).
-* **`lead_id`**: `UUID` (FK -> `leads`).
-* **`confirmation_number`**: ID interno Go Easy (Formato: `GF-XXXXXX`). Generado aleatoriamente al crear el voucher.
-* **`provider_confirmation`**: ID o Código de confirmación oficial de la rentadora (Ej: Hertz, Budget). Capturado en el momento de la generación.
-* **`voucher_url`**: No es una columna física (se genera dinámicamente o se guarda el slug). El sistema usa redirección `/v/{id}` para proporcionar un **enlace recortado** en comunicaciones.
-* **`created_at`**: Fecha de generación automática.
-* **Comportamiento**: Al generarse, el lead cambia automáticamente a estatus `voucher_enviado` y se disparan las automatizaciones de salida.
-
-### **Mensajes / Chats (`messages`)**
-Historial de interacción por WhatsApp / WABA / Evolution API.
-* **`id`**: `UUID` (PK)
-* **`lead_id`**: `UUID` (FK -> `leads`)
-* **`content`**: `TEXT` (Contenido del mensaje)
-* **`direction`**: `TEXT` (`inbound` / `outbound`)
-* **`media_url`**: `TEXT` (Enlace al archivo de audio/multimedia en Storage)
-* **`media_type`**: `TEXT` (Tipo MIME, ej. `audio/ogg`, `image/jpeg`)
-* **`is_read`**: `BOOLEAN` (Default: `FALSE`, indica si el mensaje fue visto por un agente)
-* **`created_at`**: `TIMESTAMPTZ` (Fecha de envío/recepción)
-
-
-### **Perfiles de Staff (`profiles`)**
-Información extendida de los usuarios del sistema.
-* **`id`**: `UUID` (PK, FK -> `auth.users`)
-* **`first_name`**: `TEXT` (Nombre)
-* **`last_name`**: `TEXT` (Apellido)
-* **`role`**: `user_role` (`admin` / `agente`)
-* **`phone`**: `TEXT` (Teléfono de contacto)
-* **`whatsapp_number`**: `TEXT` (Número para WhatsApp CRM)
-* **`bio`**: `TEXT` (Biografía o notas)
-* **`avatar_url`**: `TEXT` (URL de la imagen de perfil en Storage)
-
-### **Notificaciones (`notifications`)**
-Centraliza las alertas internas para los usuarios del CRM.
-* **`id`**: `UUID` (PK)
-* **`user_id`**: `UUID` (FK -> `auth.users`)
-* **`type`**: `TEXT` (Tipo de evento: `new_lead`, `payment_confirmed`, etc.)
-* **`title`**: `TEXT` (Título de la notificación)
-* **`body`**: `TEXT` (Cuerpo/adelanto de la información)
-* **`link`**: `TEXT` (URL de redirección interna)
-* **`lead_id`**: `UUID` (FK -> `leads`)
-* **`is_read`**: `BOOLEAN` (Default: `FALSE`)
-* **`created_at`**: `TIMESTAMPTZ` (Fecha de creación)
+> **Comportamiento en UI Cliente:** Cuando el `lead` vinculado pasa a `reserva_confirmada`, la cotización en vivo (`/q/[id]`) bloquea el botón de pago y muestra "RESERVA PAGADA" para evitar pagos duplicados.
 
 ---
 
-## 5. Almacenamiento (Storage Buckets)
+### **`vouchers`** — Vouchers de Confirmación
+Documentación final una vez cerrada la venta. RLS: ✅ · **7 registros**
 
-### **`avatars`**
-* **Uso**: Fotos de perfil de agentes y administradores.
-* **Estructura**: `avatars/{user_id}/{filename}`.
-* **Acceso**: Público para lectura, restringido por UID para escritura/borrado.
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` |
+| `confirmation_number` | `text` | ID interno Go Easy (Formato: `GF-XXXXXX`) |
+| `provider_confirmation` | `text` | ID oficial de la rentadora (Ej: Hertz, Budget) (Nullable) |
+| `voucher_url` | `text` | URL del voucher generado (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
 
-### **`chat_media`**
-* **Uso**: Audios, notas de voz, imágenes o documentos enviados/recibidos en el chat.
-* **Acceso**: Público para lectura (facilita reproducción en web y envío por API).
-
-### **`provider-logos`**
-* **Uso**: Logotipos de las rentadoras aliadas.
-
-### **`vehicles`**
-* **Uso**: Imágenes de la flota por categorías.
+> **Comportamiento:** Al generarse, el lead cambia automáticamente a `voucher_enviado`. El sistema usa redirección `/v/{id}` como enlace corto.
 
 ---
 
-## 6. Lógica de Cálculo y Negociación (Sistema de Triple Control)
+## 5. Tablas de Comunicación
 
-El CRM implementa un sistema de cálculo dinámico y bidireccional que permite a los agentes negociar tarifas de forma flexible.
+### **`messages`** — Historial de Chat
+Mensajes WhatsApp / WABA intercambiados con el cliente. RLS: ✅ · **143 registros**
 
-### **Fórmulas Base**
-*   **Total Diario** = `Costo Vehículo (Base)` + `Ganancia Go Easy (Margen)`
-*   **Total Reserva** = `Total Diario` × `Días de Renta`
-*   **Depósito (Stripe)** = `Ganancia Go Easy` × `Días de Renta`
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` (Nullable) |
+| `content` | `text` | Contenido del mensaje |
+| `direction` | `text` | Check: `inbound` o `outbound` (Nullable) |
+| `media_url` | `text` | URL del archivo multimedia en Storage (Nullable) |
+| `media_type` | `text` | Tipo MIME: `audio/ogg`, `image/jpeg`, etc. (Nullable) |
+| `wamid` | `text` | ID de mensaje de WhatsApp Business API (Nullable) |
+| `status` | `text` | Estado de entrega WABA: `sent`, `delivered`, `read`, etc. Default: `'sent'` (Nullable) |
+| `is_read` | `boolean` | Indica si fue visto por un agente. Default: `false` (Nullable) |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
 
-### **Comportamiento en la Interfaz (Lead Detail)**
+---
+
+### **`notifications`** — Notificaciones In-App
+Alertas internas para los usuarios del CRM. RLS: ✅ · **132 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `gen_random_uuid()` |
+| `user_id` | `uuid` (FK) | → `auth.users.id` (Nullable) |
+| `type` | `text` | Tipo de evento: `lead_assigned`, `payment_confirmed`, etc. |
+| `title` | `text` | Título de la notificación |
+| `body` | `text` | Cuerpo del mensaje (Nullable) |
+| `link` | `text` | URL de redirección interna (Nullable) |
+| `lead_id` | `uuid` (FK) | → `leads.id` (Nullable) |
+| `is_read` | `boolean` | Default: `false` (Nullable) |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+## 6. Tablas de Usuarios
+
+### **`profiles`** — Perfiles de Staff
+Información extendida de los usuarios del sistema. RLS: ✅ · **4 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK, FK) | → `auth.users.id` |
+| `role` | `user_role` | Enum: `admin` / `agente`. Default: `'agente'` |
+| `first_name` | `text` | Nombre (Nullable) |
+| `last_name` | `text` | Apellido (Nullable) |
+| `full_name` | `text` | Nombre completo — sincronizado desde `auth.users` (Nullable) |
+| `phone` | `text` | Teléfono de contacto (Nullable) |
+| `whatsapp_number` | `text` | Número para WhatsApp CRM (Nullable) |
+| `bio` | `text` | Biografía o notas internas (Nullable) |
+| `avatar_url` | `text` | URL de la imagen de perfil en Storage (Nullable) |
+| `is_active` | `boolean` | Si el agente está activo en el sistema (Nullable, Default: `false`) |
+| `last_active_at` | `timestamptz` | Última vez que el agente estuvo activo. Default: `now()` (Nullable) |
+| `last_assigned_at` | `timestamptz` | Última asignación de lead — usado para Round Robin. Default: `now()` (Nullable) |
+| `inactivity_timeout` | `integer` | Minutos de inactividad antes de marcar offline. Default: `60` (Nullable) |
+| `updated_at` | `timestamptz` | Default: `now()` |
+
+> **Lógica Round Robin:** La asignación automática de leads (`assignLeadToAgent`) ordena los agentes con `role = 'agente'` por `last_assigned_at ASC` y selecciona el primero (el que lleva más tiempo sin recibir un lead).
+
+---
+
+## 7. Tablas de Automatización
+
+### **`automation_logs`** — Logs de Automatizaciones
+Registro de todas las acciones automáticas disparadas por el motor. RLS: ❌ (sin restricciones) · **180 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `gen_random_uuid()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` (Nullable) |
+| `stage` | `text` | Etapa que disparó la automatización |
+| `channel` | `text` | Canal utilizado: `whatsapp`, `email`, etc. |
+| `template_name` | `text` | Nombre del template usado (Nullable) |
+| `status` | `text` | Resultado: `sent`, `failed`, etc. Default: `'sent'` (Nullable) |
+| `error_message` | `text` | Detalle del error si falló (Nullable) |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+### **`email_templates`** — Templates de Email
+Plantillas de correo configurables por etapa. RLS: ✅ · **5 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `uuid_generate_v4()` |
+| `stage` | `text` | **UNIQUE** — Etapa del pipeline asociada |
+| `subject` | `text` | Asunto del correo |
+| `body` | `text` | Cuerpo HTML del correo |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+| `updated_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+### **`whatsapp_template_mappings`** — Mappings de Templates WABA
+Configuración de variables para templates aprobados de WhatsApp Business. RLS: ✅ · **4 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `gen_random_uuid()` |
+| `template_name` | `text` | **UNIQUE** — Nombre exacto del template en Meta |
+| `stage` | `text` | Etapa del pipeline que usa este template (Nullable) |
+| `language_code` | `text` | Idioma: `es`, `en`, etc. Default: `'es'` (Nullable) |
+| `mappings` | `jsonb` | Variables del template → campos del lead. Default: `{}` |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+| `updated_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+## 8. Tablas de Notas y Configuración
+
+### **`lead_notes`** — Notas Internas de Leads
+Historial de notas agregadas por los agentes sobre un lead. RLS: ✅ · **25 registros**
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `gen_random_uuid()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` |
+| `agent_id` | `uuid` (FK) | → `profiles.id` — Agente que escribió la nota (Nullable) |
+| `content` | `text` | Contenido de la nota |
+| `created_at` | `timestamptz` | Nullable, Default: `now()` |
+
+---
+
+### **`system_settings`** — Configuración Global del CRM
+Tabla singleton (una sola fila, `id = 1`) con ajustes de marca y SEO. RLS: ✅
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `integer` (PK) | Check: `id = 1` — Singleton. Default: `1` |
+| `crm_name` | `text` | Nombre del CRM. Default: `'Go Easy CRM'` (Nullable) |
+| `crm_tagline` | `text` | Tagline del sistema (Nullable) |
+| `logo_url` | `text` | Logo en Storage (Nullable) |
+| `favicon_url` | `text` | Favicon en Storage (Nullable) |
+| `seo_title` | `text` | Título SEO por defecto (Nullable) |
+| `seo_description` | `text` | Meta description por defecto (Nullable) |
+| `seo_keywords` | `text` | Meta keywords (Nullable) |
+| `google_config` | `jsonb` | Config de Google (GA, Search Console, etc.). Default: `{}` (Nullable) |
+| `ai_search_config` | `jsonb` | Config de búsqueda con IA. Default: `{}` (Nullable) |
+| `updated_at` | `timestamptz` | Default: `now()` (Nullable) |
+
+---
+
+## 9. Diagrama de Relaciones
+
+```
+auth.users ──── (1:1) ──── profiles
+auth.users ──── (1:N) ──── leads (assigned_to)
+auth.users ──── (1:N) ──── notifications (user_id)
+
+leads ──── (N:1) ──── categories
+leads ──── (N:1) ──── providers
+leads ──── (N:1) ──── locations (pickup_location_id)
+leads ──── (N:1) ──── locations (return_location_id)
+leads ──── (1:N) ──── quotes
+leads ──── (1:N) ──── vouchers
+leads ──── (1:N) ──── messages
+leads ──── (1:N) ──── lead_notes
+leads ──── (1:N) ──── automation_logs
+leads ──── (1:N) ──── notifications
+
+providers ──── (1:N) ──── provider_offices
+locations ──── (1:N) ──── provider_offices
+profiles  ──── (1:N) ──── lead_notes (agent_id)
+```
+
+---
+
+## 10. Almacenamiento (Storage Buckets)
+
+| Bucket | Uso | Acceso |
+| :--- | :--- | :--- |
+| `avatars` | Fotos de perfil de agentes y admins. Path: `avatars/{user_id}/{filename}` | Público lectura, restringido por UID para escritura |
+| `chat_media` | Audios, imágenes y documentos de los chats de WhatsApp | Público lectura |
+| `provider-logos` | Logotipos de las rentadoras aliadas | Público lectura |
+| `vehicles` | Imágenes de flota por categorías | Público lectura |
+
+---
+
+## 11. Lógica de Cálculo y Negociación (Sistema de Triple Control)
+
+### Fórmulas Base
+- **Total Diario** = `Costo Vehículo (base_daily_cost)` + `Ganancia Go Easy (agreed_daily_price)`
+- **Total Reserva** = `Total Diario` × `Días de Renta`
+- **Depósito Stripe** = `Ganancia Go Easy (agreed_daily_price)` × `Días de Renta`
+
+### Comportamiento en la Interfaz (Lead Detail)
 Cuando el asesor entra en modo edición, el sistema ofrece tres campos interconectados:
-1.  **Costo Vehículo**: Editable para reflejar acuerdos con proveedores. Al cambiarlo, el **Total Diario** se actualiza manteniendo la **Ganancia** fija.
-2.  **Ganancia Go Easy**: Editable para ajustar la rentabilidad. Al cambiarlo, el **Total Diario** se actualiza manteniendo el **Costo** fijo.
-3.  **Total Diario**: Editable para igualar precios de la competencia. Al cambiarlo, el **Costo Vehículo** se recalcula manteniendo la **Ganancia** fija (comportamiento por defecto para "price matching").
+1. **Costo Vehículo**: Editable. Al cambiarlo → el **Total Diario** se actualiza manteniendo la **Ganancia** fija.
+2. **Ganancia Go Easy**: Editable. Al cambiarlo → el **Total Diario** se actualiza manteniendo el **Costo** fijo.
+3. **Total Diario**: Editable. Al cambiarlo → el **Costo Vehículo** se recalcula manteniendo la **Ganancia** fija (para "price matching").
 
-### **Persistencia y Escalado**
-*   **Tarifa locked-in**: Una vez que se guarda un total personalizado, el sistema calcula un rate diario implícito.
-*   **Cambio de Fechas**: Si el asesor cambia las fechas de la reserva, el sistema mantiene el valor diario negociado en lugar de volver a los de la categoría por defecto.
-*   **Cobro de Depósito**: `generateQuoteForLead` prioriza `agreed_daily_price` para determinar el depósito en Stripe, asegurando que la ganancia pactada se capture correctamente.
-*   **Restablecer**: Un botón permite volver a los valores predeterminados de la tabla `categories`.
-
----
+### Persistencia y Escalado
+- **Tarifa locked-in**: Una vez guardado un total personalizado, el sistema calcula un rate diario implícito.
+- **Cambio de Fechas**: El sistema mantiene el valor diario negociado en lugar de volver al precio por categoría.
+- **Cobro de Depósito**: `generateQuoteForLead` prioriza `agreed_daily_price` para el depósito en Stripe.
+- **Restablecer**: Un botón permite volver a los valores predeterminados de la tabla `categories`.
 
 ---
 
----
-
-> **Nota técnica:** Todas las tablas incluyen campos de auditoría `created_at` y, en el caso de leads, `updated_at` para control de cambios.
+> **Nota técnica:** Todas las tablas incluyen `created_at`. Las tablas `leads` y `profiles` también incluyen `updated_at` para control de cambios. Los campos `nullable` no son requeridos al momento de inserción.
