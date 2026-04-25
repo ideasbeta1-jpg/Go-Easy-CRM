@@ -211,7 +211,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
             return (
               <div
                 key={status}
-                className={`w-[85vw] sm:w-80 flex flex-col gap-4 md:gap-6 snap-center transition-all duration-200 rounded-[2.5rem] ${dropClass}`}
+                className={`w-[85vw] sm:w-80 h-full flex flex-col gap-4 md:gap-6 snap-center transition-all duration-200 rounded-[2.5rem] ${dropClass}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, status)}
@@ -256,116 +256,125 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                   /* Column Surface */
                   <div
                     data-drop-surface
-                    className="flex-1 flex flex-col gap-4 overflow-y-auto px-1 pb-10 scrollbar-hide rounded-[2.5rem] transition-colors duration-200"
+                    className="flex flex-col gap-4 overflow-y-auto px-1 pb-10 scrollbar-hide rounded-[2.5rem] transition-colors duration-200 max-h-[calc(100vh-22rem)] md:max-h-[calc(100vh-24rem)] lg:max-h-[calc(100vh-26rem)]"
                   >
                     {stageLeads.map((lead) => {
                       const unread = unreadByLead[lead.id] || 0
                       const urgency = getUrgency(lead.pickup_date)
                       const showNew = isNewLead(lead.created_at)
                       const cardAccent = getCardAccent(lead, unread)
+                      const agentName = lead.assigned_to_profile?.full_name || null
 
                       return (
-                        <div
+                        <Link
                           key={lead.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, lead.id, lead.status)}
-                          onDragEnd={handleDragEnd}
-                          className={`bg-white p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] shadow-[0_10px_40px_rgba(30,41,59,0.04)] border border-slate-100/50 hover:shadow-[0_20px_60px_rgba(64,82,182,0.12)] hover:scale-[1.02] transition-all duration-500 cursor-grab active:cursor-grabbing relative overflow-hidden ${cardAccent}`}
+                          href={`/dashboard/leads/${lead.id}`}
+                          draggable={false}
                         >
-                          <Link href={`/dashboard/leads/${lead.id}`} draggable={false}>
-                            {/* Top row: ID + badges + amount */}
-                            <div className="flex justify-between items-start mb-3 md:mb-4">
-                              <div className="flex flex-col gap-1.5">
-                                <span className="text-[9px] md:text-[10px] font-bold text-slate-400 bg-slate-100/50 px-2 md:px-2.5 py-1 rounded-full tracking-wider self-start">
-                                  #{lead.id.slice(0, 4)}
-                                </span>
-                                <div className="flex flex-wrap gap-1">
+                          <div
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, lead.id, lead.status)}
+                            onDragEnd={handleDragEnd}
+                            className={`bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing ${cardAccent}`}
+                          >
+                            <div className="p-4">
+
+                              {/* Fila 1: ID + badges + monto */}
+                              <div className="flex items-start justify-between gap-2 mb-3">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full tracking-wide">
+                                    #{lead.id.slice(0, 6)}
+                                  </span>
                                   {showNew && (
-                                    <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-500 text-white px-2 py-0.5 rounded-full animate-pulse">
-                                      🆕 Nuevo
+                                    <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full animate-pulse">
+                                      Nuevo
                                     </span>
                                   )}
                                   {urgency && (
-                                    <span className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${urgency.cls}`}>
+                                    <span className={`flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${urgency.cls}`}>
                                       <Zap className="w-2.5 h-2.5" />
                                       {urgency.label}
                                     </span>
                                   )}
                                   {unread > 0 && (
-                                    <span className="flex items-center gap-1 text-[8px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full border border-blue-100">
+                                    <span className="flex items-center gap-1 text-[9px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full border border-blue-100">
                                       <MessageCircle className="w-2.5 h-2.5" />
                                       {unread}
                                     </span>
                                   )}
                                 </div>
+                                <div className="text-right shrink-0">
+                                  <p className="text-base font-black text-primary leading-none">
+                                    <span className="text-xs opacity-40 mr-0.5">$</span>
+                                    {Math.floor(lead.total_amount || 0).toLocaleString()}
+                                  </p>
+                                  <p className="text-[9px] font-bold text-emerald-500 mt-0.5">
+                                    Rva ${Math.floor(getReservationAmount(lead)).toLocaleString()}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex flex-col items-end">
-                                <span className="text-lg md:text-xl font-sans font-black text-primary tracking-tight leading-none">
-                                  <span className="text-xs md:text-sm opacity-50 mr-0.5">$</span>
-                                  {Math.floor(lead.total_amount || 0).toLocaleString()}
-                                </span>
-                                <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-1">
-                                  Rva: ${Math.floor(getReservationAmount(lead)).toLocaleString()}
-                                </span>
-                              </div>
-                            </div>
 
-                            <div className="space-y-3 md:space-y-4">
-                              <h3 className="text-base md:text-lg font-sans font-black text-slate-900 leading-tight uppercase tracking-tight">
+                              {/* Fila 2: Nombre */}
+                              <p className="font-black text-slate-900 text-sm leading-tight mb-3">
                                 {lead.first_name} {lead.last_name}
-                              </h3>
+                              </p>
 
-                              <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-slate-400">
-                                  <Calendar className="w-3.5 h-3.5 shrink-0" />
-                                  <span className="text-[10px] font-bold uppercase tracking-wide truncate">
-                                    {lead.pickup_date
-                                      ? new Date(lead.pickup_date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })
-                                      : 'Sin fecha'} · {lead.pickup_location?.split(' ')[0] || 'Florida'}
+                              {/* Fila 3: Fecha + ubicación */}
+                              <div className="flex items-center gap-1.5 text-slate-400 mb-1.5">
+                                <Calendar className="w-3 h-3 shrink-0" />
+                                <span className="text-[10px] font-semibold truncate">
+                                  {lead.pickup_date
+                                    ? lead.pickup_date.slice(0, 10).split('-').reverse().join('/')
+                                    : 'Sin fecha'}
+                                  {lead.pickup_location ? ` · ${lead.pickup_location.split(' ').slice(0, 2).join(' ')}` : ''}
+                                </span>
+                              </div>
+
+                              {/* Fila 4: Categoría */}
+                              {lead.category?.name && (
+                                <div className="flex items-center gap-1.5 text-slate-400 mb-3">
+                                  <Car className="w-3 h-3 shrink-0" />
+                                  <span className="text-[10px] font-semibold truncate">{lead.category.name}</span>
+                                </div>
+                              )}
+
+                              {/* Fila 5: Agente asignado + estado */}
+                              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <img
+                                    src={lead.assigned_to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(agentName || 'SA')}&background=f1f5f9&color=94a3b8&size=32&bold=true`}
+                                    className="w-6 h-6 rounded-full object-cover border border-slate-100 shrink-0"
+                                    alt={agentName || 'Sin asignar'}
+                                  />
+                                  <span className={`text-[10px] font-bold truncate ${agentName ? 'text-slate-600' : 'text-orange-400'}`}>
+                                    {agentName || 'Sin asignar'}
                                   </span>
                                 </div>
-                                {lead.category?.name && (
-                                  <div className="flex items-center gap-2 text-slate-400">
-                                    <Car className="w-3.5 h-3.5 shrink-0" />
-                                    <span className="text-[10px] font-bold uppercase tracking-wide truncate">
-                                      {lead.category.name}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
 
-                            <div className="mt-5 pt-4 border-t border-slate-50 flex items-center justify-between">
-                              <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-slate-100 shrink-0">
-                                <img
-                                  src={lead.assigned_to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${lead.assigned_to_profile?.full_name || 'Agente'}&background=f1f5f9&color=64748b`}
-                                  className="w-full h-full object-cover"
-                                  alt="Agent"
-                                />
+                                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase shrink-0 ${
+                                  status === 'lead_nuevo'         ? 'bg-slate-100 text-slate-500' :
+                                  status === 'en_cotizacion'      ? 'bg-indigo-50 text-indigo-600' :
+                                  status === 'reserva_confirmada' ? 'bg-emerald-50 text-emerald-600' :
+                                  status === 'voucher_enviado'    ? 'bg-amber-50 text-amber-600' :
+                                  'bg-slate-50 text-slate-400'
+                                }`}>
+                                  {status === 'lead_nuevo'         && <Clock className="w-3 h-3" />}
+                                  {status === 'en_cotizacion'      && <Mail className="w-3 h-3" />}
+                                  {status === 'reserva_confirmada' && <CheckCircle2 className="w-3 h-3" />}
+                                  {status === 'voucher_enviado'    && <Mail className="w-3 h-3" />}
+                                  <span>
+                                    {status === 'lead_nuevo'         ? 'Nuevo' :
+                                     status === 'en_cotizacion'      ? 'Cotización' :
+                                     status === 'reserva_confirmada' ? 'Confirmado' :
+                                     status === 'voucher_enviado'    ? 'Voucher' :
+                                     'Cerrado'}
+                                  </span>
+                                </div>
                               </div>
 
-                              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                                status === 'lead_nuevo'         ? 'bg-slate-100 text-slate-600' :
-                                status === 'en_cotizacion'      ? 'bg-indigo-50 text-indigo-600' :
-                                status === 'reserva_confirmada' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100/50' :
-                                status === 'voucher_enviado'    ? 'bg-amber-50 text-amber-600' :
-                                'text-slate-400'
-                              }`}>
-                                {status === 'lead_nuevo'         && <Clock className="w-3 h-3" />}
-                                {status === 'en_cotizacion'      && <Mail className="w-3 h-3" />}
-                                {status === 'reserva_confirmada' && <CheckCircle2 className="w-3 h-3" />}
-                                {status === 'voucher_enviado'    && <Mail className="w-3 h-3" />}
-                                <span>
-                                  {status === 'lead_nuevo'         ? '24h' :
-                                   status === 'en_cotizacion'      ? 'Enviado' :
-                                   status === 'reserva_confirmada' ? 'Confirmado' :
-                                   status === 'voucher_enviado'    ? 'Voucher' :
-                                   'Cerrado'}
-                                </span>
-                              </div>
                             </div>
-                          </Link>
-                        </div>
+                          </div>
+                        </Link>
                       )
                     })}
 

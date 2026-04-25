@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc *)",
-      "Read(//c/Users/razs9/OneDrive/Desktop/Apps/Go/ Easy/ CRM/**)"
+      "Read(//c/Users/razs9/OneDrive/Desktop/Apps/Go/ Easy/ CRM/**)",
+      "Bash(npm install *)",
+      "Bash(node -e \"const webpush = require\\('web-push'\\); const keys = webpush.generateVAPIDKeys\\(\\); console.log\\('VAPID_PUBLIC_KEY=' + keys.publicKey\\); console.log\\('VAPID_PRIVATE_KEY=' + keys.privateKey\\);\")"
     ]
   }
 }

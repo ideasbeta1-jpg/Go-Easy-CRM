@@ -64,6 +64,7 @@ function LandingContent() {
     utm_campaign: searchParams.get('utm_campaign') || '',
     utm_term: searchParams.get('utm_term') || '',
     utm_content: searchParams.get('utm_content') || '',
+    source: 'landing_puerto_rico',
   })
 
   useEffect(() => {

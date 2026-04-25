@@ -1,19 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import Link from 'next/link'
-import { 
-  Search, 
-  Filter, 
-  Plus, 
-  MoreHorizontal,
-  Calendar,
-  MapPin,
-  Car,
-  Bell,
-  HelpCircle,
-  Mail,
-  CheckCircle2,
-  Clock
-} from 'lucide-react'
+import { HelpCircle } from 'lucide-react'
 
 import { KanbanBoard } from './components/KanbanBoard'
 import { NewLeadButton } from './components/NewLeadButton'
@@ -76,7 +62,7 @@ export default async function LeadsPage() {
   if (assignedToIds.length > 0) {
     const { data: profilesData } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url')
+      .select('id, full_name, first_name, last_name, avatar_url')
       .in('id', (assignedToIds as string[]))
     profiles = profilesData || []
   }
@@ -116,10 +102,18 @@ export default async function LeadsPage() {
 
   // 7. Build lookup map and group
   const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado']
-  const processedLeads = (leads || []).map(l => ({
-    ...l,
-    assigned_to_profile: profileMap[l.assigned_to]
-  }))
+  const processedLeads = (leads || []).map(l => {
+    const profile = profileMap[l.assigned_to]
+    return {
+      ...l,
+      assigned_to_profile: profile
+        ? {
+            ...profile,
+            full_name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Agente'
+          }
+        : null
+    }
+  })
 
   return (
     <KanbanFilterProvider>

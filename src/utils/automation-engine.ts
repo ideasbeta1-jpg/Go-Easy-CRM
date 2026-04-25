@@ -33,15 +33,17 @@ export async function executeStageAutomation(
       return;
     }
 
-    // 1.1 Obtener datos del agente y la cotización activa
-    if (lead.assigned_to) {
+    // 1.1 Obtener datos del agente — usar el que viene de extraData (ya asignado) o hacer fetch desde DB
+    if (extraData.assigned_agent) {
+      lead.assigned_agent = extraData.assigned_agent;
+    } else if (lead.assigned_to) {
       try {
         const { data: agent } = await supabase
           .from('profiles')
           .select('first_name, last_name, phone')
           .eq('id', lead.assigned_to)
           .single();
-        
+
         if (agent) {
           lead.assigned_agent = agent;
         }

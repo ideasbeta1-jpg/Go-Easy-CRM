@@ -6,6 +6,7 @@ import { DashboardHeader } from './components/DashboardHeader'
 import { MobileAppNavigation } from './components/MobileAppNavigation'
 import { logout } from '@/app/login/actions'
 import { NotificationProvider } from './components/NotificationProvider'
+import { PWAHead } from './components/PWAHead'
 import { Toaster } from 'sonner'
 import { ActiveStatusTracker } from './components/ActiveStatusTracker'
 import { getUserProfile } from '@/app/utils/actions/profiles'
@@ -39,6 +40,7 @@ export default async function DashboardLayout({
 
   return (
     <NotificationProvider>
+      <PWAHead />
       <div className="flex h-screen bg-slate-50 selection:bg-primary-fixed selection:text-on-primary-container overflow-hidden font-body">
         <MobileAppNavigation menuItems={menuItems} />
 

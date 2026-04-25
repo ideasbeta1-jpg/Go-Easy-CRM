@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { sendPushToUser } from '@/utils/push-notifications'
 
 export type NotificationType = 
   | 'new_lead'
@@ -86,6 +87,17 @@ export async function broadcastNotification(
       console.error('[Notifications] Error broadcasting notification:', error)
     }
   }
+
+  // Send Web Push to each target user so mobile devices receive it in background
+  const pushPayload = {
+    title: payload.title,
+    body: payload.body,
+    url: payload.link || '/dashboard',
+    tag: payload.type,
+  }
+  await Promise.allSettled(
+    Array.from(userIds).map((uid) => sendPushToUser(uid, pushPayload))
+  )
 }
 
 /**

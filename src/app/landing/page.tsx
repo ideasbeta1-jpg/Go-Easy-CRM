@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { sendGAEvent } from '@next/third-parties/google'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface Category {
   id: string
@@ -32,10 +32,10 @@ export default function LandingPage() {
   const [settings, setSettings] = useState<SystemSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
   const [step, setStep] = useState(1)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const _d = new Date()
   const _pad = (n: number) => String(n).padStart(2, '0')
@@ -59,6 +59,12 @@ export default function LandingPage() {
     first_name: '',
     last_name: '',
     terms_accepted: false,
+    source: 'landing_florida',
+    utm_source: searchParams.get('utm_source') || '',
+    utm_medium: searchParams.get('utm_medium') || '',
+    utm_campaign: searchParams.get('utm_campaign') || '',
+    utm_term: searchParams.get('utm_term') || '',
+    utm_content: searchParams.get('utm_content') || '',
   })
 
   useEffect(() => {

@@ -34,9 +34,9 @@ export async function createLead(formData: FormData) {
   }
 
   if (newLead) {
-    // Asignar agente primero para que el nombre aparezca en el WhatsApp de bienvenida
-    await assignLeadToAgent(newLead.id)
-    await executeStageAutomation(newLead.id, 'lead_nuevo')
+    // Asignar agente primero y pasar sus datos al motor para que el WhatsApp use el nombre real
+    const assignedAgent = await assignLeadToAgent(newLead.id)
+    await executeStageAutomation(newLead.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
   }
 
   revalidatePath('/dashboard/leads')

@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
       return_location,
       return_location_id,
       category_id,
+      source,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_term,
+      utm_content,
     } = body
 
     // Basic validation
@@ -45,6 +51,12 @@ export async function POST(req: NextRequest) {
           return_location_id,
           category_id,
           status: 'lead_nuevo',
+          source: source || null,
+          utm_source: utm_source || null,
+          utm_medium: utm_medium || null,
+          utm_campaign: utm_campaign || null,
+          utm_term: utm_term || null,
+          utm_content: utm_content || null,
         },
       ])
       .select('id')
@@ -56,10 +68,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (data?.id) {
-      // Asignar agente primero para que el nombre aparezca en el WhatsApp de bienvenida
-      await assignLeadToAgent(data.id)
-      // Disparar automatización después de la asignación
-      await executeStageAutomation(data.id, 'lead_nuevo')
+      // Asignar agente primero y pasar sus datos al motor para que el WhatsApp use el nombre real
+      const assignedAgent = await assignLeadToAgent(data.id)
+      await executeStageAutomation(data.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
     }
 
     // Trigger direct Meta CAPI (Lead)
