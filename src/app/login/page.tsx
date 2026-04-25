@@ -4,8 +4,9 @@ import { getSystemSettings } from '@/app/utils/actions/settings'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: { error?: string }
+  searchParams: Promise<{ error?: string }>
 }) {
+  const params = await searchParams
   const settings = await getSystemSettings()
 
   return (
@@ -68,9 +69,9 @@ export default async function LoginPage({
               </div>
             </div>
 
-            {searchParams.error && (
+            {params.error && (
               <div className="p-3 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/50 rounded-xl text-xs text-rose-600 dark:text-rose-400 font-medium animate-in fade-in slide-in-from-top-1">
-                {searchParams.error}
+                {params.error}
               </div>
             )}
 

@@ -14,8 +14,9 @@ import {
 export default async function PublicQuotePage({
   searchParams
 }: {
-  searchParams: { success?: string }
+  searchParams: Promise<{ success?: string }>
 }) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: categories } = await supabase
     .from('categories')
@@ -32,7 +33,7 @@ export default async function PublicQuotePage({
        {/* Hero Section ... */}
        
        <main className="max-w-6xl mx-auto px-6 -mt-16 pb-32">
-          {searchParams.success && (
+          {params.success && (
             <div className="mb-12 p-8 bg-emerald-50 border border-emerald-100 rounded-[2.5rem] text-center space-y-4 animate-in fade-in slide-in-from-top-4">
                <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto text-emerald-500 shadow-sm">
                   <CheckCircle2 className="w-8 h-8" />
