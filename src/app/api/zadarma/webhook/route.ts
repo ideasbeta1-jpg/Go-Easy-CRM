@@ -15,6 +15,21 @@ const DISPOSITION_MAP: Record<string, string> = {
   cancel: 'missed',
 }
 
+export async function GET(req: NextRequest) {
+  // Validación de Zadarma al configurar el Webhook
+  const url = new URL(req.url)
+  const zdEcho = url.searchParams.get('zd_echo')
+  
+  if (zdEcho) {
+    return new NextResponse(zdEcho, {
+      status: 200,
+      headers: { 'Content-Type': 'text/plain' },
+    })
+  }
+
+  return NextResponse.json({ status: 'ok' })
+}
+
 export async function POST(req: NextRequest) {
   // Zadarma envía application/x-www-form-urlencoded
   const contentType = req.headers.get('content-type') || ''
