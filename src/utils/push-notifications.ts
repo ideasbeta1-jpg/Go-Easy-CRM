@@ -1,11 +1,16 @@
 import webpush from 'web-push'
 import { createAdminClient } from './supabase/admin'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
+let vapidInitialized = false
+function ensureVapid() {
+  if (vapidInitialized) return
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!
+  )
+  vapidInitialized = true
+}
 
 export interface PushPayload {
   title: string
@@ -19,6 +24,7 @@ export interface PushPayload {
  * Stale/invalid subscriptions are automatically removed from the database.
  */
 export async function sendPushToUser(userId: string, payload: PushPayload) {
+  ensureVapid()
   const supabase = createAdminClient()
 
   const { data: subscriptions, error } = await supabase
