@@ -9,6 +9,12 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await paramsPromise
   const supabase = await createClient()
+
+  // 0. Usuario autenticado actual
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: currentUserProfile } = user
+    ? await supabase.from('profiles').select('id, role, zadarma_sip, full_name, avatar_url').eq('id', user.id).single()
+    : { data: null }
   
   // 1. Fetch lead first
   const { data: leadRaw, error: leadError } = await supabase
@@ -74,6 +80,7 @@ export default async function LeadDetailPage({
       providerOffices={providerOfficesRes.data || []}
       messages={messagesRes.data || []}
       leadNotes={notesRes.data || []}
+      currentUser={currentUserProfile}
     />
   )
 }

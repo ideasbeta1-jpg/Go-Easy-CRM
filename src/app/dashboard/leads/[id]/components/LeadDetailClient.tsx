@@ -39,6 +39,7 @@ import { generateQuoteForLead } from '@/app/utils/actions/quotes'
 import { generateVoucherForLead, updateProviderConfirmation } from '@/app/utils/actions/vouchers'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { uploadChatMedia } from '@/app/utils/actions/storage'
+import CallLogPanel from './CallLogPanel'
 
 export default function LeadDetailClient({ 
   lead, 
@@ -51,7 +52,8 @@ export default function LeadDetailClient({
   providerOffices,
   messages,
   leadNotes,
-  notesError
+  notesError,
+  currentUser
 }: {
   lead: any,
   activeQuote?: any,
@@ -63,7 +65,8 @@ export default function LeadDetailClient({
   providerOffices: any[],
   messages: any[],
   leadNotes: any[],
-  notesError?: any
+  notesError?: any,
+  currentUser?: any
 }) {
   const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
@@ -1592,8 +1595,16 @@ export default function LeadDetailClient({
                       </>
                    )}
                 </div>
-           </div>
-        </div>
+         </div>
+
+         {/* 📞 Zadarma Call Log */}
+         <CallLogPanel
+           leadId={lead.id}
+           leadPhone={formData.phone || ''}
+           agentId={currentUser?.id || ''}
+           agentSip={currentUser?.zadarma_sip || null}
+         />
+       </div>
       </div>
     </div>
   )

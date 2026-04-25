@@ -53,3 +53,46 @@ export async function deleteSystemUser(userId: string) {
         return { error: err.message || 'Error inesperado.' }
     }
 }
+
+export async function updateSystemUser(userId: string, formData: FormData) {
+  try {
+    const supabase = createAdminClient()
+    
+    const firstName = formData.get('firstName') as string
+    const lastName = formData.get('lastName') as string
+    const role = formData.get('role') as string
+    const zadarmaSip = formData.get('zadarmaSip') as string
+
+    if (!firstName || !lastName || !role) {
+      return { error: 'Nombre, apellido y rol son requeridos.' }
+    }
+
+    // Actualizamos el perfil público
+    const { error: profileError } = await supabase.from('profiles').update({
+        first_name: firstName,
+        last_name: lastName,
+        full_name: `${firstName} ${lastName}`,
+        role: role,
+        zadarma_sip: zadarmaSip || null
+    }).eq('id', userId)
+
+    if (profileError) {
+      return { error: profileError.message }
+    }
+
+    // Opcionalmente actualizar metadata en Auth
+    await supabase.auth.admin.updateUserById(userId, {
+      user_metadata: {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: `${firstName} ${lastName}`,
+        role: role
+      }
+    })
+
+    revalidatePath('/dashboard/settings/users')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Error inesperado al actualizar usuario.' }
+  }
+}

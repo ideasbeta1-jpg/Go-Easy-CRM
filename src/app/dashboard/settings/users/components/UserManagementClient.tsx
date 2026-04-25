@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, UserPlus, Users, Search, ShieldCheck, Mail, ShieldAlert, Shield, ShieldHalf, Trash2, Loader2, User as UserIcon } from 'lucide-react'
-import { createSystemUser, deleteSystemUser } from '../actions'
+import { Plus, UserPlus, Users, Search, ShieldCheck, Mail, ShieldAlert, Shield, ShieldHalf, Trash2, Loader2, User as UserIcon, Edit2, Phone } from 'lucide-react'
+import { createSystemUser, deleteSystemUser, updateSystemUser } from '../actions'
 import { Toaster, toast } from 'sonner'
 import Image from 'next/image'
 
@@ -16,12 +16,15 @@ type UserData = {
   role: string
   avatar_url: string | null
   is_active: boolean
+  zadarma_sip?: string | null
 }
 
 export default function UserManagementClient({ users }: { users: UserData[] }) {
   const [searchTerm, setSearchTerm] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
 
   // Form State
   const [formData, setFormData] = useState({
@@ -29,7 +32,8 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
     lastName: '',
     email: '',
     password: '',
-    role: 'agente'
+    role: 'agente',
+    zadarmaSip: ''
   })
 
   const filteredUsers = users.filter(u => 
@@ -48,7 +52,7 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
     setIsSubmitting(true)
     
     // Quick validation
-    if (!formData.email || !formData.password || formData.password.length < 6) {
+    if (!isEditMode && (!formData.email || !formData.password || formData.password.length < 6)) {
         toast.error('Por favor, ingresa una contraseña válida de al menos 6 caracteres')
         setIsSubmitting(false)
         return
@@ -57,26 +61,64 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
     const payload = new FormData()
     payload.append('firstName', formData.firstName)
     payload.append('lastName', formData.lastName)
-    payload.append('email', formData.email)
-    payload.append('password', formData.password)
     payload.append('role', formData.role)
+    if (formData.zadarmaSip) payload.append('zadarmaSip', formData.zadarmaSip)
 
-    const res = await createSystemUser(payload)
-    if (res.error) {
-        toast.error(res.error)
+    if (isEditMode && editingUserId) {
+      const res = await updateSystemUser(editingUserId, payload)
+      if (res.error) {
+          toast.error(res.error)
+      } else {
+          toast.success(`Usuario actualizado correctamente`)
+          closeModal()
+      }
     } else {
-        toast.success(`Usuario ${formData.firstName} creado correctamente`)
-        setIsModalOpen(false)
-        setFormData({
-            firstName: '',
-            lastName: '',
-            email: '',
-            password: '',
-            role: 'agente'
-        })
+      payload.append('email', formData.email)
+      payload.append('password', formData.password)
+      const res = await createSystemUser(payload)
+      if (res.error) {
+          toast.error(res.error)
+      } else {
+          toast.success(`Usuario ${formData.firstName} creado correctamente`)
+          closeModal()
+      }
     }
     
     setIsSubmitting(false)
+  }
+
+  const openNewUserModal = () => {
+    setIsEditMode(false)
+    setEditingUserId(null)
+    setFormData({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: '',
+        role: 'agente',
+        zadarmaSip: ''
+    })
+    setIsModalOpen(true)
+  }
+
+  const openEditUserModal = (user: UserData) => {
+    setIsEditMode(true)
+    setEditingUserId(user.id)
+    setFormData({
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        email: user.email || '',
+        password: '', // En edición no forzamos cambiar clave por ahora en este form
+        role: user.role || 'agente',
+        zadarmaSip: user.zadarma_sip || ''
+    })
+    setIsModalOpen(true)
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setIsEditMode(false)
+    setEditingUserId(null)
   }
 
   const handleDelete = async (userId: string, userName: string) => {
@@ -103,7 +145,7 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
         </div>
 
         <button 
-           onClick={() => setIsModalOpen(true)}
+           onClick={openNewUserModal}
            className="bg-primary text-white px-8 py-4 flex items-center justify-center gap-3 rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-primary/30 hover:scale-[1.02] hover:shadow-2xl hover:bg-primary-fixed transition-all group shrink-0"
         >
             <UserPlus className="w-4 h-4 group-hover:rotate-12 transition-transform" />
@@ -157,6 +199,11 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                     <div className="min-w-0">
                        <h3 className="font-black text-slate-800 text-lg tracking-tight truncate max-w-[150px]">{user.first_name} {user.last_name}</h3>
                        <p className="text-xs font-semibold text-slate-400 truncate max-w-[150px]">{user.email}</p>
+                       {user.zadarma_sip && (
+                         <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full w-max">
+                           <Phone className="w-3 h-3" /> Ext. {user.zadarma_sip}
+                         </div>
+                       )}
                     </div>
                  </div>
 
@@ -177,13 +224,22 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                    </span>
                  </div>
 
-                 <button 
-                   onClick={() => handleDelete(user.id, `${user.first_name} ${user.last_name}`)}
-                   title="Eliminar usuario"
-                   className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm"
-                 >
-                   <Trash2 className="w-3.5 h-3.5" />
-                 </button>
+                 <div className="flex items-center gap-2">
+                   <button 
+                     onClick={() => openEditUserModal(user)}
+                     title="Editar usuario"
+                     className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-primary hover:text-white flex items-center justify-center transition-colors shadow-sm"
+                   >
+                     <Edit2 className="w-3.5 h-3.5" />
+                   </button>
+                   <button 
+                     onClick={() => handleDelete(user.id, `${user.first_name} ${user.last_name}`)}
+                     title="Eliminar usuario"
+                     className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm"
+                   >
+                     <Trash2 className="w-3.5 h-3.5" />
+                   </button>
+                 </div>
                </div>
 
              </div>
@@ -206,15 +262,15 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
            {/* Backdrop */}
-           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && setIsModalOpen(false)} />
+           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isSubmitting && closeModal()} />
            
            <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-8 md:p-10 relative z-10 shadow-2xl flex flex-col gap-8 animate-in zoom-in-95 duration-300">
                <div className="flex flex-col gap-2">
                   <div className="w-12 h-12 bg-primary/10 text-primary flex items-center justify-center rounded-2xl mb-2">
-                      <UserPlus className="w-6 h-6" />
+                      {isEditMode ? <Edit2 className="w-6 h-6" /> : <UserPlus className="w-6 h-6" />}
                   </div>
-                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">Nuevo Usuario</h2>
-                  <p className="text-sm font-bold text-slate-400">Completa los datos para dar acceso a un nuevo miembro del equipo.</p>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tight">{isEditMode ? 'Editar Usuario' : 'Nuevo Usuario'}</h2>
+                  <p className="text-sm font-bold text-slate-400">{isEditMode ? 'Actualiza los datos del usuario y su configuración.' : 'Completa los datos para dar acceso a un nuevo miembro del equipo.'}</p>
                </div>
 
                <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -231,29 +287,37 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
 
                   <div className="space-y-3">
                       <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Correo Electrónico</label>
-                      <input required name="email" value={formData.email} onChange={handleInputChange} type="email" className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none placeholder:text-slate-300" placeholder="correo@ejemplo.com" />
+                      <input disabled={isEditMode} required={!isEditMode} name="email" value={formData.email} onChange={handleInputChange} type="email" className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none placeholder:text-slate-300 disabled:opacity-50" placeholder="correo@ejemplo.com" />
                   </div>
 
-                  <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 flex items-center justify-between">
-                          Contraseña
-                          <span className="text-[8px] text-slate-300 opacity-60">Mín. 6 caracteres</span>
-                      </label>
-                      <input required minLength={6} name="password" value={formData.password} onChange={handleInputChange} type="password" className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none placeholder:text-slate-300" placeholder="••••••••" />
-                  </div>
+                  {!isEditMode && (
+                    <div className="space-y-3">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2 flex items-center justify-between">
+                            Contraseña
+                            <span className="text-[8px] text-slate-300 opacity-60">Mín. 6 caracteres</span>
+                        </label>
+                        <input required minLength={6} name="password" value={formData.password} onChange={handleInputChange} type="password" className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none placeholder:text-slate-300" placeholder="••••••••" />
+                    </div>
+                  )}
 
-                  <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Rol del Usuario</label>
-                      <select required name="role" value={formData.role} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none appearance-none cursor-pointer">
-                          <option value="agente">Agente (Limitado a Gestión de Leads)</option>
-                          <option value="admin">Administrador (Acceso Completo)</option>
-                      </select>
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Rol del Usuario</label>
+                          <select required name="role" value={formData.role} onChange={handleInputChange} className="w-full bg-slate-50 border-2 border-transparent focus:border-primary/10 focus:bg-white focus:ring-4 focus:ring-primary/5 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-slate-700 outline-none appearance-none cursor-pointer">
+                              <option value="agente">Agente</option>
+                              <option value="admin">Administrador</option>
+                          </select>
+                      </div>
+                      <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-violet-500 ml-2">Extensión Zadarma</label>
+                          <input name="zadarmaSip" value={formData.zadarmaSip} onChange={handleInputChange} type="text" className="w-full bg-violet-50/50 border-2 border-transparent focus:border-violet-200 focus:bg-white focus:ring-4 focus:ring-violet-500/10 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-violet-700 outline-none placeholder:text-violet-300" placeholder="Ej: 100" />
+                      </div>
                   </div>
 
                   <div className="flex items-center gap-3 pt-4">
                       <button 
                          type="button" 
-                         onClick={() => setIsModalOpen(false)}
+                         onClick={closeModal}
                          disabled={isSubmitting}
                          className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-[1.5rem] py-4 font-black text-xs uppercase tracking-widest transition-colors disabled:opacity-50"
                       >
@@ -265,8 +329,8 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                          className="flex-1 bg-primary text-white rounded-[1.5rem] py-4 font-black text-xs uppercase tracking-widest hover:bg-primary-fixed shadow-lg shadow-primary/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                          {isSubmitting ? (
-                             <><Loader2 className="w-4 h-4 animate-spin" /> Creando...</>
-                         ) : 'Crear Usuario'}
+                             <><Loader2 className="w-4 h-4 animate-spin" /> Guardando...</>
+                         ) : (isEditMode ? 'Guardar Cambios' : 'Crear Usuario')}
                       </button>
                   </div>
                </form>

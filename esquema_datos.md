@@ -209,6 +209,7 @@ Información extendida de los usuarios del sistema. RLS: ✅ · **4 registros**
 | `last_active_at` | `timestamptz` | Última vez que el agente estuvo activo. Default: `now()` (Nullable) |
 | `last_assigned_at` | `timestamptz` | Última asignación de lead — usado para Round Robin. Default: `now()` (Nullable) |
 | `inactivity_timeout` | `integer` | Minutos de inactividad antes de marcar offline. Default: `60` (Nullable) |
+| `zadarma_sip` | `text` | Extensión PBX del agente en Zadarma (Ej: `100`, `101`). Usada para Click-to-Call y mapeo de llamadas (Nullable) |
 | `updated_at` | `timestamptz` | Default: `now()` |
 
 > **Lógica Round Robin:** La asignación automática de leads (`assignLeadToAgent`) ordena los agentes con `role = 'agente'` por `last_assigned_at ASC` y selecciona el primero (el que lleva más tiempo sin recibir un lead).
@@ -216,6 +217,31 @@ Información extendida de los usuarios del sistema. RLS: ✅ · **4 registros**
 ---
 
 ## 7. Tablas de Automatización
+
+### **`call_logs`** — Historial de Llamadas Zadarma
+Registra todas las llamadas VoIP procesadas por Zadarma PBX. RLS: ✅
+
+| Columna | Tipo | Notas |
+| :--- | :--- | :--- |
+| `id` | `uuid` (PK) | Default: `gen_random_uuid()` |
+| `lead_id` | `uuid` (FK) | → `leads.id` — Lead relacionado (Nullable) |
+| `agent_id` | `uuid` (FK) | → `profiles.id` — Agente que realizó/recibió la llamada (Nullable) |
+| `zadarma_call_id` | `text` | **UNIQUE** — ID de la llamada en Zadarma |
+| `caller_number` | `text` | Número que inició la llamada (Nullable) |
+| `called_number` | `text` | Número al que se llamó (Nullable) |
+| `pbx_extension` | `text` | Extensión PBX del agente (Nullable) |
+| `direction` | `text` | Check: `inbound` o `outbound` |
+| `status` | `text` | Estado: `initiated`, `answered`, `missed`, `failed`, `ended`. Default: `'initiated'` |
+| `duration` | `integer` | Duración en segundos. Default: `0` |
+| `recording_url` | `text` | URL de grabación (disponible tras webhook `NOTIFY_RECORD`) (Nullable) |
+| `started_at` | `timestamptz` | Timestamp de inicio (Nullable) |
+| `answered_at` | `timestamptz` | Timestamp cuando fue contestada (Nullable) |
+| `ended_at` | `timestamptz` | Timestamp de fin (Nullable) |
+| `created_at` | `timestamptz` | Default: `now()` |
+
+> **Webhook Integration:** Los eventos `NOTIFY_START`, `NOTIFY_ANSWER`, `NOTIFY_END` y `NOTIFY_RECORD` de Zadarma PBX actualizan esta tabla en tiempo real vía `/api/zadarma/webhook`.
+
+---
 
 ### **`automation_logs`** — Logs de Automatizaciones
 Registro de todas las acciones automáticas disparadas por el motor. RLS: ❌ (sin restricciones) · **180 registros**
