@@ -264,7 +264,9 @@ export default function ChatInboxClient({
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [recordedMimeType, setRecordedMimeType] = useState('audio/webm')
   const [isUploadingMedia, setIsUploadingMedia] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -400,15 +402,31 @@ export default function ChatInboxClient({
   }, [selectedLeadId, convMessages, loadingConv])
 
   // ── Audio helpers ─────────────────────────────────────────────────────────
+
+  // Pick the best MIME type the browser supports, preferring Meta-compatible formats
+  const getBestAudioMime = (): string => {
+    const candidates = [
+      'audio/ogg;codecs=opus', // Firefox — ideal, Meta accepts natively
+      'audio/mp4',             // Safari — Meta accepts natively
+      'audio/webm;codecs=opus',// Chrome — needs server conversion
+      'audio/webm',            // Chrome fallback
+    ]
+    return candidates.find(t => MediaRecorder.isTypeSupported(t)) ?? ''
+  }
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream)
+      const mimeType = getBestAudioMime()
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined)
       mediaRecorderRef.current = mediaRecorder
       audioChunksRef.current = []
+      const actualMime = mediaRecorder.mimeType || mimeType || 'audio/webm'
+      setRecordedMimeType(actualMime)
+
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const blob = new Blob(audioChunksRef.current, { type: actualMime })
         setAudioBlob(blob)
         setAudioUrl(URL.createObjectURL(blob))
         stream.getTracks().forEach(t => t.stop())
@@ -455,20 +473,68 @@ export default function ChatInboxClient({
   const handleSendAudio = async () => {
     if (!audioBlob || isUploadingMedia || !selectedLeadId || !selectedLead) return
     setIsUploadingMedia(true)
+    setUploadStatus(null)
+
     try {
       const supabase = createClient()
-      const fileName = `${selectedLeadId}_${Date.now()}.ogg`
-      const oggBlob = new Blob([audioBlob], { type: 'audio/ogg; codecs=opus' })
-      const { data: uploadData, error } = await supabase.storage
+      let finalBlob = audioBlob
+      let finalMime = recordedMimeType
+      const timestamp = Date.now()
+
+      // If the browser only supports WebM (Chrome), convert to OGG server-side
+      const needsConversion = recordedMimeType.startsWith('audio/webm')
+      if (needsConversion) {
+        setUploadStatus('Convirtiendo audio...')
+        const fd = new FormData()
+        fd.append('audio', audioBlob, 'audio.webm')
+        const res = await fetch('/api/audio/convert', { method: 'POST', body: fd })
+
+        if (res.ok) {
+          finalBlob = await res.blob()
+          finalMime = 'audio/ogg'
+        } else {
+          const errData = await res.json().catch(() => ({}))
+          if (errData.error === 'ffmpeg_not_installed') {
+            // ffmpeg not on server — upload WebM as document fallback
+            console.warn('[handleSendAudio] ffmpeg not available, uploading WebM as document')
+            finalMime = 'audio/webm'
+          } else {
+            throw new Error(errData.detail || 'Audio conversion failed')
+          }
+        }
+      }
+
+      setUploadStatus('Subiendo audio...')
+      const ext = finalMime.includes('ogg') ? 'ogg' : finalMime.includes('mp4') ? 'mp4' : 'webm'
+      const fileName = `${selectedLeadId}_${timestamp}.${ext}`
+
+      const { error: uploadError } = await supabase.storage
         .from('chat_media')
-        .upload(fileName, oggBlob, { contentType: 'audio/ogg' })
-      if (error) throw error
+        .upload(fileName, finalBlob, { contentType: finalMime })
+      if (uploadError) throw uploadError
+
       const { data: publicData } = supabase.storage.from('chat_media').getPublicUrl(fileName)
-      const ok = await sendManualWhatsAppMedia(selectedLead.phone || '', publicData.publicUrl, 'audio/ogg', selectedLeadId)
-      if (ok) discardAudio()
-      else alert('El audio se guardó pero no se pudo enviar. Revisa los logs.')
-    } catch {
-      alert('Error subiendo o enviando el audio.')
+
+      setUploadStatus('Enviando por WhatsApp...')
+      const result = await sendManualWhatsAppMedia(
+        selectedLead.phone || '',
+        publicData.publicUrl,
+        finalMime,
+        selectedLeadId
+      )
+
+      if (result.ok) {
+        discardAudio()
+        setUploadStatus(null)
+      } else {
+        const detail = result.error || 'Error desconocido de Meta'
+        alert(`No se pudo enviar el audio a WhatsApp.\n\nError de Meta: ${detail}`)
+        setUploadStatus(null)
+      }
+    } catch (err: any) {
+      console.error('[handleSendAudio]', err)
+      alert(`Error: ${err?.message || 'Error subiendo o enviando el audio.'}`)
+      setUploadStatus(null)
     } finally {
       setIsUploadingMedia(false)
     }
@@ -775,10 +841,15 @@ export default function ChatInboxClient({
                   </div>
                 ) : audioUrl ? (
                   <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-6 py-4 flex items-center gap-4 shadow-lg shadow-primary/5">
-                    <button onClick={discardAudio} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0">
+                    <button onClick={discardAudio} disabled={isUploadingMedia} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
                       <Trash2 className="w-5 h-5" />
                     </button>
-                    <audio src={audioUrl} controls className="h-10 flex-1 w-full outline-none" />
+                    <div className="flex-1 flex flex-col gap-1">
+                      <audio src={audioUrl} controls className="h-10 w-full outline-none" />
+                      {uploadStatus && (
+                        <p className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse">{uploadStatus}</p>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <input

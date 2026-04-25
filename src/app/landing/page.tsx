@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { sendGAEvent } from '@next/third-parties/google'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -26,7 +26,7 @@ interface SystemSettings {
   updated_at?: string
 }
 
-export default function LandingPage() {
+function LandingPageContent() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
   const [settings, setSettings] = useState<SystemSettings | null>(null)
@@ -637,5 +637,17 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function LandingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    }>
+      <LandingPageContent />
+    </Suspense>
   )
 }

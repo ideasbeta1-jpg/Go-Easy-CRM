@@ -294,64 +294,60 @@ export async function downloadWABAMedia(mediaId: string): Promise<{ blob: Blob, 
 }
 
 /**
- * Send an audio/media message via WABA using a public URL
+ * Send an audio/media message via WABA using a public URL.
+ * Returns { ok, error } so the caller can surface the real Meta error.
  */
-export async function sendWABAMediaMessage(recipient: string, mediaUrl: string, mediaType: string) {
-  console.log('[sendWABAMediaMessage] Starting with recipient:', recipient, 'media:', mediaUrl);
+export async function sendWABAMediaMessage(
+  recipient: string,
+  mediaUrl: string,
+  mediaType: string
+): Promise<{ ok: boolean; error?: string }> {
   if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-    console.error('[sendWABAMediaMessage] WABA credentials missing');
-    return false;
+    return { ok: false, error: 'WABA credentials missing (PHONE_NUMBER_ID or ACCESS_TOKEN)' }
   }
 
-  // Determine media type for WABA (e.g. 'audio', 'image', 'document')
-  let wabaType = 'document';
-  if (mediaType.startsWith('audio/')) wabaType = 'audio';
-  if (mediaType.startsWith('image/')) wabaType = 'image';
-  if (mediaType.startsWith('video/')) wabaType = 'video';
+  let wabaType = 'document'
+  if (mediaType.startsWith('audio/')) wabaType = 'audio'
+  if (mediaType.startsWith('image/')) wabaType = 'image'
+  if (mediaType.startsWith('video/')) wabaType = 'video'
 
-  // Clean recipient — only strip non-digits if it looks like a standard phone (not BSUID)
   const cleanRecipient = (recipient.includes(':') || /[a-zA-Z]/.test(recipient))
     ? recipient
-    : recipient.replace(/\D/g, '');
+    : recipient.replace(/\D/g, '')
 
-  // For non-audio media, we use the standard link object
-  // For audio, we strictly use the audio object per Meta's specs
-  const payload: any = {
+  const payload = {
     messaging_product: 'whatsapp',
     recipient_type: 'individual',
     to: cleanRecipient,
     type: wabaType,
-    [wabaType]: {
-      link: mediaUrl
-    }
-  };
+    [wabaType]: { link: mediaUrl },
+  }
 
-  console.log('[sendWABAMediaMessage] Final Payload for Meta:', JSON.stringify(payload));
+  console.log('[sendWABAMediaMessage] Payload:', JSON.stringify(payload))
 
   try {
-    const url = `${BASE_URL}/${PHONE_NUMBER_ID}/messages`;
-    const response = await fetch(
-      url,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${ACCESS_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      }
-    );
+    const url = `${BASE_URL}/${PHONE_NUMBER_ID}/messages`
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    })
 
-    const data = await response.json();
-    console.log(`[sendWABAMediaMessage] Meta response (${response.status}):`, JSON.stringify(data));
-    
+    const data = await response.json()
+    console.log(`[sendWABAMediaMessage] Meta response (${response.status}):`, JSON.stringify(data))
+
     if (!response.ok) {
-       console.error('[sendWABAMediaMessage] FAILED payload was:', JSON.stringify(payload));
-       console.error('[sendWABAMediaMessage] Endpoint used was:', url);
+      const errMsg = data?.error?.message || data?.error?.error_data?.details || JSON.stringify(data)
+      console.error('[sendWABAMediaMessage] FAILED:', errMsg)
+      return { ok: false, error: errMsg }
     }
-    return response.ok;
-  } catch (error) {
-    console.error('[sendWABAMediaMessage] Exception in fetch:', error);
-    return false;
+
+    return { ok: true }
+  } catch (error: any) {
+    console.error('[sendWABAMediaMessage] Exception:', error)
+    return { ok: false, error: error?.message || 'Unknown exception' }
   }
 }

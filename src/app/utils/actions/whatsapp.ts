@@ -28,7 +28,12 @@ export async function sendManualWhatsApp(phoneNumber: string, message: string, l
   return success
 }
 
-export async function sendManualWhatsAppMedia(phoneNumber: string, mediaUrl: string, mediaType: string, leadId: string) {
+export async function sendManualWhatsAppMedia(
+  phoneNumber: string,
+  mediaUrl: string,
+  mediaType: string,
+  leadId: string
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient()
 
   const cleanPhone = phoneNumber.includes(':') || /[a-zA-Z]/.test(phoneNumber)
@@ -36,9 +41,9 @@ export async function sendManualWhatsAppMedia(phoneNumber: string, mediaUrl: str
     : phoneNumber.replace(/\D/g, '')
 
   const { sendWABAMediaMessage } = await import('@/utils/waba')
-  const success = await sendWABAMediaMessage(cleanPhone, mediaUrl, mediaType)
+  const result = await sendWABAMediaMessage(cleanPhone, mediaUrl, mediaType)
 
-  if (success) {
+  if (result.ok) {
     await supabase.from('messages').insert({
       lead_id: leadId,
       content: `Media: ${mediaType}`,
@@ -51,7 +56,7 @@ export async function sendManualWhatsAppMedia(phoneNumber: string, mediaUrl: str
     revalidatePath('/dashboard/reports')
   }
 
-  return success
+  return result
 }
 
 /** Loads paginated messages for a specific conversation */
