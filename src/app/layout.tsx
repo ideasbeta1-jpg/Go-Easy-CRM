@@ -25,6 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: settings?.seo_title || "Go Easy Florida CRM",
     description: settings?.seo_description || "Premium Car Rental CRM",
     keywords: settings?.seo_keywords,
+    manifest: "/manifest.json",
     icons: {
       icon: settings?.favicon_url ? `${settings.favicon_url}${v}` : "/favicon.ico",
     }

@@ -1,25 +1,45 @@
 'use client'
 
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 
-// Injects PWA manifest + registers the service worker only for authenticated users.
-// This component is rendered exclusively inside the dashboard layout, which
-// already enforces authentication — so public visitors never see the install prompt.
 export function PWAHead() {
   useEffect(() => {
-    // Inject <link rel="manifest"> dynamically so it only appears for auth users
-    const link = document.createElement('link')
-    link.rel = 'manifest'
-    link.href = '/manifest.json'
-    document.head.appendChild(link)
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // next-pwa registers it via injected scripts, but we can hook into it
+      navigator.serviceWorker.getRegistration().then(reg => {
+        if (!reg) return;
 
-    // Register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {})
-    }
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              // Has network content changed?
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // new update is available
+                toast.success('¡Nueva actualización disponible!', {
+                  description: 'Se ha descargado una nueva versión. Actualiza para ver los cambios.',
+                  action: {
+                    label: 'Actualizar ahora',
+                    onClick: () => {
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                  },
+                  duration: Infinity, // Keep it open until they update
+                });
+              }
+            });
+          }
+        });
+      });
 
-    return () => {
-      document.head.removeChild(link)
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
   }, [])
 
