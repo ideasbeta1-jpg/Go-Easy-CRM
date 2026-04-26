@@ -20,13 +20,13 @@ import {
   Video,
   ChevronUp,
   LayoutTemplate,
-  X
+  X,
+  Paperclip
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
   sendManualWhatsApp,
-  sendManualWhatsAppMedia,
   getLeadMessages,
   sendTemplateFromChat
 } from '@/app/utils/actions/whatsapp'
@@ -273,6 +273,11 @@ export default function ChatInboxClient({
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesTopRef = useRef<HTMLDivElement>(null)
 
+  // Image / Media attach
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // ── Load conversation messages on lead select ─────────────────────────────
   const loadConversation = useCallback(async (leadId: string, page = 0) => {
     if (page === 0) setLoadingConv(true)
@@ -455,6 +460,22 @@ export default function ChatInboxClient({
     setRecordingTime(0)
   }
 
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+    setImageFile(file)
+    setImagePreviewUrl(URL.createObjectURL(file))
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  const discardImage = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
+    setImageFile(null)
+    setImagePreviewUrl(null)
+  }
+
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`
 
@@ -473,67 +494,76 @@ export default function ChatInboxClient({
   const handleSendAudio = async () => {
     if (!audioBlob || isUploadingMedia || !selectedLeadId || !selectedLead) return
     setIsUploadingMedia(true)
-    setUploadStatus(null)
+    setUploadStatus('Enviando audio...')
 
     try {
-      const supabase = createClient()
-      let finalBlob = audioBlob
-      let finalMime = recordedMimeType
-      const timestamp = Date.now()
+      const ext = recordedMimeType.includes('ogg') ? 'ogg'
+        : recordedMimeType.includes('mp4') ? 'mp4'
+        : 'webm'
 
-      // If the browser only supports WebM (Chrome), convert to OGG server-side
-      const needsConversion = recordedMimeType.startsWith('audio/webm')
-      if (needsConversion) {
-        setUploadStatus('Convirtiendo audio...')
-        const fd = new FormData()
-        fd.append('audio', audioBlob, 'audio.webm')
-        const res = await fetch('/api/audio/convert', { method: 'POST', body: fd })
+      const fd = new FormData()
+      fd.append('audio', audioBlob, `audio.${ext}`)
+      fd.append('phone', selectedLead.phone || '')
+      fd.append('leadId', selectedLeadId)
 
-        if (res.ok) {
-          finalBlob = await res.blob()
-          finalMime = 'audio/ogg'
-        } else {
-          const errData = await res.json().catch(() => ({}))
-          if (errData.error === 'ffmpeg_not_installed') {
-            // ffmpeg not on server — upload WebM as document fallback
-            console.warn('[handleSendAudio] ffmpeg not available, uploading WebM as document')
-            finalMime = 'audio/webm'
-          } else {
-            throw new Error(errData.detail || 'Audio conversion failed')
-          }
+      const res = await fetch('/api/audio/send', { method: 'POST', body: fd })
+      const data = await res.json()
+
+      if (data.ok) {
+        // Optimistically add to conv if realtime hasn't fired yet
+        if (data.message) {
+          setConvMessages(prev => {
+            const existing = prev[selectedLeadId] || []
+            if (existing.some((m: Message) => m.id === data.message.id)) return prev
+            return { ...prev, [selectedLeadId]: [...existing, data.message] }
+          })
         }
-      }
-
-      setUploadStatus('Subiendo audio...')
-      const ext = finalMime.includes('ogg') ? 'ogg' : finalMime.includes('mp4') ? 'mp4' : 'webm'
-      const fileName = `${selectedLeadId}_${timestamp}.${ext}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('chat_media')
-        .upload(fileName, finalBlob, { contentType: finalMime })
-      if (uploadError) throw uploadError
-
-      const { data: publicData } = supabase.storage.from('chat_media').getPublicUrl(fileName)
-
-      setUploadStatus('Enviando por WhatsApp...')
-      const result = await sendManualWhatsAppMedia(
-        selectedLead.phone || '',
-        publicData.publicUrl,
-        finalMime,
-        selectedLeadId
-      )
-
-      if (result.ok) {
         discardAudio()
         setUploadStatus(null)
       } else {
-        const detail = result.error || 'Error desconocido de Meta'
-        alert(`No se pudo enviar el audio a WhatsApp.\n\nError de Meta: ${detail}`)
+        alert(`No se pudo enviar el audio.\n\nError: ${data.error || 'Error desconocido'}`)
         setUploadStatus(null)
       }
     } catch (err: any) {
       console.error('[handleSendAudio]', err)
-      alert(`Error: ${err?.message || 'Error subiendo o enviando el audio.'}`)
+      alert(`Error: ${err?.message || 'Error enviando el audio.'}`)
+      setUploadStatus(null)
+    } finally {
+      setIsUploadingMedia(false)
+    }
+  }
+
+  const handleSendImage = async () => {
+    if (!imageFile || isUploadingMedia || !selectedLeadId || !selectedLead) return
+    setIsUploadingMedia(true)
+    setUploadStatus('Enviando imagen...')
+
+    try {
+      const fd = new FormData()
+      fd.append('media', imageFile)
+      fd.append('phone', selectedLead.phone || '')
+      fd.append('leadId', selectedLeadId)
+
+      const res = await fetch('/api/media/send', { method: 'POST', body: fd })
+      const data = await res.json()
+
+      if (data.ok) {
+        if (data.message) {
+          setConvMessages(prev => {
+            const existing = prev[selectedLeadId] || []
+            if (existing.some((m: Message) => m.id === data.message.id)) return prev
+            return { ...prev, [selectedLeadId]: [...existing, data.message] }
+          })
+        }
+        discardImage()
+        setUploadStatus(null)
+      } else {
+        alert(`No se pudo enviar la imagen.\n\nError: ${data.error || 'Error desconocido'}`)
+        setUploadStatus(null)
+      }
+    } catch (err: any) {
+      console.error('[handleSendImage]', err)
+      alert(`Error: ${err?.message || 'Error enviando la imagen.'}`)
       setUploadStatus(null)
     } finally {
       setIsUploadingMedia(false)
@@ -851,42 +881,79 @@ export default function ChatInboxClient({
                       )}
                     </div>
                   </div>
+                ) : imagePreviewUrl ? (
+                  <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-6 py-4 flex items-center gap-4 shadow-lg shadow-primary/5">
+                    <button onClick={discardImage} disabled={isUploadingMedia} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                    <div className="flex-1 flex items-center gap-4 min-w-0">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="Preview"
+                        className="h-16 w-16 rounded-2xl object-cover shrink-0 ring-2 ring-slate-200"
+                      />
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-slate-700 truncate">{imageFile?.name}</p>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                          {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : ''}
+                        </p>
+                        {uploadStatus && (
+                          <p className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse mt-1">{uploadStatus}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 ) : (
                   <input
                     type="text"
                     value={chatMessage}
                     onChange={e => setChatMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Escribe tu respuesta o graba un audio..."
+                    placeholder="Escribe tu respuesta, imagen o graba un audio..."
                     className="flex-1 w-full bg-slate-50 border-none rounded-[2rem] md:rounded-[2.5rem] pl-6 md:pl-8 pr-6 md:pr-8 py-4 md:py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
                   />
                 )}
 
-                {/* Template button — only when input is empty */}
-                {!isRecording && !audioUrl && !chatMessage.trim() && (
-                  <button
-                    onClick={() => setShowTemplatePicker(true)}
-                    className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-primary/10 hover:text-primary active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-primary/10"
-                    title="Enviar plantilla"
-                  >
-                    <LayoutTemplate className="w-5 h-5" />
-                  </button>
-                )}
+                {/* Hidden file input for images */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                />
 
-                {/* Mic button */}
-                {!isRecording && !audioUrl && !chatMessage.trim() && (
-                  <button
-                    onClick={startRecording}
-                    className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-red-100"
-                  >
-                    <Mic className="w-6 h-6" />
-                  </button>
+                {/* Action buttons — only when idle */}
+                {!isRecording && !audioUrl && !imageFile && !chatMessage.trim() && (
+                  <>
+                    <button
+                      onClick={() => setShowTemplatePicker(true)}
+                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-primary/10 hover:text-primary active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-primary/10"
+                      title="Enviar plantilla"
+                    >
+                      <LayoutTemplate className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-sky-50 hover:text-sky-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-sky-100"
+                      title="Enviar imagen"
+                    >
+                      <Paperclip className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={startRecording}
+                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-red-100"
+                      title="Grabar audio"
+                    >
+                      <Mic className="w-6 h-6" />
+                    </button>
+                  </>
                 )}
 
                 {/* Send button */}
-                {!isRecording && (chatMessage.trim() || audioUrl) && (
+                {!isRecording && (chatMessage.trim() || audioUrl || imageFile) && (
                   <button
-                    onClick={audioUrl ? handleSendAudio : handleSendMessage}
+                    onClick={imageFile ? handleSendImage : audioUrl ? handleSendAudio : handleSendMessage}
                     disabled={isSendingMessage || isUploadingMedia}
                     className="w-12 h-12 md:w-[60px] md:h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                   >
@@ -898,7 +965,7 @@ export default function ChatInboxClient({
                 )}
               </div>
               <p className="text-[9px] font-black text-slate-300 text-center mt-3 md:mt-6 uppercase tracking-widest opacity-50 hidden sm:block">
-                Enter para enviar • Ícono de plantilla para mensajes predefinidos • Conectado a la API Oficial
+                Enter para enviar • Imagen, plantilla o audio • Conectado a la API Oficial
               </p>
             </div>
           </>
