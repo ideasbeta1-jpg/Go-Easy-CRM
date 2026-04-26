@@ -50,36 +50,34 @@ export async function POST(req: Request) {
     const mimeType = audioFile.type || 'audio/webm'
     const timestamp = Date.now()
     let finalBuffer: Buffer
-    let finalMime = mimeType
+    const finalMime = 'audio/ogg'
 
-    // Convert WebM → OGG Opus (Meta requires a supported format)
-    if (mimeType.startsWith('audio/webm')) {
-      finalBuffer = Buffer.from(await audioFile.arrayBuffer())
-      inputPath = path.join(tmpdir(), `audio_in_${timestamp}.webm`)
-      outputPath = path.join(tmpdir(), `audio_out_${timestamp}.ogg`)
-      await writeFile(inputPath, finalBuffer)
+    // Always convert to OGG Opus via ffmpeg — Meta reliably accepts this format
+    // regardless of what the browser recorded (webm, mp4/AAC, ogg, etc.)
+    const rawBuffer = Buffer.from(await audioFile.arrayBuffer())
+    const ext_in = mimeType.includes('mp4') ? 'mp4'
+      : mimeType.includes('ogg') ? 'ogg'
+      : mimeType.includes('mpeg') ? 'mp3'
+      : 'webm'
+    inputPath = path.join(tmpdir(), `audio_in_${timestamp}.${ext_in}`)
+    outputPath = path.join(tmpdir(), `audio_out_${timestamp}.ogg`)
+    await writeFile(inputPath, rawBuffer)
 
-      const ffmpegPath = getFfmpegPath()
-      try {
-        await execAsync(`"${ffmpegPath}" -y -i "${inputPath}" -c:a libopus -b:a 64k "${outputPath}"`)
-        finalBuffer = await readFile(outputPath)
-        finalMime = 'audio/ogg'
-        console.log('[audio/send] Converted WebM → OGG successfully')
-      } catch (convErr: any) {
-        console.error('[audio/send] ffmpeg conversion failed:', convErr?.message)
-        return NextResponse.json(
-          { error: 'No se pudo convertir el audio. Verifica que ffmpeg esté instalado en el servidor.' },
-          { status: 500 }
-        )
-      }
-    } else {
-      finalBuffer = Buffer.from(await audioFile.arrayBuffer())
+    const ffmpegPath = getFfmpegPath()
+    console.log(`[audio/send] Converting ${mimeType} → OGG Opus via ffmpeg`)
+    try {
+      await execAsync(`"${ffmpegPath}" -y -i "${inputPath}" -c:a libopus -b:a 64k "${outputPath}"`)
+      finalBuffer = await readFile(outputPath)
+      console.log(`[audio/send] Converted successfully, size: ${finalBuffer.length} bytes`)
+    } catch (convErr: any) {
+      console.error('[audio/send] ffmpeg conversion failed:', convErr?.message)
+      return NextResponse.json(
+        { error: 'No se pudo convertir el audio. Verifica que ffmpeg esté instalado en el servidor.' },
+        { status: 500 }
+      )
     }
 
-    const ext = finalMime.includes('ogg') ? 'ogg'
-      : finalMime.includes('mp4') ? 'mp4'
-      : finalMime.includes('mpeg') ? 'mp3'
-      : 'webm'
+    const ext = 'ogg'
 
     // 1. Upload to Meta's media API → get media_id
     const metaForm = new FormData()
