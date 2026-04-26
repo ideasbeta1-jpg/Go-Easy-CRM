@@ -15,6 +15,16 @@ const ACCESS_TOKEN = process.env.WABA_ACCESS_TOKEN
 const VERSION = process.env.WABA_VERSION || 'v21.0'
 const BASE_URL = `https://graph.facebook.com/${VERSION}`
 
+function getFfmpegPath(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const installer = require('@ffmpeg-installer/ffmpeg')
+    return installer.path
+  } catch {
+    return 'ffmpeg' // fall back to system PATH
+  }
+}
+
 export async function POST(req: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -49,12 +59,18 @@ export async function POST(req: Request) {
       outputPath = path.join(tmpdir(), `audio_out_${timestamp}.ogg`)
       await writeFile(inputPath, finalBuffer)
 
+      const ffmpegPath = getFfmpegPath()
       try {
-        await execAsync(`ffmpeg -y -i "${inputPath}" -c:a libopus -b:a 64k "${outputPath}"`)
+        await execAsync(`"${ffmpegPath}" -y -i "${inputPath}" -c:a libopus -b:a 64k "${outputPath}"`)
         finalBuffer = await readFile(outputPath)
         finalMime = 'audio/ogg'
-      } catch {
-        console.warn('[audio/send] ffmpeg unavailable — sending WebM (may fail Meta validation)')
+        console.log('[audio/send] Converted WebM → OGG successfully')
+      } catch (convErr: any) {
+        console.error('[audio/send] ffmpeg conversion failed:', convErr?.message)
+        return NextResponse.json(
+          { error: 'No se pudo convertir el audio. Verifica que ffmpeg esté instalado en el servidor.' },
+          { status: 500 }
+        )
       }
     } else {
       finalBuffer = Buffer.from(await audioFile.arrayBuffer())
@@ -65,7 +81,7 @@ export async function POST(req: Request) {
       : finalMime.includes('mpeg') ? 'mp3'
       : 'webm'
 
-    // 1. Upload to Meta's media API → get media_id (avoids public URL requirement)
+    // 1. Upload to Meta's media API → get media_id
     const metaForm = new FormData()
     metaForm.append('file', new Blob([new Uint8Array(finalBuffer)], { type: finalMime }), `audio.${ext}`)
     metaForm.append('type', finalMime)
@@ -90,7 +106,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No media ID returned from Meta' }, { status: 502 })
     }
 
-    // 2. Send WhatsApp message using media_id (no public URL needed)
+    // 2. Send WhatsApp message using media_id
     const cleanPhone = (phone.includes(':') || /[a-zA-Z]/.test(phone))
       ? phone
       : phone.replace(/\D/g, '')
@@ -131,7 +147,7 @@ export async function POST(req: Request) {
       const { data } = adminSupabase.storage.from('chat_media').getPublicUrl(fileName)
       mediaUrl = data.publicUrl
     } else {
-      console.warn('[audio/send] Supabase storage upload failed (CRM playback unavailable):', storageErr.message)
+      console.warn('[audio/send] Supabase storage upload failed:', storageErr.message)
     }
 
     // 4. Save message to DB

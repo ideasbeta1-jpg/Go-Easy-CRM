@@ -13,8 +13,8 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
   turbopack: {},
+  serverExternalPackages: ['@ffmpeg-installer/ffmpeg'],
 };
 
 export default withPWA(nextConfig);
