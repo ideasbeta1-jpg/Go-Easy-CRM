@@ -1,6 +1,6 @@
 import { GoogleAnalytics } from '@next/third-parties/google'
 import Script from 'next/script'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Radio_Canada_Big } from 'next/font/google'
 import React from 'react'
 import "./globals.css";
@@ -10,6 +10,12 @@ const radioCanada = Radio_Canada_Big({
   subsets: ['latin'],
   variable: '--font-radio-canada',
 });
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#0ea5e9',
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const supabase = await createClient()
@@ -28,7 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: "/manifest.json",
     icons: {
       icon: settings?.favicon_url ? `${settings.favicon_url}${v}` : "/favicon.ico",
-    }
+      apple: "/icon-192x192.png",
+    },
+    appleWebApp: {
+      capable: true,
+      title: "GE CRM",
+      statusBarStyle: "black-translucent",
+    },
   }
 }
 
