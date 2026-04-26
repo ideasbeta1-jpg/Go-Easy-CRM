@@ -13,6 +13,15 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
 
+const TOAST_DURATION = {
+  message: 8_000,
+  lead: 10_000,
+  payment: 12_000,
+  assignment: 15_000,
+} as const
+
+const BEEP_THROTTLE_MS = 2_000
+
 // Generate a soft two-tone beep via Web Audio API — no external dependency
 function playBeep() {
   try {
@@ -41,8 +50,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [currentUser, setCurrentUser] = useState<{ id: string; role: string } | null>(null)
   const router = useRouter()
   const supabase = createClient()
-  // Track registration to avoid re-registering on every render
   const pushRegistered = useRef(false)
+  const lastBeepAt = useRef(0)
+
+  const playBeepThrottled = useCallback(() => {
+    const now = Date.now()
+    if (now - lastBeepAt.current < BEEP_THROTTLE_MS) return
+    lastBeepAt.current = now
+    playBeep()
+  }, [])
 
   // ─── Desktop notification helper ─────────────────────────────────────────
   const showDesktopNotification = useCallback((title: string, body: string, url: string) => {
@@ -94,34 +110,50 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const setupPush = async () => {
       if (!('Notification' in window)) return
+
+      const registerSubscription = async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+        try {
+          const reg = await navigator.serviceWorker.ready
+          const existing = await reg.pushManager.getSubscription()
+          const subscription = existing ?? await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(
+              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+            ),
+          })
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(subscription.toJSON()),
+          })
+        } catch (err) {
+          console.warn('[Push] Could not register push subscription:', err)
+        }
+      }
+
       if (Notification.permission === 'default') {
-        await Notification.requestPermission()
+        toast.message('🔔 Activa las notificaciones', {
+          description: 'Recibe alertas de nuevos leads y mensajes en tiempo real, incluso con la pestaña cerrada.',
+          action: {
+            label: 'Activar',
+            onClick: async () => {
+              const result = await Notification.requestPermission()
+              if (result === 'granted') {
+                toast.success('¡Notificaciones activadas!', { duration: 3_000 })
+                await registerSubscription()
+              } else {
+                toast.error('Notificaciones bloqueadas. Actívalas desde la configuración del navegador.', { duration: 6_000 })
+              }
+            },
+          },
+          duration: 12_000,
+        })
+        return
       }
+
       if (Notification.permission !== 'granted') return
-
-      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-
-      try {
-        const reg = await navigator.serviceWorker.ready
-        const existing = await reg.pushManager.getSubscription()
-
-        // Re-use existing subscription or create a new one
-        const subscription = existing ?? await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(
-            process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-          ),
-        })
-
-        // Save/refresh the subscription on the server
-        await fetch('/api/push/subscribe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription.toJSON()),
-        })
-      } catch (err) {
-        console.warn('[Push] Could not register push subscription:', err)
-      }
+      await registerSubscription()
     }
 
     setupPush()
@@ -152,7 +184,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         if (!isAdmin && lead?.assigned_to !== currentUser.id) return
 
-        playBeep()
+        playBeepThrottled()
         const senderName = lead ? `${lead.first_name} ${lead.last_name}` : 'Nuevo Cliente'
         const messagePreview = newMessage.content?.substring(0, 50) || 'Mensaje multimedia'
 
@@ -163,7 +195,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             label: 'Ver Chat',
             onClick: () => router.push(`/dashboard/chats?leadId=${newMessage.lead_id}`),
           },
-          duration: 8000,
+          duration: TOAST_DURATION.message,
         })
 
         showDesktopNotification(
@@ -191,7 +223,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const leadName = `${newLead.first_name} ${newLead.last_name}`
 
         if (payload.eventType === 'INSERT') {
-          playBeep()
+          playBeepThrottled()
           toast.message('🟢 ¡Nuevo Lead Registrado!', {
             description: `Se ha creado el lead: ${leadName}`,
             icon: <UserPlus className="w-4 h-4 text-emerald-500" />,
@@ -199,14 +231,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               label: 'Ver Pipeline',
               onClick: () => router.push('/dashboard/leads'),
             },
-            duration: 10000,
+            duration: TOAST_DURATION.lead,
           })
           showDesktopNotification('Nuevo Lead Registrado', leadName, '/dashboard/leads')
         }
 
         if (payload.eventType === 'UPDATE') {
           if (oldLead?.status !== 'reserva_confirmada' && newLead?.status === 'reserva_confirmada') {
-            playBeep()
+            playBeepThrottled()
             toast.success('💰 ¡Reserva Confirmada!', {
               description: `El cliente ${leadName} ha realizado el pago.`,
               icon: <DollarSign className="w-4 h-4 text-amber-500" />,
@@ -214,13 +246,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 label: 'Ver Lead',
                 onClick: () => router.push(`/dashboard/leads/${newLead.id}`),
               },
-              duration: 12000,
+              duration: TOAST_DURATION.payment,
             })
             showDesktopNotification('💰 Pago Recibido', `${leadName} confirmó su reserva.`, `/dashboard/leads/${newLead.id}`)
           }
 
           if (oldLead?.assigned_to !== currentUser.id && newLead?.assigned_to === currentUser.id) {
-            playBeep()
+            playBeepThrottled()
             toast.message('👤 ¡Nuevo Lead Asignado!', {
               description: `Se te ha asignado el lead: ${leadName}`,
               icon: <UserPlus className="w-4 h-4 text-blue-500" />,
@@ -228,7 +260,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 label: 'Atender Lead',
                 onClick: () => router.push(`/dashboard/leads/${newLead.id}`),
               },
-              duration: 15000,
+              duration: TOAST_DURATION.assignment,
             })
             showDesktopNotification('¡Lead Asignado!', `Tienes un nuevo cliente: ${leadName}`, `/dashboard/leads/${newLead.id}`)
           }
@@ -259,7 +291,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
         const icon = typeIcons[notif.type] || '🔔'
 
-        playBeep()
+        playBeepThrottled()
         toast.message(`${icon} ${notif.title}`, {
           description: notif.body || undefined,
           icon: <Bell className="w-4 h-4 text-primary" />,
@@ -267,7 +299,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             label: 'Ver',
             onClick: () => router.push(notif.link),
           } : undefined,
-          duration: 8000,
+          duration: TOAST_DURATION.message,
         })
 
         if (notif.title && notif.body) {
@@ -283,7 +315,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       supabase.removeChannel(leadsChannel)
       supabase.removeChannel(notificationsChannel)
     }
-  }, [currentUser, supabase, router, showDesktopNotification])
+  }, [currentUser, supabase, router, showDesktopNotification, playBeepThrottled])
 
   return (
     <NotificationContext.Provider value={{ unreadCount, refreshUnreadCount: fetchUnreadCount }}>
