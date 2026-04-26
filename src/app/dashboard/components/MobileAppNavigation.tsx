@@ -20,12 +20,14 @@ export function MobileAppNavigation({ menuItems }: { menuItems: MenuItem[] }) {
     setIsOpen(false)
   }, [pathname])
 
+  const isChatsPage = pathname.startsWith('/dashboard/chats')
+
   return (
     <div className="lg:hidden">
       {/* Hamburger Button for Mobile */}
-      <button 
+      <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-[60] w-14 h-14 bg-primary text-white rounded-full shadow-xl shadow-primary/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+        className={`fixed right-6 z-[60] w-14 h-14 bg-primary text-white rounded-full shadow-xl shadow-primary/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all ${isChatsPage ? 'bottom-28' : 'bottom-6'}`}
       >
         <Menu className="w-6 h-6" />
       </button>

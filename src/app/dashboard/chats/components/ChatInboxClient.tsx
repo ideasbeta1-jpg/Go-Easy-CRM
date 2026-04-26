@@ -882,17 +882,17 @@ export default function ChatInboxClient({
                     </div>
                   </div>
                 ) : imagePreviewUrl ? (
-                  <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-6 py-4 flex items-center gap-4 shadow-lg shadow-primary/5">
+                  <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-4 py-4 flex items-center gap-3 shadow-lg shadow-primary/5">
                     <button onClick={discardImage} disabled={isUploadingMedia} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
                       <Trash2 className="w-5 h-5" />
                     </button>
-                    <div className="flex-1 flex items-center gap-4 min-w-0">
+                    <div className="flex-1 flex items-center gap-3 min-w-0">
                       <img
                         src={imagePreviewUrl}
                         alt="Preview"
-                        className="h-16 w-16 rounded-2xl object-cover shrink-0 ring-2 ring-slate-200"
+                        className="h-12 w-12 rounded-xl object-cover shrink-0 ring-2 ring-slate-200"
                       />
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="text-[11px] font-black text-slate-700 truncate">{imageFile?.name}</p>
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
                           {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : ''}
@@ -902,6 +902,16 @@ export default function ChatInboxClient({
                         )}
                       </div>
                     </div>
+                    <button
+                      onClick={handleSendImage}
+                      disabled={isUploadingMedia}
+                      className="w-12 h-12 shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
+                    >
+                      {isUploadingMedia
+                        ? <Clock className="w-5 h-5 animate-spin" />
+                        : <Send className="w-5 h-5 ml-0.5" />
+                      }
+                    </button>
                   </div>
                 ) : (
                   <input
@@ -950,10 +960,10 @@ export default function ChatInboxClient({
                   </>
                 )}
 
-                {/* Send button */}
-                {!isRecording && (chatMessage.trim() || audioUrl || imageFile) && (
+                {/* Send button — not shown for imageFile (send is inside the image card) */}
+                {!isRecording && !imageFile && (chatMessage.trim() || audioUrl) && (
                   <button
-                    onClick={imageFile ? handleSendImage : audioUrl ? handleSendAudio : handleSendMessage}
+                    onClick={audioUrl ? handleSendAudio : handleSendMessage}
                     disabled={isSendingMessage || isUploadingMedia}
                     className="w-12 h-12 md:w-[60px] md:h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                   >

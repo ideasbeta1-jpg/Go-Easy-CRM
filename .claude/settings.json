@@ -8,7 +8,8 @@
       "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\({deps: Object.keys\\(p.dependencies\\), devDeps: Object.keys\\(p.devDependencies || {}\\), node: p.engines}, null, 2\\)\\)\")",
       "Bash(ffmpeg -version)",
       "Bash(node -e \"const f = require\\('@ffmpeg-installer/ffmpeg'\\); console.log\\('path:', f.path, 'version:', f.version\\)\")",
-      "Bash(node -e \"const f = require\\('@ffmpeg-installer/ffmpeg'\\); const {execSync} = require\\('child_process'\\); try { const out = execSync\\('\\\\\"' + f.path + '\\\\\" -version 2>&1'\\).toString\\(\\); console.log\\(out.split\\('\\\\n'\\)[0]\\); } catch\\(e\\) { console.log\\('Error:', e.message\\); }\")"
+      "Bash(node -e \"const f = require\\('@ffmpeg-installer/ffmpeg'\\); const {execSync} = require\\('child_process'\\); try { const out = execSync\\('\\\\\"' + f.path + '\\\\\" -version 2>&1'\\).toString\\(\\); console.log\\(out.split\\('\\\\n'\\)[0]\\); } catch\\(e\\) { console.log\\('Error:', e.message\\); }\")",
+      "Bash(grep -E \"\\\\.\\(js|json|icon|png\\)$\")"
     ]
   }
 }
