@@ -214,8 +214,17 @@ export async function executeStageAutomation(
       }
     }
 
-    // 5. Fallback a n8n
-    await sendLeadToN8n(leadId, stage, extraData);
+    // 5. Fallback a n8n — pasamos datos enriquecidos para los mensajes de WhatsApp
+    await sendLeadToN8n(leadId, stage, {
+      ...extraData,
+      first_name:     lead.first_name,
+      last_name:      lead.last_name,
+      lead_name:      `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
+      phone:          lead.phone,
+      email:          lead.email,
+      source:         lead.source,
+      assigned_agent: lead.assigned_agent,
+    });
 
     // 6. Notificación al Vendedor (Si es reserva confirmada)
     if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone) {

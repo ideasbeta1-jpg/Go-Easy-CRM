@@ -1,0 +1,126 @@
+{
+  "name": "💰 Pago Recibido → WhatsApp Grupo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pago-recibido-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-pago",
+      "name": "Webhook Pago Recibido",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "pago-recibido-whatsapp"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-event-type",
+              "leftValue": "={{ ($input.first().json.body || $input.first().json).event_type || ($input.first().json.body || $input.first().json).type || 'payment' }}",
+              "rightValue": "payment_failed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-pago-exitoso",
+      "name": "¿Pago Exitoso?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload de Stripe webhook o CRM\nconst body = $input.first().json.body || $input.first().json;\n\n// Stripe: body.data.object o body directo desde CRM\nconst stripeObj    = body.data?.object || body;\nconst customerName = stripeObj.metadata?.customer_name || stripeObj.client_name   || stripeObj.nombre    || 'Cliente';\nconst agentName    = stripeObj.metadata?.agent_name    || stripeObj.agent_name    || stripeObj.asesor    || 'Sin asignar';\nconst amountRaw    = stripeObj.amount_received          || stripeObj.amount         || stripeObj.monto     || 0;\nconst currency     = (stripeObj.currency || 'usd').toUpperCase();\nconst description  = stripeObj.description              || stripeObj.concepto       || stripeObj.plan      || '';\nconst paymentId    = stripeObj.id || stripeObj.payment_id || '';\n\n// Convertir centavos a dólares si viene de Stripe\nconst amount = currency === 'USD' && amountRaw > 1000 ? (amountRaw / 100).toFixed(2) : amountRaw;\n\nconst now = new Date();\nconst hora = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });\nconst fecha = now.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Bogota' });\n\nconst message = [\n  '💰 *PAGO RECIBIDO - GO EASY CRM*',\n  '',\n  `👤 *Cliente:* ${customerName}`,\n  `💵 *Monto:* $${amount} ${currency}`,\n  description ? `📋 *Concepto:* ${description}` : null,\n  `🧑‍💼 *Asesor:* ${agentName}`,\n  `📅 *Fecha:* ${fecha} ${hora} (Col)`,\n  paymentId ? `🆔 *Ref:* ${paymentId.slice(-8)}` : null,\n  '',\n  '✅ _Pago confirmado exitosamente_ 🎉',\n].filter(Boolean).join('\\n');\n\nreturn [{ json: { message, amount, currency, customerName } }];"
+      },
+      "id": "format-pago",
+      "name": "Formatear Pago",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionib.ideasbeta.com/message/sendText/IB Prueba",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"120363425734892399@g.us\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp-pago",
+      "name": "Enviar Notificación WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Notificación pago enviada\" }"
+      },
+      "id": "respond-pago",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1200, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": false, \"message\": \"Pago fallido ignorado\" }"
+      },
+      "id": "respond-pago-fallido",
+      "name": "Ignorar Pago Fallido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [720, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Pago Recibido": {
+      "main": [[{ "node": "¿Pago Exitoso?", "type": "main", "index": 0 }]]
+    },
+    "¿Pago Exitoso?": {
+      "main": [
+        [{ "node": "Formatear Pago", "type": "main", "index": 0 }],
+        [{ "node": "Ignorar Pago Fallido", "type": "main", "index": 0 }]
+      ]
+    },
+    "Formatear Pago": {
+      "main": [[{ "node": "Enviar Notificación WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "Enviar Notificación WhatsApp": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

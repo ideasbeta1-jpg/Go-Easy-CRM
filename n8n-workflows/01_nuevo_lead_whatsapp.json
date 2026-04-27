@@ -1,0 +1,81 @@
+{
+  "name": "🟢 Nuevo Lead → WhatsApp Grupo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nuevo-lead-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-nuevo-lead",
+      "name": "Webhook Nuevo Lead",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "nuevo-lead-whatsapp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer datos del payload del CRM\nconst body = $input.first().json.body || $input.first().json;\n\nconst leadName   = body.lead_name   || body.nombre    || 'Sin nombre';\nconst agentName  = body.agent_name  || body.asesor    || 'Sin asignar';\nconst leadPhone  = body.lead_phone  || body.telefono  || '';\nconst leadEmail  = body.lead_email  || body.email     || '';\nconst leadSource = body.source      || body.fuente    || '';\n\nconst now = new Date();\nconst hora = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });\n\nconst message = [\n  '🟢 *NUEVO LEAD REGISTRADO*',\n  '',\n  `👤 *Nombre:* ${leadName}`,\n  leadPhone  ? `📞 *Teléfono:* ${leadPhone}` : null,\n  leadEmail  ? `📧 *Email:* ${leadEmail}` : null,\n  leadSource ? `🔗 *Fuente:* ${leadSource}` : null,\n  '',\n  `🧑‍💼 *Asesor asignado:* ${agentName}`,\n  `🕐 *Hora:* ${hora} (Col)`,\n].filter(Boolean).join('\\n');\n\nreturn [{ json: { message, leadName, agentName } }];"
+      },
+      "id": "format-nuevo-lead",
+      "name": "Formatear Mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionib.ideasbeta.com/message/sendText/IB Prueba",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"120363425734892399@g.us\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp-nuevo-lead",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Notificación enviada\" }"
+      },
+      "id": "respond-nuevo-lead",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Nuevo Lead": {
+      "main": [[{ "node": "Formatear Mensaje", "type": "main", "index": 0 }]]
+    },
+    "Formatear Mensaje": {
+      "main": [[{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "Enviar WhatsApp": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

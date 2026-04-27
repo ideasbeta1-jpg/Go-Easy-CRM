@@ -1,0 +1,81 @@
+{
+  "name": "📞 Alerta Llamada Perdida → WhatsApp Grupo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "llamada-perdida-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-llamada-perdida",
+      "name": "Webhook Llamada Perdida",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "llamada-perdida-whatsapp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Payload de Zadarma o CRM al detectar llamada perdida\nconst body = $input.first().json.body || $input.first().json;\n\nconst callerNumber = body.caller_number || body.caller_id   || body.from         || 'Desconocido';\nconst callerName   = body.caller_name   || body.lead_name   || body.contact_name || '';\nconst agentName    = body.agent_name    || body.asesor      || body.sip_id       || 'Sin asignar';\nconst callTime     = body.call_time     || body.start_time  || body.called_at    || '';\n\nconst now = new Date();\nconst hora = callTime\n  ? new Date(callTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' })\n  : now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });\n\nconst nameDisplay = callerName ? `${callerName} (${callerNumber})` : callerNumber;\n\nconst message = [\n  '🔴 *ALERTA - LLAMADA PERDIDA*',\n  '',\n  `📞 *De:* ${nameDisplay}`,\n  `🧑‍💼 *Asesor:* ${agentName}`,\n  `🕐 *Hora:* ${hora} (Col)`,\n  '',\n  '⚠️ _Por favor retornar la llamada lo antes posible_',\n].join('\\n');\n\nreturn [{ json: { message, callerNumber, agentName } }];"
+      },
+      "id": "format-llamada-perdida",
+      "name": "Formatear Alerta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionib.ideasbeta.com/message/sendText/IB Prueba",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"120363425734892399@g.us\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp-llamada",
+      "name": "Enviar Alerta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Alerta enviada\" }"
+      },
+      "id": "respond-llamada",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Llamada Perdida": {
+      "main": [[{ "node": "Formatear Alerta", "type": "main", "index": 0 }]]
+    },
+    "Formatear Alerta": {
+      "main": [[{ "node": "Enviar Alerta WhatsApp", "type": "main", "index": 0 }]]
+    },
+    "Enviar Alerta WhatsApp": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}
