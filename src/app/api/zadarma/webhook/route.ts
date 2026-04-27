@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyZadarmaWebhook } from '@/lib/zadarma'
+import { sendLeadToN8n } from '@/utils/n8n'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -135,16 +136,60 @@ async function handleCallEnd(p: Record<string, string>) {
   const duration = parseInt(p.duration || p.billseconds || '0')
   const disposition = (p.disposition || p.call_status || '').toLowerCase()
 
+  const status = DISPOSITION_MAP[disposition] || 'ended'
+
   const { error } = await supabase
     .from('call_logs')
     .update({
-      status: DISPOSITION_MAP[disposition] || 'ended',
+      status,
       duration,
       ended_at: new Date().toISOString(),
     })
     .eq('zadarma_call_id', callId)
 
-  if (error) console.error('[handleCallEnd]', error)
+  if (error) {
+    console.error('[handleCallEnd]', error)
+    return
+  }
+
+  // Si la llamada fue perdida, disparamos la automatización de WhatsApp a n8n
+  if (status === 'missed') {
+    // Buscar la información completa para n8n
+    const { data: callLog } = await supabase
+      .from('call_logs')
+      .select(`
+        caller_number,
+        lead:leads(id, first_name, last_name, phone),
+        agent:profiles(id, first_name, last_name, full_name, phone)
+      `)
+      .eq('zadarma_call_id', callId)
+      .maybeSingle()
+
+    if (callLog) {
+      const leadData = Array.isArray(callLog.lead) ? callLog.lead[0] : callLog.lead
+      const agentData = Array.isArray(callLog.agent) ? callLog.agent[0] : callLog.agent
+
+      const agentName = agentData 
+        ? `${agentData.first_name || ''} ${agentData.last_name || ''}`.trim() || agentData.full_name 
+        : 'Sin asignar'
+      
+      const callerName = leadData 
+        ? `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() 
+        : ''
+
+      // Payload para la plantilla de Llamada Perdida
+      const payload = {
+        caller_number: callLog.caller_number || p.caller_id || '',
+        caller_name: callerName,
+        agent_name: agentName,
+        agent_phone: agentData?.phone || '',
+        lead_id: leadData?.id || '',
+      }
+
+      // Enviar a n8n
+      await sendLeadToN8n(leadData?.id || 'unknown', 'llamada_perdida', payload)
+    }
+  }
 }
 
 async function handleRecordingReady(p: Record<string, string>) {
