@@ -72,6 +72,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     cerrado_ganado: true,
     cerrado_perdido: true,
   })
+  const [mobileMoveLead, setMobileMoveLead] = useState<{ id: string; status: string } | null>(null)
   const router = useRouter()
   const { searchTerm, sortBy, agentFilter, dateFilter } = useKanbanFilter()
 
@@ -302,7 +303,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                             className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                           >
                             <div className="p-4">
-                              {/* Row 1: ID + badges + unread */}
+                              {/* Row 1: ID + badges + unread + mobile move */}
                               <div className="flex items-center gap-1.5 mb-2.5">
                                 <span className="text-[10px] font-bold text-slate-400">
                                   {shortId(lead.id)}
@@ -317,11 +318,25 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                     🔥 {urgency.label}
                                   </span>
                                 )}
-                                {unread > 0 && (
-                                  <span className="ml-auto bg-blue-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0">
-                                    {unread > 9 ? '9+' : unread}
-                                  </span>
-                                )}
+                                <div className="ml-auto flex items-center gap-1 shrink-0">
+                                  {unread > 0 && (
+                                    <span className="bg-blue-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+                                      {unread > 9 ? '9+' : unread}
+                                    </span>
+                                  )}
+                                  {(VALID_TRANSITIONS[lead.status] ?? []).length > 0 && (
+                                    <button
+                                      className="lg:hidden p-1 text-slate-300 hover:text-primary active:text-primary transition-colors rounded-lg"
+                                      onClick={e => {
+                                        e.preventDefault()
+                                        e.stopPropagation()
+                                        setMobileMoveLead({ id: lead.id, status: lead.status })
+                                      }}
+                                    >
+                                      <ChevronRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
 
                               {/* Row 2: Name + total amount */}
@@ -517,9 +532,71 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
         </div>
       )}
 
+      {/* Mobile: Move Lead bottom sheet */}
+      {mobileMoveLead && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setMobileMoveLead(null)}
+          />
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl p-6 animate-in slide-in-from-bottom duration-300">
+            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-5" />
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Mover a etapa</p>
+            {(VALID_TRANSITIONS[mobileMoveLead.status] ?? []).length === 0 ? (
+              <p className="text-center text-sm text-slate-400 py-4">No hay etapas disponibles</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2.5">
+                {statuses
+                  .filter(s => (VALID_TRANSITIONS[mobileMoveLead.status] ?? []).includes(s))
+                  .map(s => (
+                    <button
+                      key={s}
+                      onClick={async () => {
+                        const lead = leads.find(l => l.id === mobileMoveLead.id)
+                        if (!lead) return
+                        setMobileMoveLead(null)
+                        if (s === LOST_STAGE) {
+                          setSelectedReason(null)
+                          setOtherReason('')
+                          setLostMovePending({ leadId: mobileMoveLead.id, leadName: `${lead.first_name} ${lead.last_name}`.trim() })
+                        } else if (CONFIRM_STAGES.has(s)) {
+                          setPendingMove({
+                            leadId: mobileMoveLead.id,
+                            leadName: `${lead.first_name} ${lead.last_name}`.trim(),
+                            toStatus: s,
+                            toLabel: statusConfig[s]?.label || s,
+                            automationNote: STAGE_AUTOMATION_NOTE[s] || 'Se disparará una automatización.',
+                          })
+                        } else {
+                          await executeMove(mobileMoveLead.id, s)
+                        }
+                      }}
+                      className={`py-3.5 px-4 rounded-2xl text-sm font-bold border text-left transition-all active:scale-95 ${
+                        s === 'cerrado_perdido'
+                          ? 'bg-rose-50 border-rose-100 text-rose-600'
+                          : 'bg-slate-50 border-slate-100 text-slate-700 hover:bg-primary/5 hover:border-primary/20 hover:text-primary'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mb-2 ${statusConfig[s]?.color || 'bg-slate-300'}`} />
+                      {statusConfig[s]?.label || s}
+                    </button>
+                  ))
+                }
+              </div>
+            )}
+            <button
+              onClick={() => setMobileMoveLead(null)}
+              className="mt-5 w-full py-3 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Updating indicator */}
       {isUpdating && (
-        <div className="fixed bottom-8 right-8 bg-white px-5 py-3 rounded-full shadow-2xl border border-slate-100 flex items-center gap-3 animate-in slide-in-from-right-12">
+        <div className="fixed bottom-20 sm:bottom-8 right-4 sm:right-8 bg-white px-5 py-3 rounded-full shadow-2xl border border-slate-100 flex items-center gap-3 animate-in slide-in-from-right-12">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           <span className="text-xs font-black uppercase tracking-widest text-slate-900">Actualizando...</span>
         </div>

@@ -24,7 +24,7 @@ import { ActivityTimeline } from './sections/ActivityTimeline'
 
 // ─── Types & Constants ────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'cotizacion' | 'voucher' | 'historial'
+type TabId = 'info' | 'cotizacion' | 'voucher' | 'historial' | 'chat'
 
 const STATUS_MAP: Record<string, string> = {
   lead_nuevo: 'Lead Nuevo',
@@ -432,9 +432,9 @@ export default function LeadDetailClient({
           {nextStatus && (
             <button
               onClick={() => handleStatusChange(nextStatus)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-dim transition-all shadow-lg shadow-primary/20"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-dim transition-all shadow-lg shadow-primary/20"
             >
-              Avanzar etapa →
+              <span className="hidden sm:inline">Avanzar etapa </span>→
             </button>
           )}
           <button
@@ -469,8 +469,8 @@ export default function LeadDetailClient({
         )}
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────────────────── */}
-      <div className="border-b border-slate-100 px-6 shrink-0">
+      {/* ── Tabs (desktop only) ─────────────────────────────────────── */}
+      <div className="hidden lg:block border-b border-slate-100 px-6 shrink-0">
         <div className="flex">
           {([
             { id: 'info', label: 'Información' },
@@ -496,8 +496,8 @@ export default function LeadDetailClient({
       {/* ── Two-Column Content ──────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left: tab content */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        {/* Left: tab content — hidden on mobile when chat tab is active */}
+        <div className={`flex-1 overflow-y-auto scrollbar-hide pb-20 lg:pb-0${activeTab === 'chat' ? ' hidden lg:block' : ''}`}>
 
           {/* INFORMACIÓN */}
           {activeTab === 'info' && (
@@ -646,7 +646,7 @@ export default function LeadDetailClient({
           {activeTab === 'cotizacion' && (
             <div className="p-6 space-y-5 max-w-2xl">
               {/* Vehicle + dates */}
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 {/* Vehicle dark card */}
                 <div className="bg-slate-900 rounded-2xl p-5 flex flex-col gap-4">
                   <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Vehículo</p>
@@ -905,8 +905,8 @@ export default function LeadDetailClient({
           )}
         </div>
 
-        {/* ── Right sidebar: WhatsApp + Notes ─────────────────────────── */}
-        <div className="hidden lg:flex w-[380px] border-l border-slate-100 flex-col shrink-0 overflow-hidden">
+        {/* ── Right sidebar: WhatsApp + Notes — shown on mobile via chat tab ── */}
+        <div className={`border-l border-slate-100 flex-col shrink-0 overflow-hidden ${activeTab === 'chat' ? 'flex flex-1 lg:flex-none' : 'hidden lg:flex'} lg:w-[380px]`}>
 
           {/* WhatsApp Chat */}
           <div className="flex flex-col overflow-hidden" style={{ flex: '1 1 0' }}>
@@ -1062,7 +1062,7 @@ export default function LeadDetailClient({
                     </div>
                     <button
                       onClick={() => handleDeleteNote(note.id)}
-                      className="opacity-0 group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all shrink-0"
+                      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 p-1 text-slate-300 hover:text-red-500 transition-all shrink-0"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -1096,16 +1096,17 @@ export default function LeadDetailClient({
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-xl border-t border-slate-100 flex items-center justify-around px-1 pt-2 pb-4">
         {([
           { id: 'info', label: 'Info', icon: User },
-          { id: 'cotizacion', label: 'Cotización', icon: Zap },
+          { id: 'cotizacion', label: 'Cotiza', icon: Zap },
           { id: 'voucher', label: 'Voucher', icon: FileText },
           { id: 'historial', label: 'Historial', icon: Clock },
+          { id: 'chat', label: 'Chat', icon: MessageSquare },
         ] as { id: TabId; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id
           return (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
-              className={`flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-2xl transition-all ${isActive ? 'text-primary' : 'text-slate-400'}`}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-all ${isActive ? 'text-primary' : 'text-slate-400'}`}
             >
               <Icon className={`w-5 h-5 ${isActive ? 'stroke-[2.5]' : 'stroke-[1.5]'}`} />
               <span className={`text-[9px] font-black uppercase tracking-widest ${isActive ? 'opacity-100' : 'opacity-60'}`}>{label}</span>
