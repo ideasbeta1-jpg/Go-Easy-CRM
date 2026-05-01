@@ -63,7 +63,7 @@ export function PendingActionsPanel({ initialActions }: { initialActions: Pendin
             <span className="text-xs font-black text-slate-800 truncate">
               {lead ? `${lead.first_name} ${lead.last_name}` : action.lead_id.slice(0, 8)}
             </span>
-            <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${STATUS_STYLE[action.status]}">
+            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${STATUS_STYLE[action.status] || 'bg-slate-100 text-slate-400 border-slate-200'}`}>
               {STATUS_LABEL[action.status] || action.status}
             </span>
           </div>

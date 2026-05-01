@@ -79,15 +79,29 @@ export async function deleteAutomationRule(id: string): Promise<{ ok: boolean; e
 
 export async function getPendingActions(limit = 30): Promise<{ actions: PendingAction[]; error?: string }> {
   const supabase = createAdminClient()
+
   const { data, error } = await supabase
     .from('pending_actions')
-    .select('*, automation_rules(name), leads(first_name, last_name, phone)')
+    .select('*, automation_rules(name)')
     .neq('status', 'cancelled')
     .order('execute_at', { ascending: true })
     .limit(limit)
 
   if (error) return { actions: [], error: error.message }
-  return { actions: (data || []) as PendingAction[] }
+
+  // Enriquecer con datos del lead manualmente (lead_id no tiene FK explícita)
+  const actions = await Promise.all(
+    (data || []).map(async (action: any) => {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('first_name, last_name, phone')
+        .eq('id', action.lead_id)
+        .maybeSingle()
+      return { ...action, leads: lead || null }
+    })
+  )
+
+  return { actions: actions as PendingAction[] }
 }
 
 export async function cancelPendingAction(id: string): Promise<{ ok: boolean; error?: string }> {
