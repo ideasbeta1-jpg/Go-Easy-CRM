@@ -169,7 +169,7 @@ async function executeAction(action: any, supabase: any) {
       const text = interpolateMessage(raw, lead)
       await broadcastNotification(
         {
-          type: 'automation',
+          type: 'status_changed',
           title: '⚡ Automatización',
           body: text,
           link: `/dashboard/leads/${action.lead_id}`,

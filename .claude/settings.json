@@ -13,7 +13,10 @@
       "Bash(xargs grep *)",
       "Read(//c/Users/razs9/OneDrive/Desktop/Apps/**)",
       "Bash(xargs wc *)",
-      "mcp__claude_ai_Supabase__list_projects"
+      "mcp__claude_ai_Supabase__list_projects",
+      "Read(//c/c/Users/razs9/OneDrive/Desktop/Apps/**)",
+      "Read(//c/Users/razs9/OneDHome/Desktop/Apps/**)",
+      "Bash(grep -r \"automation_config\\\\|automation_rules\\\\|automation_logs\" supabase/migrations/)"
     ],
     "additionalDirectories": [
       "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"
