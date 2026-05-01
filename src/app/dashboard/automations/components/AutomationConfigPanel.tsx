@@ -65,10 +65,8 @@ export function AutomationConfigPanel({ initialConfig }: { initialConfig: Automa
     })
   }
 
-  // Collect unique channels in display order
-  const allChannels = Object.keys(CHANNEL_META).filter(ch =>
-    initialConfig.some(r => r.channel === ch)
-  )
+  // Always show all channels in display order
+  const allChannels = Object.keys(CHANNEL_META)
 
   return (
     <div className="overflow-x-auto">
@@ -94,11 +92,7 @@ export function AutomationConfigPanel({ initialConfig }: { initialConfig: Automa
           </tr>
         </thead>
         <tbody>
-          {STAGE_ORDER.map((stage, i) => {
-            const stageChannels = initialConfig.filter(r => r.stage === stage).map(r => r.channel)
-            if (stageChannels.length === 0) return null
-
-            return (
+          {STAGE_ORDER.map((stage, i) => (
               <tr
                 key={stage}
                 className={`transition-colors ${i % 2 === 0 ? 'bg-slate-50/60' : ''} hover:bg-primary/5 rounded-2xl`}
@@ -107,42 +101,36 @@ export function AutomationConfigPanel({ initialConfig }: { initialConfig: Automa
                   <span className="text-xs font-black text-slate-700">{STAGE_LABELS[stage] || stage}</span>
                 </td>
                 {allChannels.map(ch => {
-                  const hasChannel = stageChannels.includes(ch)
                   const on = isOn(stage, ch)
                   const key = `${stage}:${ch}`
                   const isSaving = saving === key
 
                   return (
                     <td key={ch} className="py-3 px-3 text-center last:rounded-r-2xl">
-                      {hasChannel ? (
-                        <button
-                          onClick={() => toggle(stage, ch)}
-                          disabled={!!saving}
-                          title={on ? 'Deshabilitar' : 'Habilitar'}
-                          className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-60 ${
-                            on ? 'bg-primary' : 'bg-slate-200'
+                      <button
+                        onClick={() => toggle(stage, ch)}
+                        disabled={!!saving}
+                        title={on ? 'Deshabilitar' : 'Habilitar'}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none disabled:opacity-60 ${
+                          on ? 'bg-primary' : 'bg-slate-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                            on ? 'translate-x-4' : 'translate-x-0.5'
                           }`}
-                        >
-                          <span
-                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                              on ? 'translate-x-4' : 'translate-x-0.5'
-                            }`}
-                          />
-                          {isSaving && (
-                            <span className="absolute inset-0 flex items-center justify-center">
-                              <span className="h-2 w-2 animate-spin rounded-full border border-white border-t-transparent" />
-                            </span>
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-slate-200 text-lg">·</span>
-                      )}
+                        />
+                        {isSaving && (
+                          <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="h-2 w-2 animate-spin rounded-full border border-white border-t-transparent" />
+                          </span>
+                        )}
+                      </button>
                     </td>
                   )
                 })}
               </tr>
-            )
-          })}
+          ))}
         </tbody>
       </table>
 
