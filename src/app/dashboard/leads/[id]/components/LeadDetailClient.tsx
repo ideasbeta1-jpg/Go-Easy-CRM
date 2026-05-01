@@ -527,8 +527,8 @@ export default function LeadDetailClient({
                     return_location: lead.return_location || '',
                     pickup_location_id: lead.pickup_location_id || '',
                     return_location_id: lead.return_location_id || '',
-                    pickup_date: lead.pickup_date ? new Date(lead.pickup_date).toISOString().slice(0, 16) : '',
-                    return_date: lead.return_date ? new Date(lead.return_date).toISOString().slice(0, 16) : '',
+                    pickup_date: lead.pickup_date ? lead.pickup_date.slice(0, 16) : '',
+                    return_date: lead.return_date ? lead.return_date.slice(0, 16) : '',
                     category_id: lead.category_id || '',
                     provider_id: lead.provider_id || '',
                     assigned_to: lead.assigned_to || '',
@@ -834,11 +834,11 @@ export default function LeadDetailClient({
                            ) : (
                               <>
                                  <p className="text-2xl font-sans font-black text-slate-900 leading-tight">
-                                   {lead.pickup_date ? format(new Date(lead.pickup_date), "EEEE, d 'de' MMMM", { locale: es }) : 'Fecha pendiente'}
+                                   {lead.pickup_date ? format(new Date(lead.pickup_date.slice(0, 16)), "EEEE, d 'de' MMMM", { locale: es }) : 'Fecha pendiente'}
                                  </p>
                                  <div className="flex items-center gap-3 text-sm font-bold text-slate-400">
                                     <MapPin className="w-4 h-4 text-primary/40" />
-                                    <span>{(locations.find(l => l.id === formData.pickup_location_id)?.name) || formData.pickup_location || '—'} · {lead.pickup_date ? format(new Date(lead.pickup_date), "hh:mm a") : ''}</span>
+                                    <span>{(locations.find(l => l.id === formData.pickup_location_id)?.name) || formData.pickup_location || '—'} · {lead.pickup_date ? format(new Date(lead.pickup_date.slice(0, 16)), "hh:mm a") : ''}</span>
                                  </div>
                               </>
                            )}
@@ -876,11 +876,11 @@ export default function LeadDetailClient({
                            ) : (
                               <>
                                  <p className="text-2xl font-sans font-black text-slate-900 leading-tight">
-                                   {lead.return_date ? format(new Date(lead.return_date), "EEEE, d 'de' MMMM", { locale: es }) : 'Fecha pendiente'}
+                                   {lead.return_date ? format(new Date(lead.return_date.slice(0, 16)), "EEEE, d 'de' MMMM", { locale: es }) : 'Fecha pendiente'}
                                  </p>
                                  <div className="flex items-center gap-3 text-sm font-bold text-slate-400">
                                     <MapPin className="w-4 h-4 text-slate-300" />
-                                    <span>{(locations.find(l => l.id === formData.return_location_id)?.name) || formData.return_location || '—'} · {lead.return_date ? format(new Date(lead.return_date), "hh:mm a") : ''}</span>
+                                    <span>{(locations.find(l => l.id === formData.return_location_id)?.name) || formData.return_location || '—'} · {lead.return_date ? format(new Date(lead.return_date.slice(0, 16)), "hh:mm a") : ''}</span>
                                  </div>
                               </>
                            )}
