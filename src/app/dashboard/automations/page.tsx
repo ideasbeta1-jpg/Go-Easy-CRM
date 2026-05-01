@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
 import FailedLogsPanel from './components/FailedLogsPanel'
+import { AutomationConfigPanel } from './components/AutomationConfigPanel'
+import { getAutomationConfig } from '@/app/utils/actions/automation'
 
 export default async function AutomationsPage() {
   const supabase = await createClient()
@@ -19,6 +21,8 @@ export default async function AutomationsPage() {
     .eq('status', 'failed')
     .order('created_at', { ascending: false })
     .limit(30)
+
+  const { config: automationConfig } = await getAutomationConfig()
 
   // Status of n8n configuration
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
@@ -276,6 +280,23 @@ export default async function AutomationsPage() {
           </div>
         </aside>
       </div>
+
+      {/* Automation Config — control de canales por etapa */}
+      <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-50 pb-6 mb-8">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              Control de Automatizaciones
+              <span className="text-[10px] font-black bg-primary/10 text-primary px-3 py-1 rounded-full">Kanban</span>
+            </h2>
+            <p className="text-sm font-bold text-slate-400 mt-1 italic">
+              Activa o desactiva cada canal por etapa del pipeline
+            </p>
+          </div>
+          <span className="material-symbols-outlined text-3xl text-slate-200">tune</span>
+        </div>
+        <AutomationConfigPanel initialConfig={automationConfig} />
+      </section>
 
       {/* Failed Automations — full width */}
       <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">

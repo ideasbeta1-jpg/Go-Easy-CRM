@@ -20,6 +20,18 @@ export async function executeStageAutomation(
   await logAutomation(leadId, stage, 'system', 'engine_start', 'processing');
 
   try {
+    // 0. Cargar config de canales habilitados para esta etapa
+    const { data: configRows } = await supabase
+      .from('automation_config')
+      .select('channel, enabled')
+      .eq('stage', stage)
+
+    const isEnabled = (channel: string): boolean => {
+      if (!configRows) return true
+      const row = configRows.find(r => r.channel === channel)
+      return row === undefined ? true : row.enabled
+    }
+
     // 1. Obtener datos del lead y su categoría
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -100,7 +112,10 @@ export async function executeStageAutomation(
 
     const templateName = mapping?.template_name || defaultTemplates[stage];
     
-    if (!templateName) {
+    if (!isEnabled('whatsapp')) {
+      console.log(`[AutomationEngine] WhatsApp deshabilitado para etapa: ${stage}`);
+      await logAutomation(leadId, stage, 'whatsapp', 'skipped_by_config', 'skipped');
+    } else if (!templateName) {
       console.log(`[AutomationEngine] No hay plantilla definida para la etapa: ${stage}`);
       await logAutomation(leadId, stage, 'system', 'no_template', 'skipped');
     } else if (lead.phone) {
@@ -196,7 +211,9 @@ export async function executeStageAutomation(
     }
 
     // 4. Ejecutar Email (si hay email)
-    if (lead.email) {
+    if (!isEnabled('email')) {
+      await logAutomation(leadId, stage, 'email', 'skipped_by_config', 'skipped');
+    } else if (lead.email) {
       try {
         const { subject, html } = await getStageEmailTemplate(stage, lead, extraData);
         const emailResult = await sendEmail({ to: lead.email, subject, html });
@@ -215,45 +232,51 @@ export async function executeStageAutomation(
     }
 
     // 5. Fallback a n8n — pasamos datos enriquecidos para los mensajes de WhatsApp
-    await sendLeadToN8n(leadId, stage, {
-      ...extraData,
-      first_name:     lead.first_name,
-      last_name:      lead.last_name,
-      lead_name:      `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
-      phone:          lead.phone,
-      email:          lead.email,
-      source:         lead.source,
-      assigned_agent: lead.assigned_agent,
-    });
+    if (isEnabled('n8n')) {
+      await sendLeadToN8n(leadId, stage, {
+        ...extraData,
+        first_name:     lead.first_name,
+        last_name:      lead.last_name,
+        lead_name:      `${lead.first_name || ''} ${lead.last_name || ''}`.trim(),
+        phone:          lead.phone,
+        email:          lead.email,
+        source:         lead.source,
+        assigned_agent: lead.assigned_agent,
+      });
+    }
 
     // 6. Notificación al Vendedor (Si es reserva confirmada)
-    if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone) {
+    if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone && isEnabled('agent_whatsapp')) {
       const depositAmount = typeof extraData.amount === 'number' ? extraData.amount.toFixed(2) : (extraData.amount || '—');
       const agentMsg = `🎉 *¡Felicidades!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* ha pagado el depósito de *$${depositAmount}*. Ahora ayúdanos gestionando el voucher.`;
       await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
     }
 
     // 7. In-App Notifications
-    const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim();
-    const stageNotifications: Record<string, { title: string; body: string; type: any }> = {
-      'lead_nuevo': { type: 'new_lead', title: '🟢 Nuevo Lead Registrado', body: `${leadName} ha sido registrado en el sistema.` },
-      'en_cotizacion': { type: 'quote_generated', title: '📄 Cotización Generada', body: `Se generó una cotización para ${leadName}.` },
-      'reserva_confirmada': { type: 'payment_confirmed', title: '💰 ¡Pago Confirmado!', body: `${leadName} ha confirmado su reserva con un depósito.` },
-      'voucher_enviado': { type: 'voucher_sent', title: '📋 Voucher Enviado', body: `El voucher de ${leadName} fue enviado.` },
-      'cerrado_ganado':  { type: 'lead_closed', title: '🏆 Lead Ganado',  body: `El alquiler de ${leadName} se cerró exitosamente.` },
-      'cerrado_perdido': { type: 'lead_closed', title: '❌ Lead Perdido', body: `El lead de ${leadName} fue marcado como perdido.` }
-    };
+    if (isEnabled('in_app')) {
+      const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim();
+      const stageNotifications: Record<string, { title: string; body: string; type: any }> = {
+        'lead_nuevo': { type: 'new_lead', title: '🟢 Nuevo Lead Registrado', body: `${leadName} ha sido registrado en el sistema.` },
+        'en_cotizacion': { type: 'quote_generated', title: '📄 Cotización Generada', body: `Se generó una cotización para ${leadName}.` },
+        'reserva_confirmada': { type: 'payment_confirmed', title: '💰 ¡Pago Confirmado!', body: `${leadName} ha confirmado su reserva con un depósito.` },
+        'voucher_enviado': { type: 'voucher_sent', title: '📋 Voucher Enviado', body: `El voucher de ${leadName} fue enviado.` },
+        'cerrado_ganado':  { type: 'lead_closed', title: '🏆 Lead Ganado',  body: `El alquiler de ${leadName} se cerró exitosamente.` },
+        'cerrado_perdido': { type: 'lead_closed', title: '❌ Lead Perdido', body: `El lead de ${leadName} fue marcado como perdido.` }
+      };
 
-    const notifConfig = stageNotifications[stage];
-    if (notifConfig) {
-      await broadcastNotification(
-        { type: notifConfig.type, title: notifConfig.title, body: notifConfig.body, link: `/dashboard/leads/${leadId}`, lead_id: leadId },
-        lead.assigned_to || null
-      );
+      const notifConfig = stageNotifications[stage];
+      if (notifConfig) {
+        await broadcastNotification(
+          { type: notifConfig.type, title: notifConfig.title, body: notifConfig.body, link: `/dashboard/leads/${leadId}`, lead_id: leadId },
+          lead.assigned_to || null
+        );
+      }
     }
 
     // 8. Meta CAPI tracking por etapa
-    try {
+    if (!isEnabled('meta_capi')) {
+      await logAutomation(leadId, stage, 'meta_capi', 'skipped_by_config', 'skipped');
+    } else try {
       const { sendMetaEvent } = await import('./meta-capi');
       
       const eventMapping: Record<string, string> = {
