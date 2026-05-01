@@ -25,6 +25,14 @@ interface Template {
   id: string;
 }
 
+const PIPELINE_STAGES = [
+  { id: 'lead_nuevo',         label: 'Lead Nuevo',          color: 'bg-blue-50 text-blue-700 border-blue-100' },
+  { id: 'en_cotizacion',      label: 'En Cotización',       color: 'bg-amber-50 text-amber-700 border-amber-100' },
+  { id: 'reserva_confirmada', label: 'Reserva Confirmada',  color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  { id: 'voucher_enviado',    label: 'Voucher Enviado',     color: 'bg-violet-50 text-violet-700 border-violet-100' },
+  { id: 'cerrado',            label: 'Cerrado',             color: 'bg-slate-100 text-slate-600 border-slate-200' },
+]
+
 export default function WhatsAppSettingsClient() {
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
@@ -32,6 +40,7 @@ export default function WhatsAppSettingsClient() {
   const [showForm, setShowForm] = useState(false)
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [configuredNames, setConfiguredNames] = useState<string[]>([])
+  const [stageMappings, setStageMappings] = useState<Record<string, any>>({})
 
   const fetchTemplates = async () => {
     setLoading(true)
@@ -49,6 +58,12 @@ export default function WhatsAppSettingsClient() {
 
     if (mappingsRes.success && mappingsRes.data) {
       setConfiguredNames(mappingsRes.data.map((m: any) => m.template_name))
+      // Build stage → mapping lookup
+      const byStage: Record<string, any> = {}
+      for (const m of mappingsRes.data) {
+        if (m.stage) byStage[m.stage] = m
+      }
+      setStageMappings(byStage)
     }
     setLoading(false)
   }
@@ -237,6 +252,78 @@ export default function WhatsAppSettingsClient() {
             })}
           </div>
         )}
+      </div>
+
+      {/* Stage Automation Section */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            Automatización por Etapa
+            <span className="text-[10px] bg-blue-50 px-2 py-1 rounded-full text-blue-600 uppercase tracking-widest font-black border border-blue-100">Pipeline</span>
+          </h2>
+          <p className="text-xs font-bold text-slate-400 hidden sm:block">Una plantilla por etapa · Se dispara automáticamente al cambiar estado</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {PIPELINE_STAGES.map((stage, idx) => {
+            const mapping = stageMappings[stage.id]
+            const tpl = mapping ? templates.find(t => t.name === mapping.template_name) : null
+            return (
+              <div key={stage.id} className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all group">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-[11px] font-black text-slate-500">
+                    {idx + 1}
+                  </div>
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border ${stage.color}`}>
+                    {stage.label}
+                  </span>
+                </div>
+
+                {mapping ? (
+                  <div className="space-y-2">
+                    <p className="text-sm font-black text-slate-800 truncate">{mapping.template_name.replace(/_/g, ' ')}</p>
+                    <div className="flex items-center gap-2">
+                      {tpl?.status === 'APPROVED' ? (
+                        <span className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-2.5 h-2.5" /> Aprobada
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <Clock className="w-2.5 h-2.5" /> Revisión
+                        </span>
+                      )}
+                      <span className="text-[9px] font-bold text-slate-400">{mapping.language_code || 'es'}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const t = templates.find(t => t.name === mapping.template_name)
+                        if (t) setSelectedTemplate(t)
+                      }}
+                      className="mt-3 w-full text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                      Editar configuración
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[11px] font-bold text-slate-400 italic">Sin plantilla configurada</p>
+                    <p className="text-[9px] text-slate-300 font-bold">Ninguna plantilla está asignada a esta etapa todavía.</p>
+                    {templates.length > 0 && (
+                      <button
+                        onClick={() => setSelectedTemplate(templates.find(t => t.status === 'APPROVED') || templates[0])}
+                        className="mt-3 w-full text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 py-2 rounded-xl transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <Settings2 className="w-3.5 h-3.5" />
+                        Asignar plantilla
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* Mapping Modal */}

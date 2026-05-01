@@ -35,6 +35,22 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient()
 
+    // Dedup by phone — if a non-deleted lead with this phone exists return it
+    const cleanPhone = phone.replace(/\D/g, '')
+    const { data: existingLead } = await supabase
+      .from('leads')
+      .select('id, status')
+      .or(`phone.eq.${phone},phone.eq.${cleanPhone},phone.like.%${cleanPhone}`)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingLead) {
+      console.log('[/api/leads] Duplicate phone detected, returning existing lead:', existingLead.id)
+      return NextResponse.json({ success: true, id: existingLead.id, duplicate: true }, { status: 200 })
+    }
+
     const { data, error } = await supabase
       .from('leads')
       .insert([

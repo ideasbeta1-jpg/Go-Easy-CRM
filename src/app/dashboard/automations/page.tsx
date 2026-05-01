@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import Link from 'next/link'
+import FailedLogsPanel from './components/FailedLogsPanel'
 
 export default async function AutomationsPage() {
   const supabase = await createClient()
@@ -11,6 +12,14 @@ export default async function AutomationsPage() {
     .order('created_at', { ascending: false })
     .limit(20)
 
+  // Fetch failed automation logs
+  const { data: failedLogs } = await supabase
+    .from('automation_logs')
+    .select('id, lead_id, stage, channel, action, status, error, created_at, leads(first_name, last_name, phone)')
+    .eq('status', 'failed')
+    .order('created_at', { ascending: false })
+    .limit(30)
+
   // Status of n8n configuration
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
   const isn8nConfigured = !!n8nWebhookUrl
@@ -19,6 +28,7 @@ export default async function AutomationsPage() {
   const totalMessages = (messages || []).length
   const inboundCount = (messages || []).filter(m => m.direction === 'inbound').length
   const outboundCount = (messages || []).filter(m => m.direction === 'outbound').length
+  const failedCount = (failedLogs || []).length
 
   return (
     <div className="flex flex-col gap-10 animate-in fade-in slide-in-from-bottom-5 duration-700">
@@ -46,7 +56,7 @@ export default async function AutomationsPage() {
       </header>
 
       {/* Stats Bento Grid Header */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <section className="grid grid-cols-2 md:grid-cols-4 gap-8">
         <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
           <div className="flex items-center gap-5 relative z-10">
             <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -68,7 +78,7 @@ export default async function AutomationsPage() {
               <span className="material-symbols-outlined text-2xl">call_received</span>
             </div>
             <div>
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Entrantes (Input)</div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Entrantes</div>
               <div className="text-3xl font-black text-slate-900 tracking-tight mt-0.5">{inboundCount}</div>
             </div>
           </div>
@@ -83,12 +93,27 @@ export default async function AutomationsPage() {
               <span className="material-symbols-outlined text-2xl">call_made</span>
             </div>
             <div>
-              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Salientes (Output)</div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Salientes</div>
               <div className="text-3xl font-black text-slate-900 tracking-tight mt-0.5">{outboundCount}</div>
             </div>
           </div>
            <div className="absolute -right-6 -bottom-6 opacity-[0.03] scale-150 rotate-12 group-hover:rotate-0 transition-transform duration-700">
             <span className="material-symbols-outlined text-[120px]">call_made</span>
+          </div>
+        </div>
+
+        <div className={`p-8 rounded-[2.5rem] border shadow-sm hover:shadow-xl transition-all group overflow-hidden relative ${failedCount > 0 ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100'}`}>
+          <div className="flex items-center gap-5 relative z-10">
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform ${failedCount > 0 ? 'bg-rose-100 text-rose-600' : 'bg-slate-50 text-slate-400'}`}>
+              <span className="material-symbols-outlined text-2xl">error</span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">Fallos</div>
+              <div className={`text-3xl font-black tracking-tight mt-0.5 ${failedCount > 0 ? 'text-rose-600' : 'text-slate-900'}`}>{failedCount}</div>
+            </div>
+          </div>
+          <div className="absolute -right-6 -bottom-6 opacity-[0.03] scale-150 -rotate-12 group-hover:rotate-0 transition-transform duration-700">
+            <span className="material-symbols-outlined text-[120px]">error</span>
           </div>
         </div>
       </section>
@@ -251,6 +276,22 @@ export default async function AutomationsPage() {
           </div>
         </aside>
       </div>
+
+      {/* Failed Automations — full width */}
+      <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between border-b border-slate-50 pb-6 mb-6">
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+              Automatizaciones Fallidas
+              {failedCount > 0 && (
+                <span className="text-[10px] font-black bg-rose-100 text-rose-600 px-3 py-1 rounded-full">{failedCount} pendientes</span>
+              )}
+            </h2>
+            <p className="text-sm font-bold text-slate-400 mt-1 italic">Mensajes y acciones que no se completaron · Puedes reintentarlos con un clic</p>
+          </div>
+        </div>
+        <FailedLogsPanel initialLogs={(failedLogs || []) as any} />
+      </section>
     </div>
   )
 }
