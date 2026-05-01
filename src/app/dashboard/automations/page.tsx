@@ -3,6 +3,9 @@ import Link from 'next/link'
 import FailedLogsPanel from './components/FailedLogsPanel'
 import { AutomationConfigPanel } from './components/AutomationConfigPanel'
 import { getAutomationConfig } from '@/app/utils/actions/automation'
+import { RulesPanel } from './components/RulesPanel'
+import { PendingActionsPanel } from './components/PendingActionsPanel'
+import { getAutomationRules, getPendingActions } from '@/app/utils/actions/automation-rules'
 
 export default async function AutomationsPage() {
   const supabase = await createClient()
@@ -23,6 +26,8 @@ export default async function AutomationsPage() {
     .limit(30)
 
   const { config: automationConfig } = await getAutomationConfig()
+  const { rules: automationRules } = await getAutomationRules()
+  const { actions: pendingActions } = await getPendingActions()
 
   // Status of n8n configuration
   const n8nWebhookUrl = process.env.N8N_WEBHOOK_URL
@@ -297,6 +302,41 @@ export default async function AutomationsPage() {
         </div>
         <AutomationConfigPanel initialConfig={automationConfig} />
       </section>
+
+      {/* Reglas de automatización + Cola de acciones */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100 flex flex-col gap-8">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-6">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                Reglas
+                <span className="text-[10px] font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{automationRules.length}</span>
+              </h2>
+              <p className="text-sm font-bold text-slate-400 mt-1 italic">Delays, fechas e inactividad</p>
+            </div>
+            <span className="material-symbols-outlined text-3xl text-slate-200">bolt</span>
+          </div>
+          <RulesPanel initialRules={automationRules as any} />
+        </section>
+
+        <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100 flex flex-col gap-8">
+          <div className="flex items-center justify-between border-b border-slate-50 pb-6">
+            <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                Cola de acciones
+                {pendingActions.filter(a => a.status === 'pending').length > 0 && (
+                  <span className="text-[10px] font-black bg-amber-50 text-amber-600 px-3 py-1 rounded-full">
+                    {pendingActions.filter(a => a.status === 'pending').length} pendientes
+                  </span>
+                )}
+              </h2>
+              <p className="text-sm font-bold text-slate-400 mt-1 italic">Acciones programadas y ejecutadas</p>
+            </div>
+            <span className="material-symbols-outlined text-3xl text-slate-200">schedule</span>
+          </div>
+          <PendingActionsPanel initialActions={pendingActions as any} />
+        </section>
+      </div>
 
       {/* Failed Automations — full width */}
       <section className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-100">

@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
 import { assignLeadToAgent } from '@/utils/assignment'
 import { VALID_TRANSITIONS } from '@/lib/leads/transitions'
+import { scheduleDateRulesForLead } from '@/utils/automation-scheduler'
 
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
@@ -38,6 +39,10 @@ export async function createLead(formData: FormData) {
     // Asignar agente primero y pasar sus datos al motor para que el WhatsApp use el nombre real
     const assignedAgent = await assignLeadToAgent(newLead.id)
     await executeStageAutomation(newLead.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
+    // Programar reglas de fecha (pickup_date, return_date) — fire-and-forget
+    scheduleDateRulesForLead(newLead.id).catch(err =>
+      console.error('[leads/actions] Error scheduling date rules:', err)
+    )
   }
 
   revalidatePath('/dashboard/leads')

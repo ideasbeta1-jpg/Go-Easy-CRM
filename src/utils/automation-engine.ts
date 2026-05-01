@@ -3,6 +3,7 @@ import { sendTemplateMessage, sendTemplateMessageWithError, sendWABATextMessage 
 import { sendEmail, getStageEmailTemplate } from './email';
 import { sendLeadToN8n } from './n8n';
 import { broadcastNotification } from '@/app/utils/actions/notifications';
+import { scheduleRulesForStage } from './automation-scheduler';
 
 /**
  * Motor central de automatización de Go Easy CRM
@@ -318,6 +319,11 @@ export async function executeStageAutomation(
     }
 
     await logAutomation(leadId, stage, 'system', 'engine_complete', 'success');
+
+    // Programar reglas de delay para esta etapa (fire-and-forget)
+    scheduleRulesForStage(leadId, stage).catch(err =>
+      console.error('[AutomationEngine] Error scheduling stage rules:', err)
+    );
 
   } catch (error: any) {
     console.error('[AutomationEngine] Error inesperado:', error);
