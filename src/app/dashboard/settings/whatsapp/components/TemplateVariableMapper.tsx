@@ -41,7 +41,8 @@ const STAGES = [
   { id: 'en_cotizacion', label: 'En Cotización' },
   { id: 'reserva_confirmada', label: 'Reserva Confirmada' },
   { id: 'voucher_enviado', label: 'Voucher Enviado' },
-  { id: 'cerrado', label: 'Cerrado' }
+  { id: 'cerrado_ganado',  label: 'Cerrado Ganado' },
+  { id: 'cerrado_perdido', label: 'Cerrado Perdido' }
 ];
 
 export default function TemplateVariableMapper({ template, onClose, onSuccess }: Props) {

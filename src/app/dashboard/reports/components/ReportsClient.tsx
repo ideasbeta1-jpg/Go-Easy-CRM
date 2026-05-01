@@ -52,7 +52,8 @@ export default function ReportsClient({
       'en_cotizacion': 'En Cotización',
       'reserva_confirmada': 'Confirmada',
       'voucher_enviado': 'Voucher Enviado',
-      'cerrado': 'Cerrado'
+      'cerrado_ganado':  'Cerrado Ganado',
+      'cerrado_perdido': 'Cerrado Perdido'
     };
     statusStats.forEach(s => {
       counts[s.status] = (counts[s.status] || 0) + 1;
@@ -71,7 +72,7 @@ export default function ReportsClient({
       const dayStart = startOfDay(date);
       const leadsToday = leadsOverTime.filter(l => isSameDay(new Date(l.created_at), dayStart));
       
-      const confirmedToday = leadsToday.filter(l => l.status === 'reserva_confirmada' || l.status === 'cerrado' || l.status === 'voucher_enviado');
+      const confirmedToday = leadsToday.filter(l => l.status === 'reserva_confirmada' || l.status === 'cerrado_ganado' || l.status === 'voucher_enviado');
       const revenueToday = confirmedToday.reduce((sum, current) => sum + (parseFloat(current.total_amount) || 0), 0);
       
       data.push({
@@ -102,7 +103,7 @@ export default function ReportsClient({
   const conversionRate = totalLeads > 0 ? ((totalConfirmed / totalLeads) * 100).toFixed(1) : 0;
   
   const totalRevenue = leadsOverTime
-    .filter(l => l.status === 'reserva_confirmada' || l.status === 'cerrado' || l.status === 'voucher_enviado')
+    .filter(l => l.status === 'reserva_confirmada' || l.status === 'cerrado_ganado' || l.status === 'voucher_enviado')
     .reduce((sum, current) => sum + (parseFloat(current.total_amount) || 0), 0);
 
   // --- Process Message Stats ---

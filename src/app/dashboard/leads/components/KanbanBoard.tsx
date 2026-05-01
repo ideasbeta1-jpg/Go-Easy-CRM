@@ -4,13 +4,17 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   Calendar, Car, Clock, Mail, CheckCircle2,
-  MessageCircle, Zap, ChevronDown, ChevronRight, X, AlertTriangle
+  MessageCircle, Zap, ChevronDown, ChevronRight, X, AlertTriangle,
+  Trophy, XCircle, Timer
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useKanbanFilter } from './KanbanFilterContext'
-import { isToday, isThisWeek, isThisMonth, differenceInHours } from 'date-fns'
+import { isToday, isThisWeek, isThisMonth, differenceInHours, differenceInDays } from 'date-fns'
 import { updateLeadStatus } from '../actions'
-import { VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES } from '@/lib/leads/transitions'
+import {
+  VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES,
+  LOST_STAGE, LOST_REASONS
+} from '@/lib/leads/transitions'
 import { calcRentalDays, calcReservationAmount } from '@/lib/leads/calculations'
 
 interface KanbanBoardProps {
@@ -28,13 +32,24 @@ interface PendingMove {
   automationNote: string
 }
 
+interface LostMovePending {
+  leadId: string
+  leadName: string
+}
+
 export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {} }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragSourceStatus, setDragSourceStatus] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
   const [pendingMove, setPendingMove] = useState<PendingMove | null>(null)
-  const [closedCollapsed, setClosedCollapsed] = useState(false)
+  const [lostMovePending, setLostMovePending] = useState<LostMovePending | null>(null)
+  const [selectedReason, setSelectedReason] = useState<string | null>(null)
+  const [otherReason, setOtherReason] = useState('')
+  const [collapsedStages, setCollapsedStages] = useState<Record<string, boolean>>({
+    cerrado_ganado: true,
+    cerrado_perdido: true,
+  })
   const router = useRouter()
   const { searchTerm, sortBy, agentFilter, dateFilter } = useKanbanFilter()
 
@@ -73,6 +88,13 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     const lead = leads.find(l => l.id === leadId)
     if (!lead || lead.status === targetStatus) return
 
+    if (targetStatus === LOST_STAGE) {
+      setSelectedReason(null)
+      setOtherReason('')
+      setLostMovePending({ leadId, leadName: `${lead.first_name} ${lead.last_name}`.trim() })
+      return
+    }
+
     if (CONFIRM_STAGES.has(targetStatus)) {
       setPendingMove({
         leadId,
@@ -87,12 +109,12 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     await executeMove(leadId, targetStatus)
   }
 
-  const executeMove = async (leadId: string, targetStatus: string) => {
+  const executeMove = async (leadId: string, targetStatus: string, lostReason?: string) => {
     const oldLeads = [...leads]
     setLeads(prev => prev.map(l => l.id === leadId ? { ...l, status: targetStatus } : l))
     setIsUpdating(true)
     try {
-      await updateLeadStatus(leadId, targetStatus)
+      await updateLeadStatus(leadId, targetStatus, lostReason)
     } catch (error: any) {
       console.error('Error updating lead status:', error)
       setLeads(oldLeads)
@@ -145,7 +167,6 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     return calcReservationAmount(lead.agreed_daily_price, lead.category?.daily_price, days)
   }
 
-  // Urgency badge based on pickup proximity
   const getUrgency = (pickupDate: string | null) => {
     if (!pickupDate) return null
     const hours = differenceInHours(new Date(pickupDate), new Date())
@@ -158,7 +179,6 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
   const isNewLead = (createdAt: string | null) =>
     !!createdAt && differenceInHours(new Date(), new Date(createdAt)) < 2
 
-  // Left accent border: unread > unassigned > new > none
   const getCardAccent = (lead: any, unread: number) => {
     if (unread > 0) return 'border-l-[3px] border-l-blue-400'
     if (!lead.assigned_to) return 'border-l-[3px] border-l-orange-400'
@@ -166,12 +186,26 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     return ''
   }
 
-  // Column drop zone highlight when dragging
+  const getStageAge = (lead: any) => {
+    const dateStr = lead.status_changed_at || lead.updated_at
+    if (!dateStr) return null
+    const days = differenceInDays(new Date(), new Date(dateStr))
+    const hours = differenceInHours(new Date(), new Date(dateStr))
+    if (days === 0) return { label: `${hours}h`, cls: 'text-emerald-500' }
+    if (days < 3) return { label: `${days}d`, cls: 'text-emerald-500' }
+    if (days < 7) return { label: `${days}d`, cls: 'text-amber-500' }
+    return { label: `${days}d`, cls: 'text-rose-500' }
+  }
+
   const getColumnDropClass = (status: string) => {
     if (!dragSourceStatus || dragSourceStatus === status) return ''
     const valid = VALID_TRANSITIONS[dragSourceStatus] ?? []
     if (valid.includes(status)) return 'ring-2 ring-primary/30 ring-inset'
     return 'opacity-40 pointer-events-none'
+  }
+
+  const toggleStageCollapse = (status: string) => {
+    setCollapsedStages(prev => ({ ...prev, [status]: !prev[status] }))
   }
 
   return (
@@ -181,7 +215,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
           {statuses.map((status) => {
             const stageLeads = getGroupedLeads(status)
             const totalRva = stageLeads.reduce((acc, l) => acc + getReservationAmount(l), 0)
-            const isClosed = status === 'cerrado'
+            const isTerminal = status === 'cerrado_ganado' || status === 'cerrado_perdido'
+            const isCollapsed = !!collapsedStages[status]
             const dropClass = getColumnDropClass(status)
 
             return (
@@ -204,29 +239,37 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-tight bg-emerald-50 px-2 py-0.5 rounded-full">
+                    <span className={`text-[10px] font-black uppercase tracking-widest leading-tight px-2 py-0.5 rounded-full ${
+                      status === 'cerrado_ganado'  ? 'text-emerald-700 bg-emerald-100' :
+                      status === 'cerrado_perdido' ? 'text-rose-500 bg-rose-50' :
+                      'text-emerald-500 bg-emerald-50'
+                    }`}>
                       ${Math.floor(totalRva).toLocaleString()}
                     </span>
-                    {isClosed && (
+                    {isTerminal && (
                       <button
-                        onClick={() => setClosedCollapsed(v => !v)}
+                        onClick={() => toggleStageCollapse(status)}
                         className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
-                        title={closedCollapsed ? 'Expandir' : 'Colapsar'}
+                        title={isCollapsed ? 'Expandir' : 'Colapsar'}
                       >
-                        {closedCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Collapsed state for cerrado */}
-                {isClosed && closedCollapsed ? (
+                {/* Collapsed state */}
+                {isTerminal && isCollapsed ? (
                   <button
-                    onClick={() => setClosedCollapsed(false)}
-                    className="flex items-center justify-center gap-2 py-5 px-3 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors text-xs font-bold"
+                    onClick={() => toggleStageCollapse(status)}
+                    className={`flex items-center justify-center gap-2 py-5 px-3 rounded-2xl border-2 border-dashed transition-colors text-xs font-bold ${
+                      status === 'cerrado_ganado'
+                        ? 'border-emerald-200 text-emerald-400 hover:text-emerald-600 hover:border-emerald-300'
+                        : 'border-rose-200 text-rose-400 hover:text-rose-600 hover:border-rose-300'
+                    }`}
                   >
                     <ChevronRight className="w-4 h-4" />
-                    Ver {stageLeads.length} leads cerrados
+                    Ver {stageLeads.length} leads {status === 'cerrado_ganado' ? 'ganados' : 'perdidos'}
                   </button>
                 ) : (
                   /* Column Surface */
@@ -240,6 +283,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                       const showNew = isNewLead(lead.created_at)
                       const cardAccent = getCardAccent(lead, unread)
                       const agentName = lead.assigned_to_profile?.full_name || null
+                      const stageAge = getStageAge(lead)
 
                       return (
                         <Link
@@ -280,7 +324,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                   )}
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <p className="text-base font-black text-primary leading-none">
+                                  <p className={`text-base font-black leading-none ${status === 'cerrado_perdido' ? 'text-slate-400 line-through' : 'text-primary'}`}>
                                     <span className="text-xs opacity-40 mr-0.5">$</span>
                                     {Math.floor(lead.total_amount || 0).toLocaleString()}
                                   </p>
@@ -314,7 +358,16 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                 </div>
                               )}
 
-                              {/* Fila 5: Agente asignado + estado */}
+                              {/* Fila 5: Razón de pérdida (solo en cerrado_perdido) */}
+                              {status === 'cerrado_perdido' && lead.lost_reason && (
+                                <div className="mb-3">
+                                  <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
+                                    {lead.lost_reason}
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Fila 6: Agente + estado + tiempo en etapa */}
                               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <img
@@ -327,24 +380,39 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                   </span>
                                 </div>
 
-                                <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase shrink-0 ${
-                                  status === 'lead_nuevo'         ? 'bg-slate-100 text-slate-500' :
-                                  status === 'en_cotizacion'      ? 'bg-indigo-50 text-indigo-600' :
-                                  status === 'reserva_confirmada' ? 'bg-emerald-50 text-emerald-600' :
-                                  status === 'voucher_enviado'    ? 'bg-amber-50 text-amber-600' :
-                                  'bg-slate-50 text-slate-400'
-                                }`}>
-                                  {status === 'lead_nuevo'         && <Clock className="w-3 h-3" />}
-                                  {status === 'en_cotizacion'      && <Mail className="w-3 h-3" />}
-                                  {status === 'reserva_confirmada' && <CheckCircle2 className="w-3 h-3" />}
-                                  {status === 'voucher_enviado'    && <Mail className="w-3 h-3" />}
-                                  <span>
-                                    {status === 'lead_nuevo'         ? 'Nuevo' :
-                                     status === 'en_cotizacion'      ? 'Cotización' :
-                                     status === 'reserva_confirmada' ? 'Confirmado' :
-                                     status === 'voucher_enviado'    ? 'Voucher' :
-                                     'Cerrado'}
-                                  </span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {stageAge && (
+                                    <span className={`flex items-center gap-0.5 text-[9px] font-black ${stageAge.cls}`}>
+                                      <Timer className="w-2.5 h-2.5" />
+                                      {stageAge.label}
+                                    </span>
+                                  )}
+
+                                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
+                                    status === 'lead_nuevo'         ? 'bg-slate-100 text-slate-500' :
+                                    status === 'en_cotizacion'      ? 'bg-indigo-50 text-indigo-600' :
+                                    status === 'reserva_confirmada' ? 'bg-emerald-50 text-emerald-600' :
+                                    status === 'voucher_enviado'    ? 'bg-amber-50 text-amber-600' :
+                                    status === 'cerrado_ganado'     ? 'bg-emerald-100 text-emerald-700' :
+                                    status === 'cerrado_perdido'    ? 'bg-rose-50 text-rose-500' :
+                                    'bg-slate-50 text-slate-400'
+                                  }`}>
+                                    {status === 'lead_nuevo'         && <Clock className="w-3 h-3" />}
+                                    {status === 'en_cotizacion'      && <Mail className="w-3 h-3" />}
+                                    {status === 'reserva_confirmada' && <CheckCircle2 className="w-3 h-3" />}
+                                    {status === 'voucher_enviado'    && <Mail className="w-3 h-3" />}
+                                    {status === 'cerrado_ganado'     && <Trophy className="w-3 h-3" />}
+                                    {status === 'cerrado_perdido'    && <XCircle className="w-3 h-3" />}
+                                    <span>
+                                      {status === 'lead_nuevo'         ? 'Nuevo' :
+                                       status === 'en_cotizacion'      ? 'Cotización' :
+                                       status === 'reserva_confirmada' ? 'Confirmado' :
+                                       status === 'voucher_enviado'    ? 'Voucher' :
+                                       status === 'cerrado_ganado'     ? 'Ganado' :
+                                       status === 'cerrado_perdido'    ? 'Perdido' :
+                                       'Cerrado'}
+                                    </span>
+                                  </div>
                                 </div>
                               </div>
 
@@ -420,6 +488,84 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                   await executeMove(move.leadId, move.toStatus)
                 }}
                 className="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-sm font-black hover:bg-primary/90 transition-colors"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lost Reason Modal */}
+      {lostMovePending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+            onClick={() => setLostMovePending(null)}
+          />
+          <div className="relative bg-white rounded-[2rem] shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
+            <button
+              onClick={() => setLostMovePending(null)}
+              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center shrink-0">
+                <XCircle className="w-5 h-5 text-rose-500" />
+              </div>
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Cerrar como perdido</p>
+                <h3 className="font-black text-slate-900 text-lg leading-tight">{lostMovePending.leadName}</h3>
+              </div>
+            </div>
+
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">¿Por qué se perdió?</p>
+
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              {LOST_REASONS.map((reason) => (
+                <button
+                  key={reason}
+                  onClick={() => setSelectedReason(reason)}
+                  className={`text-left text-xs font-bold px-3 py-2.5 rounded-xl border transition-all ${
+                    selectedReason === reason
+                      ? 'bg-rose-50 border-rose-300 text-rose-700'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+
+            {selectedReason === 'Otro' && (
+              <input
+                type="text"
+                value={otherReason}
+                onChange={(e) => setOtherReason(e.target.value)}
+                placeholder="Describe el motivo..."
+                autoFocus
+                className="w-full text-sm border border-slate-200 rounded-xl px-4 py-2.5 mb-4 focus:outline-none focus:ring-2 focus:ring-rose-200"
+              />
+            )}
+
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => setLostMovePending(null)}
+                className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={!selectedReason || (selectedReason === 'Otro' && !otherReason.trim())}
+                onClick={async () => {
+                  const move = lostMovePending
+                  const reason = selectedReason === 'Otro' ? otherReason.trim() : selectedReason!
+                  setLostMovePending(null)
+                  await executeMove(move.leadId, LOST_STAGE, reason)
+                }}
+                className="flex-1 py-3 px-4 rounded-2xl bg-rose-500 text-white text-sm font-black hover:bg-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Confirmar
               </button>

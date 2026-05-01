@@ -9,11 +9,12 @@ import { KanbanSearchControls, KanbanFilterChips } from './components/KanbanSear
 
 // Map of status to friendly names and colors for the columns
 const statusConfig: Record<string, { label: string; color: string }> = {
-  lead_nuevo: { label: 'Lead Nuevo', color: 'bg-blue-500' },
-  en_cotizacion: { label: 'En Cotización', color: 'bg-indigo-500' },
-  reserva_confirmada: { label: 'Reserva Confirmada', color: 'bg-emerald-500' },
-  voucher_enviado: { label: 'Voucher Enviado', color: 'bg-amber-500' },
-  cerrado: { label: 'Cerrado', color: 'bg-slate-500' },
+  lead_nuevo:          { label: 'Lead Nuevo',         color: 'bg-blue-500' },
+  en_cotizacion:       { label: 'En Cotización',       color: 'bg-indigo-500' },
+  reserva_confirmada:  { label: 'Reserva Confirmada',  color: 'bg-emerald-500' },
+  voucher_enviado:     { label: 'Voucher Enviado',     color: 'bg-amber-500' },
+  cerrado_ganado:      { label: 'Cerrado Ganado',      color: 'bg-emerald-600' },
+  cerrado_perdido:     { label: 'Cerrado Perdido',     color: 'bg-rose-400' },
 }
 
 export default async function LeadsPage() {
@@ -90,8 +91,14 @@ export default async function LeadsPage() {
   })
 
   // KPI calculations
-  const activeLeads = (leads || []).filter(l => l.status !== 'cerrado')
+  const TERMINAL_STATUSES = ['cerrado_ganado', 'cerrado_perdido']
+  const activeLeads = (leads || []).filter(l => !TERMINAL_STATUSES.includes(l.status))
+  const wonLeads = (leads || []).filter(l => l.status === 'cerrado_ganado')
+  const lostLeads = (leads || []).filter(l => l.status === 'cerrado_perdido')
   const activePipelineValue = activeLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
+  const wonValue = wonLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
+  const closedTotal = wonLeads.length + lostLeads.length
+  const winRate = closedTotal > 0 ? Math.round((wonLeads.length / closedTotal) * 100) : null
   const unassignedCount = activeLeads.filter(l => !l.assigned_to).length
   const now = Date.now()
   const urgentCount = activeLeads.filter(l => {
@@ -99,10 +106,9 @@ export default async function LeadsPage() {
     const hrs = (new Date(l.pickup_date).getTime() - now) / 3600000
     return hrs > 0 && hrs <= 72
   }).length
-  const totalUnread = Object.values(unreadByLead).reduce((a, b) => a + b, 0)
 
   // 7. Build lookup map and group
-  const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado']
+  const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado_ganado', 'cerrado_perdido']
   const processedLeads = (leads || []).map(l => {
     const profile = profileMap[l.assigned_to]
     return {
@@ -183,6 +189,13 @@ export default async function LeadsPage() {
             </p>
           </div>
           <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cerrado Ganado</p>
+            <p className="text-xl font-black text-emerald-600 tracking-tight">
+              <span className="text-sm opacity-50 mr-0.5">$</span>
+              {Math.floor(wonValue).toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sin Asignar</p>
             <p className={`text-xl font-black tracking-tight ${unassignedCount > 0 ? 'text-orange-500' : 'text-slate-900'}`}>
               {unassignedCount}
@@ -190,18 +203,19 @@ export default async function LeadsPage() {
             </p>
           </div>
           <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">⚡ Urgentes</p>
-            <p className={`text-xl font-black tracking-tight ${urgentCount > 0 ? 'text-rose-500' : 'text-slate-900'}`}>
-              {urgentCount}
-              <span className="text-xs font-bold text-slate-400 ml-1.5">en 72h</span>
-            </p>
-          </div>
-          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mensajes</p>
-            <p className={`text-xl font-black tracking-tight ${totalUnread > 0 ? 'text-blue-500' : 'text-slate-900'}`}>
-              {totalUnread}
-              <span className="text-xs font-bold text-slate-400 ml-1.5">sin leer</span>
-            </p>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tasa de Cierre</p>
+            {winRate !== null ? (
+              <p className={`text-xl font-black tracking-tight ${winRate >= 50 ? 'text-emerald-600' : winRate >= 25 ? 'text-amber-500' : 'text-rose-500'}`}>
+                {winRate}
+                <span className="text-xs font-bold text-slate-400 ml-0.5">%</span>
+                <span className="text-[10px] font-bold text-slate-400 ml-1.5">{wonLeads.length}/{closedTotal}</span>
+              </p>
+            ) : (
+              <p className="text-xl font-black text-slate-300 tracking-tight">
+                —
+                <span className="text-xs font-bold text-slate-300 ml-1.5">sin cierres</span>
+              </p>
+            )}
           </div>
         </div>
 

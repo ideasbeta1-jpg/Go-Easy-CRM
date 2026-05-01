@@ -200,7 +200,7 @@ export async function getStageEmailTemplate(stage: string, leadData: any, extraD
         `;
         break;
       }
-      case 'cerrado':
+      case 'cerrado_ganado':
         subject = 'Gracias por confiar en Go Easy Florida ⭐';
         content = `
           <h1 style="color: #4052b6; font-size: 24px; font-weight: 800; margin-bottom: 16px;">¡Gracias, ${name}!</h1>

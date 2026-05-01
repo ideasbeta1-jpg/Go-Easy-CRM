@@ -30,7 +30,8 @@ const PIPELINE_STAGES = [
   { id: 'en_cotizacion',      label: 'En Cotización',       color: 'bg-amber-50 text-amber-700 border-amber-100' },
   { id: 'reserva_confirmada', label: 'Reserva Confirmada',  color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
   { id: 'voucher_enviado',    label: 'Voucher Enviado',     color: 'bg-violet-50 text-violet-700 border-violet-100' },
-  { id: 'cerrado',            label: 'Cerrado',             color: 'bg-slate-100 text-slate-600 border-slate-200' },
+  { id: 'cerrado_ganado',     label: 'Cerrado Ganado',      color: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+  { id: 'cerrado_perdido',    label: 'Cerrado Perdido',     color: 'bg-rose-50 text-rose-600 border-rose-100' },
 ]
 
 export default function WhatsAppSettingsClient() {

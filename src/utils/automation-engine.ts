@@ -88,7 +88,7 @@ export async function executeStageAutomation(
       'en_cotizacion': 'cotizacion_enviada',
       'reserva_confirmada': 'reserva_confirmada',
       'voucher_enviado': 'voucher_disponible',
-      'cerrado': 'gracias_feedback'
+      'cerrado_ganado': 'gracias_feedback'
     };
 
     // Intentar buscar un mapping manual para esta etapa
@@ -240,7 +240,8 @@ export async function executeStageAutomation(
       'en_cotizacion': { type: 'quote_generated', title: '📄 Cotización Generada', body: `Se generó una cotización para ${leadName}.` },
       'reserva_confirmada': { type: 'payment_confirmed', title: '💰 ¡Pago Confirmado!', body: `${leadName} ha confirmado su reserva con un depósito.` },
       'voucher_enviado': { type: 'voucher_sent', title: '📋 Voucher Enviado', body: `El voucher de ${leadName} fue enviado.` },
-      'cerrado': { type: 'lead_closed', title: '✅ Lead Cerrado', body: `El alquiler de ${leadName} ha finalizado.` }
+      'cerrado_ganado':  { type: 'lead_closed', title: '🏆 Lead Ganado',  body: `El alquiler de ${leadName} se cerró exitosamente.` },
+      'cerrado_perdido': { type: 'lead_closed', title: '❌ Lead Perdido', body: `El lead de ${leadName} fue marcado como perdido.` }
     };
 
     const notifConfig = stageNotifications[stage];

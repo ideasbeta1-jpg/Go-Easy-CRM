@@ -44,7 +44,7 @@ export async function createLead(formData: FormData) {
 }
 
 
-export async function updateLeadStatus(id: string, status: string) {
+export async function updateLeadStatus(id: string, status: string, lostReason?: string) {
   const supabase = await createClient()
 
   // Fetch current status to check if transition is valid
@@ -61,9 +61,18 @@ export async function updateLeadStatus(id: string, status: string) {
   // Skip update + automation if status didn't change
   if (current.status === status) return
 
+  const updateData: Record<string, any> = {
+    status,
+    status_changed_at: new Date().toISOString(),
+  }
+
+  if (status === 'cerrado_perdido' && lostReason) {
+    updateData.lost_reason = lostReason
+  }
+
   const { error } = await supabase
     .from('leads')
-    .update({ status })
+    .update(updateData)
     .eq('id', id)
 
   if (error) {

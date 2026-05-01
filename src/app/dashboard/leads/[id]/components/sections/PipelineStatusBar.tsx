@@ -3,7 +3,7 @@
 import { CheckCircle2 } from 'lucide-react'
 import { STAGE_LABELS } from '@/lib/leads/transitions'
 
-const STAGES = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado']
+const STAGES = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado_ganado', 'cerrado_perdido']
 
 interface Props {
   currentStatus: string
