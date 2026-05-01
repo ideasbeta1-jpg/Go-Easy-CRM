@@ -2,26 +2,27 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import {
-  Calendar, Car, Clock, Mail, CheckCircle2,
-  MessageCircle, Zap, ChevronDown, ChevronRight, X, AlertTriangle,
-  Trophy, XCircle, Timer
-} from 'lucide-react'
+import { Calendar, X, AlertTriangle, Zap, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useKanbanFilter } from './KanbanFilterContext'
 import { isToday, isThisWeek, isThisMonth, differenceInHours, differenceInDays } from 'date-fns'
 import { updateLeadStatus } from '../actions'
-import {
-  VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES,
-  LOST_STAGE, LOST_REASONS
-} from '@/lib/leads/transitions'
+import { VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES, LOST_STAGE, LOST_REASONS } from '@/lib/leads/transitions'
 import { calcRentalDays, calcReservationAmount } from '@/lib/leads/calculations'
+import { NewLeadButton } from './NewLeadButton'
+
+interface AddLeadProps {
+  categories: any[]
+  locations: any[]
+  currentUserId: string
+}
 
 interface KanbanBoardProps {
   initialLeads: any[]
   statuses: string[]
   statusConfig: Record<string, { label: string; color: string }>
   unreadByLead?: Record<string, number>
+  addLeadProps?: AddLeadProps
 }
 
 interface PendingMove {
@@ -37,7 +38,28 @@ interface LostMovePending {
   leadName: string
 }
 
-export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {} }: KanbanBoardProps) {
+function formatPickupDate(dateStr: string | null): string {
+  if (!dateStr) return 'Sin fecha'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
+    .replace(/\bene\b/i, 'Ene').replace(/\bfeb\b/i, 'Feb').replace(/\bmar\b/i, 'Mar')
+    .replace(/\babr\b/i, 'Abr').replace(/\bmay\b/i, 'May').replace(/\bjun\b/i, 'Jun')
+    .replace(/\bjul\b/i, 'Jul').replace(/\bago\b/i, 'Ago').replace(/\bsep\b/i, 'Sep')
+    .replace(/\boct\b/i, 'Oct').replace(/\bnov\b/i, 'Nov').replace(/\bdic\b/i, 'Dic')
+    .replace(/\./g, '')
+}
+
+function shortLocation(loc: string | null): string {
+  if (!loc) return ''
+  const words = loc.trim().split(' ')
+  return words.slice(0, 2).join(' ')
+}
+
+function shortId(uuid: string): string {
+  return 'GE-' + uuid.slice(-4).toUpperCase()
+}
+
+export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, addLeadProps }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragSourceStatus, setDragSourceStatus] = useState<string | null>(null)
@@ -57,9 +79,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     e.dataTransfer.setData('leadId', leadId)
     setDraggingId(leadId)
     setDragSourceStatus(currentStatus)
-    setTimeout(() => {
-      (e.target as HTMLElement).classList.add('opacity-40')
-    }, 0)
+    setTimeout(() => { (e.target as HTMLElement).classList.add('opacity-40') }, 0)
   }
 
   const handleDragEnd = (e: React.DragEvent) => {
@@ -116,7 +136,6 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     try {
       await updateLeadStatus(leadId, targetStatus, lostReason)
     } catch (error: any) {
-      console.error('Error updating lead status:', error)
       setLeads(oldLeads)
       alert('Error al mover el lead: ' + error.message)
     }
@@ -179,22 +198,15 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
   const isNewLead = (createdAt: string | null) =>
     !!createdAt && differenceInHours(new Date(), new Date(createdAt)) < 2
 
-  const getCardAccent = (lead: any, unread: number) => {
-    if (unread > 0) return 'border-l-[3px] border-l-blue-400'
-    if (!lead.assigned_to) return 'border-l-[3px] border-l-orange-400'
-    if (isNewLead(lead.created_at)) return 'border-l-[3px] border-l-emerald-400'
-    return ''
-  }
-
   const getStageAge = (lead: any) => {
     const dateStr = lead.status_changed_at || lead.updated_at
     if (!dateStr) return null
-    const days = differenceInDays(new Date(), new Date(dateStr))
     const hours = differenceInHours(new Date(), new Date(dateStr))
-    if (days === 0) return { label: `${hours}h`, cls: 'text-emerald-500' }
-    if (days < 3) return { label: `${days}d`, cls: 'text-emerald-500' }
-    if (days < 7) return { label: `${days}d`, cls: 'text-amber-500' }
-    return { label: `${days}d`, cls: 'text-rose-500' }
+    const days = differenceInDays(new Date(), new Date(dateStr))
+    if (hours < 24) return { label: '< 24h', dotCls: 'bg-emerald-500', cls: 'text-emerald-600' }
+    if (days < 4) return { label: `${days}d`, dotCls: 'bg-emerald-500', cls: 'text-emerald-600' }
+    if (days < 7) return { label: `${days}d`, dotCls: 'bg-amber-400', cls: 'text-amber-500' }
+    return { label: `${days}+d`, dotCls: 'bg-rose-500', cls: 'text-rose-500' }
   }
 
   const getColumnDropClass = (status: string) => {
@@ -208,51 +220,44 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     setCollapsedStages(prev => ({ ...prev, [status]: !prev[status] }))
   }
 
+  const TERMINAL = new Set(['cerrado_ganado', 'cerrado_perdido'])
+
   return (
     <>
-      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-4 snap-x snap-mandatory scroll-smooth scrollbar-hide">
-        <div className="flex gap-4 md:gap-8 h-full min-w-max pr-8 px-4 md:px-0">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden pb-3 snap-x snap-mandatory scroll-smooth scrollbar-hide">
+        <div className="flex gap-4 h-full min-w-max pr-6">
           {statuses.map((status) => {
             const stageLeads = getGroupedLeads(status)
-            const totalRva = stageLeads.reduce((acc, l) => acc + getReservationAmount(l), 0)
-            const isTerminal = status === 'cerrado_ganado' || status === 'cerrado_perdido'
+            const isTerminal = TERMINAL.has(status)
             const isCollapsed = !!collapsedStages[status]
             const dropClass = getColumnDropClass(status)
 
             return (
               <div
                 key={status}
-                className={`w-[85vw] sm:w-80 h-full flex flex-col gap-4 md:gap-6 snap-center transition-all duration-200 rounded-[2.5rem] ${dropClass}`}
+                className={`w-[320px] h-full flex flex-col gap-3 snap-center transition-all duration-200 ${dropClass}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, status)}
               >
                 {/* Column Header */}
-                <div className="flex items-center justify-between px-2 shrink-0">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2.5 h-2.5 rounded-full ${statusConfig[status]?.color || 'bg-slate-300'}`} />
-                    <span className="font-sans font-black text-slate-900 uppercase tracking-tighter text-sm md:text-base">
+                <div className="flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full ${statusConfig[status]?.color || 'bg-slate-300'}`} />
+                    <span className="font-bold text-slate-800 text-sm">
                       {statusConfig[status]?.label || status}
                     </span>
-                    <span className="bg-slate-200 text-slate-500 px-2 md:px-2.5 py-0.5 rounded-full text-[10px] md:text-[11px] font-black">
+                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[11px] font-black">
                       {stageLeads.length}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-black uppercase tracking-widest leading-tight px-2 py-0.5 rounded-full ${
-                      status === 'cerrado_ganado'  ? 'text-emerald-700 bg-emerald-100' :
-                      status === 'cerrado_perdido' ? 'text-rose-500 bg-rose-50' :
-                      'text-emerald-500 bg-emerald-50'
-                    }`}>
-                      ${Math.floor(totalRva).toLocaleString()}
-                    </span>
+                  <div className="flex items-center gap-1.5">
                     {isTerminal && (
                       <button
                         onClick={() => toggleStageCollapse(status)}
-                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
-                        title={isCollapsed ? 'Expandir' : 'Colapsar'}
+                        className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
                       >
-                        {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                       </button>
                     )}
                   </div>
@@ -262,28 +267,27 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                 {isTerminal && isCollapsed ? (
                   <button
                     onClick={() => toggleStageCollapse(status)}
-                    className={`flex items-center justify-center gap-2 py-5 px-3 rounded-2xl border-2 border-dashed transition-colors text-xs font-bold ${
+                    className={`flex items-center justify-center gap-2 py-4 px-3 rounded-2xl border-2 border-dashed transition-colors text-xs font-bold ${
                       status === 'cerrado_ganado'
-                        ? 'border-emerald-200 text-emerald-400 hover:text-emerald-600 hover:border-emerald-300'
-                        : 'border-rose-200 text-rose-400 hover:text-rose-600 hover:border-rose-300'
+                        ? 'border-emerald-200 text-emerald-400 hover:text-emerald-600'
+                        : 'border-rose-200 text-rose-400 hover:text-rose-600'
                     }`}
                   >
                     <ChevronRight className="w-4 h-4" />
                     Ver {stageLeads.length} leads {status === 'cerrado_ganado' ? 'ganados' : 'perdidos'}
                   </button>
                 ) : (
-                  /* Column Surface */
                   <div
                     data-drop-surface
-                    className="flex flex-col gap-4 overflow-y-auto px-1 pb-10 scrollbar-hide rounded-[2.5rem] transition-colors duration-200 max-h-[calc(100vh-22rem)] md:max-h-[calc(100vh-24rem)] lg:max-h-[calc(100vh-26rem)]"
+                    className="flex flex-col gap-2.5 overflow-y-auto pb-4 scrollbar-hide transition-colors duration-200 max-h-[calc(100vh-20rem)]"
                   >
                     {stageLeads.map((lead) => {
                       const unread = unreadByLead[lead.id] || 0
                       const urgency = getUrgency(lead.pickup_date)
                       const showNew = isNewLead(lead.created_at)
-                      const cardAccent = getCardAccent(lead, unread)
                       const agentName = lead.assigned_to_profile?.full_name || null
                       const stageAge = getStageAge(lead)
+                      const reserveAmt = getReservationAmount(lead)
 
                       return (
                         <Link
@@ -295,80 +299,76 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                             draggable
                             onDragStart={(e) => handleDragStart(e, lead.id, lead.status)}
                             onDragEnd={handleDragEnd}
-                            className={`bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing ${cardAccent}`}
+                            className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing"
                           >
                             <div className="p-4">
-
-                              {/* Fila 1: ID + badges + monto */}
-                              <div className="flex items-start justify-between gap-2 mb-3">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full tracking-wide">
-                                    #{lead.id.slice(0, 6)}
+                              {/* Row 1: ID + badges + unread */}
+                              <div className="flex items-center gap-1.5 mb-2.5">
+                                <span className="text-[10px] font-bold text-slate-400">
+                                  {shortId(lead.id)}
+                                </span>
+                                {showNew && (
+                                  <span className="text-[9px] font-black bg-emerald-500 text-white px-2 py-0.5 rounded-full">
+                                    Nuevo
                                   </span>
-                                  {showNew && (
-                                    <span className="text-[9px] font-black uppercase bg-emerald-500 text-white px-2 py-0.5 rounded-full animate-pulse">
-                                      Nuevo
-                                    </span>
-                                  )}
-                                  {urgency && (
-                                    <span className={`flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${urgency.cls}`}>
-                                      <Zap className="w-2.5 h-2.5" />
-                                      {urgency.label}
-                                    </span>
-                                  )}
-                                  {unread > 0 && (
-                                    <span className="flex items-center gap-1 text-[9px] font-black bg-blue-50 text-blue-500 px-2 py-0.5 rounded-full border border-blue-100">
-                                      <MessageCircle className="w-2.5 h-2.5" />
-                                      {unread}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right shrink-0">
-                                  <p className={`text-base font-black leading-none ${status === 'cerrado_perdido' ? 'text-slate-400 line-through' : 'text-primary'}`}>
-                                    <span className="text-xs opacity-40 mr-0.5">$</span>
-                                    {Math.floor(lead.total_amount || 0).toLocaleString()}
-                                  </p>
-                                  <p className="text-[9px] font-bold text-emerald-500 mt-0.5">
-                                    Rva ${Math.floor(getReservationAmount(lead)).toLocaleString()}
-                                  </p>
-                                </div>
+                                )}
+                                {urgency && (
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 ${urgency.cls}`}>
+                                    🔥 {urgency.label}
+                                  </span>
+                                )}
+                                {unread > 0 && (
+                                  <span className="ml-auto bg-blue-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0">
+                                    {unread > 9 ? '9+' : unread}
+                                  </span>
+                                )}
                               </div>
 
-                              {/* Fila 2: Nombre */}
-                              <p className="font-black text-slate-900 text-sm leading-tight mb-3">
-                                {lead.first_name} {lead.last_name}
-                              </p>
+                              {/* Row 2: Name + total amount */}
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <p className="font-black text-slate-900 text-sm leading-tight">
+                                  {lead.first_name} {lead.last_name}
+                                </p>
+                                <p className={`text-sm font-black shrink-0 leading-none ${status === 'cerrado_perdido' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                                  ${Math.floor(lead.total_amount || 0).toLocaleString()}
+                                </p>
+                              </div>
 
-                              {/* Fila 3: Fecha + ubicación */}
-                              <div className="flex items-center gap-1.5 text-slate-400 mb-1.5">
+                              {/* Row 3: Date + location */}
+                              <div className="flex items-center gap-1.5 text-slate-400 mb-2">
                                 <Calendar className="w-3 h-3 shrink-0" />
                                 <span className="text-[10px] font-semibold truncate">
-                                  {lead.pickup_date
-                                    ? lead.pickup_date.slice(0, 10).split('-').reverse().join('/')
-                                    : 'Sin fecha'}
-                                  {lead.pickup_location ? ` · ${lead.pickup_location.split(' ').slice(0, 2).join(' ')}` : ''}
+                                  {formatPickupDate(lead.pickup_date)}
+                                  {lead.pickup_location ? ` · ${shortLocation(lead.pickup_location)}` : ''}
                                 </span>
                               </div>
 
-                              {/* Fila 4: Categoría */}
-                              {lead.category?.name && (
-                                <div className="flex items-center gap-1.5 text-slate-400 mb-3">
-                                  <Car className="w-3 h-3 shrink-0" />
-                                  <span className="text-[10px] font-semibold truncate">{lead.category.name}</span>
-                                </div>
-                              )}
+                              {/* Row 4: Category chip + stage age */}
+                              <div className="flex items-center justify-between mb-3">
+                                {lead.category?.name ? (
+                                  <span className="text-[10px] font-bold bg-slate-100 text-slate-500 px-2.5 py-1 rounded-lg">
+                                    {lead.category.name}
+                                  </span>
+                                ) : <span />}
+                                {stageAge && (
+                                  <span className="flex items-center gap-1.5 text-[10px] font-bold shrink-0">
+                                    <span className={`w-2 h-2 rounded-full shrink-0 ${stageAge.dotCls}`} />
+                                    <span className={stageAge.cls}>{stageAge.label}</span>
+                                  </span>
+                                )}
+                              </div>
 
-                              {/* Fila 5: Razón de pérdida (solo en cerrado_perdido) */}
+                              {/* Lost reason */}
                               {status === 'cerrado_perdido' && lead.lost_reason && (
-                                <div className="mb-3">
+                                <div className="mb-2.5">
                                   <span className="text-[9px] font-bold text-rose-500 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-full">
                                     {lead.lost_reason}
                                   </span>
                                 </div>
                               )}
 
-                              {/* Fila 6: Agente + estado + tiempo en etapa */}
-                              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                              {/* Row 5: Agent + reservation amount */}
+                              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <img
                                     src={lead.assigned_to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(agentName || 'SA')}&background=f1f5f9&color=94a3b8&size=32&bold=true`}
@@ -379,55 +379,33 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                     {agentName || 'Sin asignar'}
                                   </span>
                                 </div>
-
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {stageAge && (
-                                    <span className={`flex items-center gap-0.5 text-[9px] font-black ${stageAge.cls}`}>
-                                      <Timer className="w-2.5 h-2.5" />
-                                      {stageAge.label}
-                                    </span>
-                                  )}
-
-                                  <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase ${
-                                    status === 'lead_nuevo'         ? 'bg-slate-100 text-slate-500' :
-                                    status === 'en_cotizacion'      ? 'bg-indigo-50 text-indigo-600' :
-                                    status === 'reserva_confirmada' ? 'bg-emerald-50 text-emerald-600' :
-                                    status === 'voucher_enviado'    ? 'bg-amber-50 text-amber-600' :
-                                    status === 'cerrado_ganado'     ? 'bg-emerald-100 text-emerald-700' :
-                                    status === 'cerrado_perdido'    ? 'bg-rose-50 text-rose-500' :
-                                    'bg-slate-50 text-slate-400'
-                                  }`}>
-                                    {status === 'lead_nuevo'         && <Clock className="w-3 h-3" />}
-                                    {status === 'en_cotizacion'      && <Mail className="w-3 h-3" />}
-                                    {status === 'reserva_confirmada' && <CheckCircle2 className="w-3 h-3" />}
-                                    {status === 'voucher_enviado'    && <Mail className="w-3 h-3" />}
-                                    {status === 'cerrado_ganado'     && <Trophy className="w-3 h-3" />}
-                                    {status === 'cerrado_perdido'    && <XCircle className="w-3 h-3" />}
-                                    <span>
-                                      {status === 'lead_nuevo'         ? 'Nuevo' :
-                                       status === 'en_cotizacion'      ? 'Cotización' :
-                                       status === 'reserva_confirmada' ? 'Confirmado' :
-                                       status === 'voucher_enviado'    ? 'Voucher' :
-                                       status === 'cerrado_ganado'     ? 'Ganado' :
-                                       status === 'cerrado_perdido'    ? 'Perdido' :
-                                       'Cerrado'}
-                                    </span>
-                                  </div>
-                                </div>
+                                {reserveAmt > 0 && (
+                                  <span className="text-[10px] font-bold text-emerald-600 shrink-0">
+                                    $Reserv ${Math.floor(reserveAmt).toLocaleString()}
+                                  </span>
+                                )}
                               </div>
-
                             </div>
                           </div>
                         </Link>
                       )
                     })}
 
-                    {stageLeads.length === 0 && (
-                      <div className="h-40 flex flex-col items-center justify-center text-slate-200 gap-3 select-none">
-                        <Clock className="w-8 h-8 opacity-[0.2]" />
-                        <span className="text-[10px] font-bold uppercase tracking-[0.3em]">
-                          {searchTerm || agentFilter || dateFilter !== 'all' ? 'Sin resultados' : 'Radar Limpio'}
-                        </span>
+                    {/* Add lead button at bottom of non-terminal columns */}
+                    {!isTerminal && addLeadProps && (
+                      <div className="mt-1">
+                        <NewLeadButton
+                          categories={addLeadProps.categories}
+                          locations={addLeadProps.locations}
+                          currentUserId={addLeadProps.currentUserId}
+                          variant="inline"
+                        />
+                      </div>
+                    )}
+
+                    {stageLeads.length === 0 && isTerminal && (
+                      <div className="h-32 flex flex-col items-center justify-center text-slate-200 gap-2 select-none">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Sin registros</span>
                       </div>
                     )}
                   </div>
@@ -441,20 +419,13 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
       {/* Automation Confirmation Modal */}
       {pendingMove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setPendingMove(null)}
-          />
-          <div className="relative bg-white rounded-[2rem] shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setPendingMove(null)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
-            >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setPendingMove(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
+            <button onClick={() => setPendingMove(null)} className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all">
               <X className="w-4 h-4" />
             </button>
-
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-5 h-5 text-amber-500" />
               </div>
               <div>
@@ -462,32 +433,20 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                 <h3 className="font-black text-slate-900 text-lg leading-tight">→ {pendingMove.toLabel}</h3>
               </div>
             </div>
-
             <p className="text-sm font-bold text-slate-700 mb-3 leading-relaxed">
               Estás moviendo a <strong>{pendingMove.leadName}</strong> a esta etapa.
             </p>
-
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-100 rounded-xl p-3 mb-6">
               <Zap className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs font-bold text-amber-700 leading-relaxed">
-                {pendingMove.automationNote}
-              </p>
+              <p className="text-xs font-bold text-amber-700 leading-relaxed">{pendingMove.automationNote}</p>
             </div>
-
             <div className="flex gap-3">
-              <button
-                onClick={() => setPendingMove(null)}
-                className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-colors"
-              >
+              <button onClick={() => setPendingMove(null)} className="flex-1 py-3 px-4 rounded-xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-colors">
                 Cancelar
               </button>
               <button
-                onClick={async () => {
-                  const move = pendingMove
-                  setPendingMove(null)
-                  await executeMove(move.leadId, move.toStatus)
-                }}
-                className="flex-1 py-3 px-4 rounded-2xl bg-primary text-white text-sm font-black hover:bg-primary/90 transition-colors"
+                onClick={async () => { const move = pendingMove; setPendingMove(null); await executeMove(move.leadId, move.toStatus) }}
+                className="flex-1 py-3 px-4 rounded-xl bg-primary text-white text-sm font-black hover:bg-primary/90 transition-colors"
               >
                 Confirmar
               </button>
@@ -499,20 +458,13 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
       {/* Lost Reason Modal */}
       {lostMovePending && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/30 backdrop-blur-sm"
-            onClick={() => setLostMovePending(null)}
-          />
-          <div className="relative bg-white rounded-[2rem] shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
-            <button
-              onClick={() => setLostMovePending(null)}
-              className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
-            >
+          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setLostMovePending(null)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
+            <button onClick={() => setLostMovePending(null)} className="absolute top-5 right-5 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all">
               <X className="w-4 h-4" />
             </button>
-
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-10 h-10 rounded-2xl bg-rose-50 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
                 <XCircle className="w-5 h-5 text-rose-500" />
               </div>
               <div>
@@ -520,25 +472,20 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                 <h3 className="font-black text-slate-900 text-lg leading-tight">{lostMovePending.leadName}</h3>
               </div>
             </div>
-
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">¿Por qué se perdió?</p>
-
             <div className="grid grid-cols-2 gap-2 mb-4">
               {LOST_REASONS.map((reason) => (
                 <button
                   key={reason}
                   onClick={() => setSelectedReason(reason)}
                   className={`text-left text-xs font-bold px-3 py-2.5 rounded-xl border transition-all ${
-                    selectedReason === reason
-                      ? 'bg-rose-50 border-rose-300 text-rose-700'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                    selectedReason === reason ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
                   }`}
                 >
                   {reason}
                 </button>
               ))}
             </div>
-
             {selectedReason === 'Otro' && (
               <input
                 type="text"
@@ -549,12 +496,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                 className="w-full text-sm border border-slate-200 rounded-xl px-4 py-2.5 mb-4 focus:outline-none focus:ring-2 focus:ring-rose-200"
               />
             )}
-
             <div className="flex gap-3 mt-2">
-              <button
-                onClick={() => setLostMovePending(null)}
-                className="flex-1 py-3 px-4 rounded-2xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-colors"
-              >
+              <button onClick={() => setLostMovePending(null)} className="flex-1 py-3 px-4 rounded-xl bg-slate-100 text-slate-600 text-sm font-black hover:bg-slate-200 transition-colors">
                 Cancelar
               </button>
               <button
@@ -565,7 +508,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                   setLostMovePending(null)
                   await executeMove(move.leadId, LOST_STAGE, reason)
                 }}
-                className="flex-1 py-3 px-4 rounded-2xl bg-rose-500 text-white text-sm font-black hover:bg-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 py-3 px-4 rounded-xl bg-rose-500 text-white text-sm font-black hover:bg-rose-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Confirmar
               </button>
@@ -576,9 +519,9 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
 
       {/* Updating indicator */}
       {isUpdating && (
-        <div className="fixed bottom-12 right-12 bg-white px-6 py-3 rounded-full shadow-2xl border border-slate-100 flex items-center gap-3 animate-in slide-in-from-right-12">
+        <div className="fixed bottom-8 right-8 bg-white px-5 py-3 rounded-full shadow-2xl border border-slate-100 flex items-center gap-3 animate-in slide-in-from-right-12">
           <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          <span className="text-xs font-black uppercase tracking-widest text-slate-900">Actualizando Pipeline...</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-900">Actualizando...</span>
         </div>
       )}
     </>

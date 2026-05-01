@@ -16,20 +16,12 @@ export function KanbanFilterChips({ agents = [] }: { agents?: Agent[] }) {
   const chips: { label: string; onRemove: () => void }[] = []
 
   if (sortBy !== 'newest') {
-    const labels: Record<string, string> = {
-      oldest: 'Más Antiguos',
-      highest_value: 'Mayor Valor',
-      lowest_value: 'Menor Valor',
-    }
+    const labels: Record<string, string> = { oldest: 'Más Antiguos', highest_value: 'Mayor Valor', lowest_value: 'Menor Valor' }
     chips.push({ label: labels[sortBy] || sortBy, onRemove: () => setSortBy('newest') })
   }
 
   if (dateFilter !== 'all') {
-    const labels: Record<string, string> = {
-      today: 'Hoy',
-      this_week: 'Esta Semana',
-      this_month: 'Este Mes',
-    }
+    const labels: Record<string, string> = { today: 'Hoy', this_week: 'Esta semana', this_month: 'Este mes' }
     chips.push({ label: labels[dateFilter] || dateFilter, onRemove: () => setDateFilter('all') })
   }
 
@@ -41,16 +33,16 @@ export function KanbanFilterChips({ agents = [] }: { agents?: Agent[] }) {
   if (chips.length === 0) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros:</span>
+    <div className="flex flex-wrap items-center gap-2 shrink-0">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtros activos:</span>
       {chips.map((chip, i) => (
         <button
           key={i}
           onClick={chip.onRemove}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary text-[11px] font-black rounded-full hover:bg-primary/20 transition-colors group"
+          className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-600 text-[11px] font-bold rounded-full hover:bg-slate-200 transition-colors"
         >
           {chip.label}
-          <X className="w-3 h-3 opacity-60 group-hover:opacity-100" />
+          <X className="w-3 h-3 text-slate-400" />
         </button>
       ))}
     </div>

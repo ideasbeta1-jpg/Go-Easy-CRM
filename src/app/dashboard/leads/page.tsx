@@ -1,13 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
-import { HelpCircle } from 'lucide-react'
 
 import { KanbanBoard } from './components/KanbanBoard'
 import { NewLeadButton } from './components/NewLeadButton'
-import { NotificationBell } from '../components/NotificationBell'
 import { KanbanFilterProvider } from './components/KanbanFilterContext'
 import { KanbanSearchControls, KanbanFilterChips } from './components/KanbanSearchControls'
 
-// Map of status to friendly names and colors for the columns
 const statusConfig: Record<string, { label: string; color: string }> = {
   lead_nuevo:          { label: 'Lead Nuevo',         color: 'bg-blue-500' },
   en_cotizacion:       { label: 'En Cotización',       color: 'bg-indigo-500' },
@@ -19,28 +16,21 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 
 export default async function LeadsPage() {
   const supabase = await createClient()
-  
-  // 1. Get current user
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // 2. Get user profile and role
   const { data: profile } = await supabase
     .from('profiles')
     .select('role, full_name, first_name, last_name, avatar_url')
     .eq('id', user.id)
     .single()
 
-  // Default to admin for now if profile is not found, to ensure visibility during setup
   const isAdmin = !profile || profile?.role === 'admin'
 
-  // 3. Query leads
   let leadsQuery = supabase
     .from('leads')
-    .select(`
-      *,
-      category:categories(name, image_url, daily_price)
-    `)
+    .select(`*, category:categories(name, image_url, daily_price)`)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
@@ -52,13 +42,12 @@ export default async function LeadsPage() {
 
   if (error) {
     return (
-      <div className="p-12 text-rose-600 bg-rose-50 rounded-[3rem] border border-rose-100 font-bold font-sans">
-         Error al cargar los leads: {error.message}
+      <div className="p-8 text-rose-600 bg-rose-50 rounded-2xl border border-rose-100 font-bold">
+        Error al cargar los leads: {error.message}
       </div>
     )
   }
 
-  // 4. Fetch profiles for assignment if we have leads
   const assignedToIds = Array.from(new Set(leads?.map(l => l.assigned_to).filter(Boolean)))
   let profiles: any[] = []
   if (assignedToIds.length > 0) {
@@ -74,11 +63,9 @@ export default async function LeadsPage() {
     return acc
   }, {} as Record<string, any>)
 
-  // 5. Fetch categories and locations for the new lead modal
   const { data: categories } = await supabase.from('categories').select('*').order('name')
   const { data: locations } = await supabase.from('locations').select('*').order('name')
 
-  // 6. Fetch unread inbound messages to show indicators on cards
   const { data: unreadMessages } = await supabase
     .from('messages')
     .select('lead_id')
@@ -90,7 +77,6 @@ export default async function LeadsPage() {
     if (m.lead_id) unreadByLead[m.lead_id] = (unreadByLead[m.lead_id] || 0) + 1
   })
 
-  // KPI calculations
   const TERMINAL_STATUSES = ['cerrado_ganado', 'cerrado_perdido']
   const activeLeads = (leads || []).filter(l => !TERMINAL_STATUSES.includes(l.status))
   const wonLeads = (leads || []).filter(l => l.status === 'cerrado_ganado')
@@ -98,123 +84,79 @@ export default async function LeadsPage() {
   const activePipelineValue = activeLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
   const wonValue = wonLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
   const closedTotal = wonLeads.length + lostLeads.length
-  const winRate = closedTotal > 0 ? Math.round((wonLeads.length / closedTotal) * 100) : null
+  const winRate = closedTotal > 0 ? ((wonLeads.length / closedTotal) * 100).toFixed(1) : null
   const unassignedCount = activeLeads.filter(l => !l.assigned_to).length
-  const now = Date.now()
-  const urgentCount = activeLeads.filter(l => {
-    if (!l.pickup_date) return false
-    const hrs = (new Date(l.pickup_date).getTime() - now) / 3600000
-    return hrs > 0 && hrs <= 72
-  }).length
 
-  // 7. Build lookup map and group
   const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado_ganado', 'cerrado_perdido']
   const processedLeads = (leads || []).map(l => {
     const profile = profileMap[l.assigned_to]
     return {
       ...l,
       assigned_to_profile: profile
-        ? {
-            ...profile,
-            full_name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Agente'
-          }
+        ? { ...profile, full_name: profile.full_name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Agente' }
         : null
     }
   })
 
+  const addLeadProps = {
+    categories: categories || [],
+    locations: locations || [],
+    currentUserId: user.id,
+  }
+
   return (
     <KanbanFilterProvider>
-      <div className="flex flex-col h-full gap-5 md:gap-8 animate-in fade-in slide-in-from-bottom-4 duration-700 relative">
+      <div className="flex flex-col h-full gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
 
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 shrink-0 relative z-10">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-sans font-black text-slate-900 tracking-tighter leading-none uppercase">
-              Pipeline de <span className="text-primary">Ventas</span>
+        {/* Page Header */}
+        <div className="flex items-center justify-between gap-4 shrink-0">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900">
+              Pipeline de Ventas
             </h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-0.5">
-              {leads?.length || 0} leads en total
+            <p className="text-xs text-slate-400 mt-0.5">
+              {leads?.length || 0} leads · actualizado hace 2 min <span className="text-amber-400">⚡</span>
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 md:gap-4 bg-white/40 p-1.5 md:p-2 rounded-[1.5rem] md:rounded-[2rem] border border-white/60 shadow-sm backdrop-blur-sm w-full lg:w-auto">
+          <div className="flex items-center gap-2.5 flex-1 justify-end max-w-xl">
             <KanbanSearchControls agents={profiles} />
-
-            <div className="hidden sm:flex items-center gap-1 border-l border-slate-200 pl-3">
-              <NotificationBell />
-              <button className="p-2 text-slate-400 hover:text-primary hover:bg-white rounded-full transition-all">
-                <HelpCircle className="w-5 h-5" />
-              </button>
-            </div>
-
             <NewLeadButton
               categories={categories || []}
               locations={locations || []}
               currentUserId={user.id}
             />
-
-            <div className="flex items-center gap-3 pl-3 pr-2 md:pr-4 border-l border-slate-200 shrink-0" title={user?.email || ''}>
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-[9px] font-black text-primary uppercase leading-none mb-1">
-                  {profile?.first_name && profile?.last_name
-                    ? `${profile.first_name} ${profile.last_name}`
-                    : profile?.full_name || 'Cargando...'}
-                </span>
-                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">
-                  {profile?.role === 'admin' ? 'Administrador' : 'Agente'}
-                </span>
-              </div>
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-full overflow-hidden border border-slate-200 bg-slate-100">
-                <img
-                  src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                    (profile?.first_name && profile?.last_name)
-                      ? `${profile.first_name} ${profile.last_name}`
-                      : profile?.full_name || 'U'
-                  )}&background=4052b6&color=fff&bold=true`}
-                  className="w-full h-full object-cover"
-                  alt="Profile"
-                />
-              </div>
-            </div>
           </div>
         </div>
 
         {/* KPI Row */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 shrink-0">
-          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 shrink-0">
+          <div className="bg-white rounded-2xl px-5 py-4 border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pipeline Activo</p>
-            <p className="text-xl font-black text-primary tracking-tight">
-              <span className="text-sm opacity-50 mr-0.5">$</span>
-              {Math.floor(activePipelineValue).toLocaleString()}
+            <p className="text-2xl font-black text-primary tracking-tight">
+              ${Math.floor(activePipelineValue).toLocaleString()}
             </p>
           </div>
-          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
+          <div className="bg-white rounded-2xl px-5 py-4 border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Cerrado Ganado</p>
-            <p className="text-xl font-black text-emerald-600 tracking-tight">
-              <span className="text-sm opacity-50 mr-0.5">$</span>
-              {Math.floor(wonValue).toLocaleString()}
+            <p className="text-2xl font-black text-emerald-600 tracking-tight">
+              ${Math.floor(wonValue).toLocaleString()}
             </p>
           </div>
-          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
+          <div className="bg-white rounded-2xl px-5 py-4 border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Sin Asignar</p>
-            <p className={`text-xl font-black tracking-tight ${unassignedCount > 0 ? 'text-orange-500' : 'text-slate-900'}`}>
+            <p className={`text-2xl font-black tracking-tight ${unassignedCount > 0 ? 'text-orange-500' : 'text-slate-900'}`}>
               {unassignedCount}
-              <span className="text-xs font-bold text-slate-400 ml-1.5">leads</span>
             </p>
           </div>
-          <div className="bg-white rounded-2xl md:rounded-3xl px-5 py-4 border border-slate-100/60 shadow-[0_4px_20px_rgba(30,41,59,0.04)]">
+          <div className="bg-white rounded-2xl px-5 py-4 border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tasa de Cierre</p>
             {winRate !== null ? (
-              <p className={`text-xl font-black tracking-tight ${winRate >= 50 ? 'text-emerald-600' : winRate >= 25 ? 'text-amber-500' : 'text-rose-500'}`}>
-                {winRate}
-                <span className="text-xs font-bold text-slate-400 ml-0.5">%</span>
-                <span className="text-[10px] font-bold text-slate-400 ml-1.5">{wonLeads.length}/{closedTotal}</span>
+              <p className={`text-2xl font-black tracking-tight ${Number(winRate) >= 50 ? 'text-emerald-600' : Number(winRate) >= 25 ? 'text-amber-500' : 'text-rose-500'}`}>
+                {winRate}%
               </p>
             ) : (
-              <p className="text-xl font-black text-slate-300 tracking-tight">
-                —
-                <span className="text-xs font-bold text-slate-300 ml-1.5">sin cierres</span>
-              </p>
+              <p className="text-2xl font-black text-slate-300 tracking-tight">—</p>
             )}
           </div>
         </div>
@@ -227,6 +169,7 @@ export default async function LeadsPage() {
           statuses={statuses}
           statusConfig={statusConfig}
           unreadByLead={unreadByLead}
+          addLeadProps={addLeadProps}
         />
       </div>
     </KanbanFilterProvider>

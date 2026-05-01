@@ -27,10 +27,9 @@ export default async function DashboardLayout({
   const userProfile = await getUserProfile()
   const settings = await getSystemSettings()
 
-  // Sidebar navigation items data
   const menuItems = [
     { name: 'Inicio', href: '/dashboard' },
-    { name: 'Leads (Kanban)', href: '/dashboard/leads' },
+    { name: 'Leads Kanban', href: '/dashboard/leads' },
     { name: 'Chats WhatsApp', href: '/dashboard/chats' },
     { name: 'Catálogo Flota', href: '/dashboard/catalog' },
     { name: 'Proveedores', href: '/dashboard/providers' },
@@ -45,47 +44,67 @@ export default async function DashboardLayout({
       <div className="flex h-screen bg-slate-50 selection:bg-primary-fixed selection:text-on-primary-container overflow-hidden font-body">
         <MobileAppNavigation menuItems={menuItems} />
 
-        {/* SideNavBar - Premium Coastal Sidebar */}
-        <aside className="hidden lg:flex flex-col h-screen w-72 rounded-r-[3rem] sticky left-0 top-0 bg-white py-12 px-8 justify-between shrink-0 z-50 overflow-y-auto border-r border-slate-100/50 shadow-xl shadow-slate-200/20">
-          <div className="flex flex-col gap-12">
-            <div className="px-2">
-              <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-                {settings?.logo_url ? (
-                  <img src={settings.logo_url} alt={settings.crm_name || 'CRM'} className="h-10 w-auto" />
-                ) : (
-                  <span className="text-2xl font-black text-primary font-sans leading-none tracking-tight">
-                    {settings?.crm_name || 'Go Easy CRM'}
-                  </span>
-                )}
-              </Link>
-              <div className="text-[0.625rem] text-slate-400 font-bold uppercase tracking-[0.2em] mt-2">
-                {settings?.crm_tagline || 'Premium Car Rental CRM'}
-              </div>
+        {/* Dark Navy Sidebar */}
+        <aside className="hidden lg:flex flex-col h-screen w-64 sticky left-0 top-0 bg-[#1c2537] py-8 px-5 justify-between shrink-0 z-50 overflow-y-auto">
+          {/* Top: Logo + Nav */}
+          <div className="flex flex-col gap-8">
+            {/* Logo */}
+            <Link href="/dashboard" className="flex items-center gap-3 px-2 hover:opacity-90 transition-opacity">
+              {settings?.logo_url ? (
+                <img src={settings.logo_url} alt={settings.crm_name || 'CRM'} className="h-9 w-auto" />
+              ) : (
+                <>
+                  <div className="w-9 h-9 bg-primary rounded-xl flex items-center justify-center shrink-0">
+                    <span className="text-white font-black text-base leading-none">
+                      {(settings?.crm_name || 'G')[0]}
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-white font-black text-sm leading-tight">
+                      {settings?.crm_name || 'Go Easy CRM'}
+                    </div>
+                    <div className="text-slate-400 text-[10px] font-medium mt-0.5">
+                      {settings?.crm_tagline || 'Premium Car Rental CRM'}
+                    </div>
+                  </div>
+                </>
+              )}
+            </Link>
+
+            {/* Nav section */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 px-3 mb-1">
+                Operación
+              </span>
+              <SidebarNav menuItems={menuItems} />
             </div>
-            
-            <SidebarNav menuItems={menuItems} />
           </div>
 
-          <div className="flex flex-col gap-8">
-            <div className="bg-slate-50 rounded-[2.5rem] p-8 flex flex-col gap-4 relative overflow-hidden group border border-slate-100/50">
-              <span className="material-symbols-outlined text-primary text-2xl relative z-10 font-black">lightbulb</span>
-               <div className="flex flex-col gap-1 relative z-10">
-                 <div className="text-[10px] font-black uppercase tracking-wider text-slate-900 border-b border-slate-200/50 pb-1 mb-1">Sales Tips</div>
-                 <p className="text-[10px] font-bold leading-relaxed text-slate-500">Intenta contactar nuevos leads en menos de 5 minutos.</p>
-               </div>
+          {/* Bottom: Sales Tip + Settings */}
+          <div className="flex flex-col gap-5">
+            {/* Sales Tip */}
+            <div className="bg-white/5 rounded-2xl p-5 flex flex-col gap-2 border border-white/5">
+              <div className="text-[10px] font-black uppercase tracking-wider text-primary">Sales Tip</div>
+              <p className="text-sm font-bold text-white leading-snug">Responde en menos de 5 min</p>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Los leads contactados rápido cierran 3.2× más. Activa respuestas automáticas.
+              </p>
             </div>
-            
-            <nav className="flex flex-col gap-1">
-               <Link href="/dashboard/settings" className="flex items-center gap-4 px-6 py-3.5 text-slate-500 hover:text-primary transition-all group">
-                 <span className="material-symbols-outlined text-[20px] group-hover:rotate-45 transition-transform">settings</span>
-                 <span className="font-sans font-bold text-xs uppercase tracking-widest">Configuración</span>
-               </Link>
-               <form action={logout}>
-                 <button className="w-full flex items-center gap-4 px-6 py-3.5 text-slate-500 hover:text-error transition-all group">
-                   <span className="material-symbols-outlined text-[20px] group-hover:-translate-x-1 transition-transform">logout</span>
-                   <span className="font-sans font-bold text-xs uppercase tracking-widest tracking-tight">Cerrar Sesión</span>
-                 </button>
-               </form>
+
+            {/* Settings + Logout */}
+            <nav className="flex items-center justify-between px-1">
+              <Link
+                href="/dashboard/settings"
+                className="flex items-center gap-2.5 text-slate-400 hover:text-white transition-colors py-2 px-2 rounded-lg hover:bg-white/5"
+              >
+                <span className="material-symbols-outlined text-[20px]">settings</span>
+                <span className="font-bold text-xs">Ajustes</span>
+              </Link>
+              <form action={logout}>
+                <button className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">
+                  <span className="material-symbols-outlined text-[20px]">logout</span>
+                </button>
+              </form>
             </nav>
           </div>
         </aside>
@@ -95,8 +114,7 @@ export default async function DashboardLayout({
           <DashboardHeader userProfile={userProfile} />
 
           {/* Dynamic Content Surface */}
-          <div className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 bg-[#f8fafc] relative">
-            <div className="absolute inset-0 bg-dots opacity-[0.2] pointer-events-none" />
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-[#f8fafc] relative">
             <div className="relative z-10 h-full">
               {children}
             </div>
@@ -107,5 +125,4 @@ export default async function DashboardLayout({
       <ActiveStatusTracker />
     </NotificationProvider>
   )
-
 }

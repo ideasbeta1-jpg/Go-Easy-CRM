@@ -15,6 +15,7 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
 
   const iconMap: Record<string, string> = {
     'Inicio': 'grid_view',
+    'Leads Kanban': 'view_kanban',
     'Leads (Kanban)': 'view_kanban',
     'Chats WhatsApp': 'forum',
     'Catálogo Flota': 'directions_car',
@@ -25,25 +26,25 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
   };
 
   return (
-    <nav className="flex flex-col gap-3">
+    <nav className="flex flex-col gap-0.5">
       {menuItems.map((item) => {
         const isActive = pathname === item.href;
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-4 px-6 py-4 rounded-full transition-all duration-300 ${
-              isActive 
-              ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-100' 
-              : 'text-slate-500 hover:text-primary hover:bg-slate-50'
+            className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
+              isActive
+                ? 'bg-white/10 text-white'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className={`material-symbols-outlined text-[22px] ${isActive ? 'fill-1' : ''}`}>
+            <span className={`material-symbols-outlined text-[20px] shrink-0 ${isActive ? 'fill-1' : ''}`}>
               {iconMap[item.name]}
             </span>
-            <span className="font-sans font-bold text-sm tracking-tight flex-1">{item.name}</span>
+            <span className="font-semibold text-sm flex-1">{item.name}</span>
             {item.name === 'Chats WhatsApp' && unreadCount > 0 && (
-              <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse shadow-lg shadow-rose-500/20 mr-1">
+              <span className="bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow-lg shadow-rose-500/20 leading-none">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

@@ -1,15 +1,18 @@
 'use client'
 
-import { usePathname } from 'next/navigation'
-import { Radio } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getProfileStatus, updateProfileStatus } from '@/app/utils/actions/profiles'
 import { toast } from 'sonner'
 import { NotificationBell } from './NotificationBell'
 
+function getGreeting() {
+  const hour = new Date().getHours()
+  if (hour >= 6 && hour < 12) return '¡Buen día!'
+  if (hour >= 12 && hour < 19) return '¡Buenas tardes!'
+  return '¡Buenas noches!'
+}
+
 export function DashboardHeader({ userProfile }: { userProfile: any }) {
-  const pathname = usePathname();
-  const isLeadsPage = pathname === '/dashboard/leads';
   const [isActive, setIsActive] = useState(userProfile?.is_active ?? false)
   const [loading, setLoading] = useState(userProfile ? false : true)
 
@@ -39,71 +42,72 @@ export function DashboardHeader({ userProfile }: { userProfile: any }) {
     }
   }
 
-  if (isLeadsPage) return null;
+  const firstName = userProfile?.first_name || userProfile?.full_name?.split(' ')[0] || 'Usuario'
+  const lastName = userProfile?.last_name || userProfile?.full_name?.split(' ')[1] || ''
+  const fullName = userProfile?.first_name && userProfile?.last_name
+    ? `${userProfile.first_name} ${userProfile.last_name}`
+    : userProfile?.full_name || 'Cargando...'
+  const roleLabel = userProfile?.role === 'admin' ? 'Gerente de Ventas' : 'Agente de Ventas'
+  const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=4052b6&color=fff&bold=true`
 
   return (
-    <header className="w-full h-24 shrink-0 flex justify-between items-center px-12 bg-white/50 backdrop-blur-md z-40 border-b border-slate-100/30">
-      <div className="flex flex-col">
-          <h1 className="font-sans text-2xl font-black text-slate-900 tracking-tight uppercase">
-            ¡Bienvenido de nuevo! <span className="text-primary">{userProfile?.first_name || userProfile?.full_name?.split(' ')[0] || 'Usuario'}</span> 🌴
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-             <div className={`w-2 h-2 rounded-full animate-pulse ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
-               Sistema de Asignación: {isActive ? 'Activo' : 'Pausado'}
-             </span>
-          </div>
+    <header className="w-full h-[72px] shrink-0 flex items-center justify-between px-8 bg-white z-40 border-b border-slate-100">
+      {/* Left: Greeting + Name */}
+      <div>
+        <p className="text-xs text-slate-400 font-medium leading-none">{getGreeting()}</p>
+        <h2 className="text-lg font-black text-slate-900 leading-tight mt-0.5">{firstName} {lastName}</h2>
       </div>
 
-      <div className="flex items-center gap-8">
-          <div className="flex items-center gap-3">
-            {/* Availability Toggle */}
-            <button 
-              onClick={handleToggle}
-              disabled={loading}
-              className={`flex items-center gap-2 px-4 py-2 rounded-2xl transition-all border font-bold text-xs uppercase tracking-wider ${
-                isActive 
-                ? 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100' 
-                : 'bg-slate-50 border-slate-100 text-slate-400 hover:bg-slate-100'
-              }`}
-            >
-              <Radio size={14} className={isActive ? 'animate-pulse' : ''} />
-              {isActive ? 'Online' : 'Offline'}
-            </button>
-
-            <div className="h-6 w-[1px] bg-slate-100 mx-2"></div>
-            
-            <div className="flex items-center gap-2">
-              <NotificationBell />
-              <button className="material-symbols-outlined p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-2xl transition-all font-variation-fill">help</button>
-            </div>
+      {/* Center: Status toggle + Search */}
+      <div className="flex items-center gap-5 flex-1 mx-8 max-w-xl">
+        {/* Online Toggle */}
+        <button
+          onClick={handleToggle}
+          disabled={loading}
+          className="flex items-center gap-2 shrink-0"
+          title={isActive ? 'Cambiar a Offline' : 'Cambiar a Online'}
+        >
+          <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+          <span className={`text-sm font-bold ${isActive ? 'text-slate-700' : 'text-slate-400'}`}>
+            {isActive ? 'En línea' : 'Desconectado'}
+          </span>
+          <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 ${isActive ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${isActive ? 'translate-x-4' : 'translate-x-1'}`} />
           </div>
-          
-          <div className="h-10 w-[1px] bg-slate-200 hidden md:block"></div>
+        </button>
 
-          <div className="flex items-center gap-4 px-3 py-1.5 hover:bg-slate-50 rounded-2xl transition-all cursor-pointer group" title={userProfile?.email}>
-            <div className="flex flex-col items-end">
-              <span className="text-[11px] font-black text-primary uppercase tracking-tight">
-                {userProfile?.first_name && userProfile?.last_name 
-                  ? `${userProfile.first_name} ${userProfile.last_name}`
-                  : userProfile?.full_name || 'Cargando...'}
-              </span>
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                {userProfile?.role === 'admin' ? 'Administrador' : 'Agente'}
-              </span>
-            </div>
-            <div className="w-11 h-11 rounded-2xl overflow-hidden bg-slate-100 border border-slate-200">
-              <img 
-                src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  (userProfile?.first_name && userProfile?.last_name) 
-                    ? `${userProfile.first_name} ${userProfile.last_name}` 
-                    : userProfile?.full_name || 'U'
-                )}&background=4052b6&color=fff&bold=true`} 
-                className="w-full h-full object-cover" 
-                alt="Profile" 
-              />
-            </div>
+        {/* Search Bar */}
+        <div className="flex-1 relative">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-300">
+            search
+          </span>
+          <input
+            type="text"
+            placeholder="Buscar leads, vehículos..."
+            className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-100 rounded-xl text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 transition-all"
+          />
+        </div>
+      </div>
+
+      {/* Right: Bell + User */}
+      <div className="flex items-center gap-4">
+        <NotificationBell />
+
+        <div className="h-8 w-px bg-slate-100" />
+
+        <div className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity" title={userProfile?.email}>
+          <div className="flex flex-col items-end">
+            <span className="text-sm font-black text-slate-900 leading-tight">{fullName}</span>
+            <span className="text-[10px] font-medium text-slate-400 leading-tight">{roleLabel}</span>
           </div>
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100 border-2 border-white shadow-sm shrink-0">
+            <img
+              src={avatarUrl}
+              className="w-full h-full object-cover"
+              alt="Profile"
+            />
+          </div>
+        </div>
       </div>
     </header>
   );

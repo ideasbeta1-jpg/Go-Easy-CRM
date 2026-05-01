@@ -5,7 +5,6 @@ import {
   Search,
   MessageSquare,
   Send,
-  Filter,
   ArrowLeft,
   ChevronRight,
   AlertCircle,
@@ -15,13 +14,12 @@ import {
   Check,
   CheckCheck,
   Clock,
-  ImageIcon,
   FileText,
-  Video,
   ChevronUp,
   LayoutTemplate,
   X,
-  Paperclip
+  Paperclip,
+  MoreHorizontal,
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -63,13 +61,40 @@ interface Lead {
   [key: string]: any
 }
 
+type TabFilter = 'all' | 'unread' | 'archived'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const AVATAR_PALETTE = [
+  'bg-indigo-500', 'bg-purple-500', 'bg-teal-500', 'bg-orange-500',
+  'bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500',
+]
+
+function getAvatarColor(name: string): string {
+  const code = (name || '').split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return AVATAR_PALETTE[code % AVATAR_PALETTE.length]
+}
+
+function formatStatus(status?: string): string {
+  if (!status) return ''
+  const MAP: Record<string, string> = {
+    lead_nuevo: 'Lead Nuevo',
+    en_cotizacion: 'Cotización',
+    reserva_confirmada: 'Confirmada',
+    voucher_enviado: 'Voucher',
+    cerrado_ganado: 'Ganado',
+    cerrado_perdido: 'Perdido',
+  }
+  return MAP[status] || status.replace(/_/g, ' ')
+}
+
 // ─── Status Icon ─────────────────────────────────────────────────────────────
 
 function MessageStatus({ status }: { status?: string | null }) {
-  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-300" />
-  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-white/60" />
-  if (status === 'failed') return <X className="w-3.5 h-3.5 text-red-300" />
-  return <Check className="w-3.5 h-3.5 text-white/60" />
+  if (status === 'read') return <CheckCheck className="w-3.5 h-3.5 text-sky-400" />
+  if (status === 'delivered') return <CheckCheck className="w-3.5 h-3.5 text-slate-300" />
+  if (status === 'failed') return <X className="w-3.5 h-3.5 text-red-400" />
+  return <Check className="w-3.5 h-3.5 text-slate-300" />
 }
 
 // ─── Template Picker Modal ────────────────────────────────────────────────────
@@ -101,17 +126,14 @@ function TemplatePicker({
     const components: any[] = []
     const bodyComp = template.components?.find((c: any) => c.type === 'BODY')
     if (!bodyComp) return components
-
     const paramCount = (bodyComp.text?.match(/\{\{(\d+)\}\}/g) || []).length
     if (paramCount === 0) return components
-
     const fieldMap = mapping?.mappings || {}
     const params = Array.from({ length: paramCount }, (_, i) => {
       const fieldKey = fieldMap[String(i + 1)]
       const value = fieldKey ? (lead[fieldKey] ?? `{{${i + 1}}}`) : `{{${i + 1}}}`
       return { type: 'text', text: String(value) }
     })
-
     components.push({ type: 'body', parameters: params })
     return components
   }
@@ -122,13 +144,7 @@ function TemplatePicker({
       const mapping = mappings.find(m => m.template_name === template.name)
       const components = buildComponents(template, mapping)
       const langCode = mapping?.language_code || template.language || 'es'
-      const result = await sendTemplateFromChat(
-        lead.id,
-        lead.phone || '',
-        template.name,
-        langCode,
-        components
-      )
+      const result = await sendTemplateFromChat(lead.id, lead.phone || '', template.name, langCode, components)
       if (result.ok) {
         const newMsg: Message = {
           id: crypto.randomUUID(),
@@ -148,14 +164,11 @@ function TemplatePicker({
     }
   }
 
-  const filtered = templates.filter(t =>
-    t.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = templates.filter(t => t.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center bg-black/30 backdrop-blur-sm animate-in fade-in">
       <div className="w-full max-w-lg bg-white rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 md:slide-in-from-bottom-0">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Enviar Plantilla</h3>
@@ -165,8 +178,6 @@ function TemplatePicker({
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        {/* Search */}
         <div className="px-6 pt-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
@@ -179,8 +190,6 @@ function TemplatePicker({
             />
           </div>
         </div>
-
-        {/* List */}
         <div className="overflow-y-auto max-h-[50vh] p-4 space-y-2">
           {loading ? (
             <div className="text-center py-8 text-slate-300 text-xs font-black uppercase tracking-widest">Cargando...</div>
@@ -195,7 +204,7 @@ function TemplatePicker({
                   key={t.name}
                   onClick={() => handleSend(t)}
                   disabled={sending === t.name}
-                  className="w-full text-left p-4 rounded-2xl border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all group disabled:opacity-50"
+                  className="w-full text-left p-4 rounded-2xl border border-slate-100 hover:border-primary/20 hover:bg-primary/5 transition-all disabled:opacity-50"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -240,7 +249,8 @@ export default function ChatInboxClient({
   const { refreshUnreadCount } = useNotifications()
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterType, setFilterType] = useState<'my' | 'all'>('my')
+  const [tabFilter, setTabFilter] = useState<TabFilter>('all')
+  const [filterType] = useState<'my' | 'all'>('all')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
@@ -248,18 +258,15 @@ export default function ChatInboxClient({
   const [showMsgSearch, setShowMsgSearch] = useState(false)
   const [showTemplatePicker, setShowTemplatePicker] = useState(false)
 
-  // Realtime global state
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [previewMessages, setPreviewMessages] = useState<Message[]>(initialMessages)
 
-  // Per-conversation lazy-loaded messages
   const [convMessages, setConvMessages] = useState<Record<string, Message[]>>({})
   const [convPage, setConvPage] = useState<Record<string, number>>({})
   const [convHasMore, setConvHasMore] = useState<Record<string, boolean>>({})
   const [loadingConv, setLoadingConv] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
 
-  // Audio Recording
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
@@ -271,14 +278,12 @@ export default function ChatInboxClient({
   const audioChunksRef = useRef<Blob[]>([])
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const messagesTopRef = useRef<HTMLDivElement>(null)
 
-  // Image / Media attach
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // ── Load conversation messages on lead select ─────────────────────────────
+  // ── Load conversation ─────────────────────────────────────────────────────
   const loadConversation = useCallback(async (leadId: string, page = 0) => {
     if (page === 0) setLoadingConv(true)
     else setLoadingMore(true)
@@ -286,7 +291,6 @@ export default function ChatInboxClient({
       const { messages, hasMore } = await getLeadMessages(leadId, page)
       setConvMessages(prev => {
         const existing = page === 0 ? [] : (prev[leadId] || [])
-        // Merge avoiding duplicates
         const ids = new Set(existing.map(m => m.id))
         const merged = [...messages.filter(m => !ids.has(m.id)), ...existing]
         return { ...prev, [leadId]: merged }
@@ -303,29 +307,22 @@ export default function ChatInboxClient({
     setSelectedLeadId(leadId)
     setMsgSearch('')
     setShowMsgSearch(false)
-    if (!convMessages[leadId]) {
-      loadConversation(leadId, 0)
-    }
+    if (!convMessages[leadId]) loadConversation(leadId, 0)
   }, [convMessages, loadConversation])
 
   const handleLoadMore = () => {
     if (!selectedLeadId || loadingMore) return
-    const nextPage = (convPage[selectedLeadId] ?? 0) + 1
-    loadConversation(selectedLeadId, nextPage)
+    loadConversation(selectedLeadId, (convPage[selectedLeadId] ?? 0) + 1)
   }
 
-  // ── Realtime subscriptions ────────────────────────────────────────────────
+  // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient()
-
     const leadsChannel = supabase
       .channel('leads-all')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setLeads(prev => [payload.new as Lead, ...prev])
-        } else if (payload.eventType === 'UPDATE') {
-          setLeads(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l))
-        }
+        if (payload.eventType === 'INSERT') setLeads(prev => [payload.new as Lead, ...prev])
+        else if (payload.eventType === 'UPDATE') setLeads(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l))
       })
       .subscribe()
 
@@ -333,22 +330,15 @@ export default function ChatInboxClient({
       .channel('messages-all')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const msg = payload.new as Message
-        // Update preview messages (sidebar)
-        setPreviewMessages(prev => {
-          if (prev.some(m => m.id === msg.id)) return prev
-          return [msg, ...prev]
-        })
-        // Update per-conversation messages if loaded
+        setPreviewMessages(prev => prev.some(m => m.id === msg.id) ? prev : [msg, ...prev])
         setConvMessages(prev => {
           const existing = prev[msg.lead_id]
-          if (!existing) return prev
-          if (existing.some(m => m.id === msg.id)) return prev
+          if (!existing || existing.some(m => m.id === msg.id)) return prev
           return { ...prev, [msg.lead_id]: [...existing, msg] }
         })
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
         const msg = payload.new as Message
-        // Update delivery status in conv messages
         setConvMessages(prev => {
           const existing = prev[msg.lead_id]
           if (!existing) return prev
@@ -363,35 +353,22 @@ export default function ChatInboxClient({
     }
   }, [])
 
-  // ── Auto-select from URL ──────────────────────────────────────────────────
   useEffect(() => {
     const leadId = searchParams.get('leadId')
-    if (leadId && leads.some(l => l.id === leadId)) {
-      handleSelectLead(leadId)
-    }
+    if (leadId && leads.some(l => l.id === leadId)) handleSelectLead(leadId)
   }, [searchParams, leads, handleSelectLead])
 
-  // ── Mark as read ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedLeadId) return
     const markAsRead = async () => {
       const supabase = createClient()
-      const { error } = await supabase
-        .from('messages')
-        .update({ is_read: true })
-        .eq('lead_id', selectedLeadId)
-        .eq('direction', 'inbound')
-        .eq('is_read', false)
+      const { error } = await supabase.from('messages').update({ is_read: true })
+        .eq('lead_id', selectedLeadId).eq('direction', 'inbound').eq('is_read', false)
       if (!error) {
         setConvMessages(prev => {
           const existing = prev[selectedLeadId]
           if (!existing) return prev
-          return {
-            ...prev,
-            [selectedLeadId]: existing.map(m =>
-              m.direction === 'inbound' ? { ...m, is_read: true } : m
-            )
-          }
+          return { ...prev, [selectedLeadId]: existing.map(m => m.direction === 'inbound' ? { ...m, is_read: true } : m) }
         })
         refreshUnreadCount()
       }
@@ -399,23 +376,13 @@ export default function ChatInboxClient({
     markAsRead()
   }, [selectedLeadId, refreshUnreadCount])
 
-  // ── Scroll to bottom on new messages ─────────────────────────────────────
   useEffect(() => {
-    if (!loadingConv) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
+    if (!loadingConv) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [selectedLeadId, convMessages, loadingConv])
 
   // ── Audio helpers ─────────────────────────────────────────────────────────
-
-  // Pick the best MIME type the browser supports, preferring Meta-compatible formats
   const getBestAudioMime = (): string => {
-    const candidates = [
-      'audio/ogg;codecs=opus', // Firefox — ideal, Meta accepts natively
-      'audio/mp4',             // Safari — Meta accepts natively
-      'audio/webm;codecs=opus',// Chrome — needs server conversion
-      'audio/webm',            // Chrome fallback
-    ]
+    const candidates = ['audio/ogg;codecs=opus', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm']
     return candidates.find(t => MediaRecorder.isTypeSupported(t)) ?? ''
   }
 
@@ -428,7 +395,6 @@ export default function ChatInboxClient({
       audioChunksRef.current = []
       const actualMime = mediaRecorder.mimeType || mimeType || 'audio/webm'
       setRecordedMimeType(actualMime)
-
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: actualMime })
@@ -466,7 +432,6 @@ export default function ChatInboxClient({
     if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl)
     setImageFile(file)
     setImagePreviewUrl(URL.createObjectURL(file))
-    // Reset input so same file can be re-selected
     e.target.value = ''
   }
 
@@ -495,22 +460,15 @@ export default function ChatInboxClient({
     if (!audioBlob || isUploadingMedia || !selectedLeadId || !selectedLead) return
     setIsUploadingMedia(true)
     setUploadStatus('Enviando audio...')
-
     try {
-      const ext = recordedMimeType.includes('ogg') ? 'ogg'
-        : recordedMimeType.includes('mp4') ? 'mp4'
-        : 'webm'
-
+      const ext = recordedMimeType.includes('ogg') ? 'ogg' : recordedMimeType.includes('mp4') ? 'mp4' : 'webm'
       const fd = new FormData()
       fd.append('audio', audioBlob, `audio.${ext}`)
       fd.append('phone', selectedLead.phone || '')
       fd.append('leadId', selectedLeadId)
-
       const res = await fetch('/api/audio/send', { method: 'POST', body: fd })
       const data = await res.json()
-
       if (data.ok) {
-        // Optimistically add to conv if realtime hasn't fired yet
         if (data.message) {
           setConvMessages(prev => {
             const existing = prev[selectedLeadId] || []
@@ -525,7 +483,6 @@ export default function ChatInboxClient({
         setUploadStatus(null)
       }
     } catch (err: any) {
-      console.error('[handleSendAudio]', err)
       alert(`Error: ${err?.message || 'Error enviando el audio.'}`)
       setUploadStatus(null)
     } finally {
@@ -537,16 +494,13 @@ export default function ChatInboxClient({
     if (!imageFile || isUploadingMedia || !selectedLeadId || !selectedLead) return
     setIsUploadingMedia(true)
     setUploadStatus('Enviando imagen...')
-
     try {
       const fd = new FormData()
       fd.append('media', imageFile)
       fd.append('phone', selectedLead.phone || '')
       fd.append('leadId', selectedLeadId)
-
       const res = await fetch('/api/media/send', { method: 'POST', body: fd })
       const data = await res.json()
-
       if (data.ok) {
         if (data.message) {
           setConvMessages(prev => {
@@ -562,7 +516,6 @@ export default function ChatInboxClient({
         setUploadStatus(null)
       }
     } catch (err: any) {
-      console.error('[handleSendImage]', err)
       alert(`Error: ${err?.message || 'Error enviando la imagen.'}`)
       setUploadStatus(null)
     } finally {
@@ -573,7 +526,6 @@ export default function ChatInboxClient({
   // ── Derived state ─────────────────────────────────────────────────────────
   const processedLeads = useMemo(() => {
     return leads.map(lead => {
-      // Use preview messages for sidebar (performance)
       const leadMsgs = previewMessages
         .filter(m => m.lead_id === lead.id)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -594,6 +546,14 @@ export default function ChatInboxClient({
     })
   }, [leads, previewMessages, searchTerm, filterType, currentUserId, isAdmin])
 
+  const totalUnread = useMemo(() => processedLeads.filter(l => l.isPending).length, [processedLeads])
+
+  const displayedLeads = useMemo(() => {
+    if (tabFilter === 'unread') return processedLeads.filter(l => l.isPending)
+    if (tabFilter === 'archived') return []
+    return processedLeads
+  }, [processedLeads, tabFilter])
+
   const selectedLead = leads.find(l => l.id === selectedLeadId)
 
   const selectedMessages = useMemo(() => {
@@ -603,7 +563,6 @@ export default function ChatInboxClient({
     return msgs.filter(m => m.content?.toLowerCase().includes(msgSearch.toLowerCase()))
   }, [selectedLeadId, convMessages, msgSearch])
 
-  // WhatsApp 24-hour conversation window
   const { isWindowOpen, lastInboundAt } = useMemo(() => {
     if (!selectedLeadId) return { isWindowOpen: false, lastInboundAt: null }
     const msgs = convMessages[selectedLeadId] || []
@@ -615,149 +574,172 @@ export default function ChatInboxClient({
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <div className="h-[calc(100vh-100px)] md:h-[calc(100vh-140px)] bg-slate-50/50 rounded-2xl md:rounded-[3rem] border border-slate-100 overflow-hidden flex animate-in fade-in duration-700">
+    <div className="h-[calc(100vh-100px)] md:h-[calc(100vh-140px)] flex overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm animate-in fade-in duration-500">
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
-      <div className={`${selectedLeadId ? 'hidden md:flex' : 'flex'} w-full md:w-[380px] border-r border-slate-100 flex-col bg-white`}>
-        <div className="p-8 pb-4 space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter uppercase font-sans">Chat Inbox</h1>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-full">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[9px] font-black uppercase tracking-widest italic">Live API</span>
-            </div>
-          </div>
+      <div className={`${selectedLeadId ? 'hidden md:flex' : 'flex'} w-full md:w-[320px] flex-col border-r border-slate-100 bg-white shrink-0`}>
 
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        {/* Sidebar header */}
+        <div className="px-5 pt-5 pb-0">
+          <h1 className="text-xl font-black text-slate-900 mb-4">Conversaciones</h1>
+
+          {/* Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
             <input
               type="text"
-              placeholder="Buscar por nombre o celular..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all"
+              className="w-full bg-slate-50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white border border-transparent focus:border-primary/10 transition-all"
             />
           </div>
 
-          <div className="flex gap-2 p-1 bg-slate-50 rounded-2xl">
-            {(['my', 'all'] as const).map(type => (
+          {/* Tabs */}
+          <div className="flex border-b border-slate-100">
+            {([
+              { id: 'all', label: 'Todos', count: null },
+              { id: 'unread', label: 'Sin leer', count: totalUnread },
+              { id: 'archived', label: 'Archivados', count: null },
+            ] as { id: TabFilter; label: string; count: number | null }[]).map(tab => (
               <button
-                key={type}
-                onClick={() => setFilterType(type)}
-                className={`flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                  filterType === type ? 'bg-white text-primary shadow-sm ring-1 ring-slate-100' : 'text-slate-400 hover:text-slate-600'
+                key={tab.id}
+                onClick={() => setTabFilter(tab.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-3 text-[13px] font-bold border-b-2 -mb-px transition-all ${
+                  tabFilter === tab.id
+                    ? 'text-primary border-primary'
+                    : 'text-slate-400 border-transparent hover:text-slate-600'
                 }`}
               >
-                {type === 'my' ? 'Mis Chats' : 'Todos'}
+                {tab.label}
+                {tab.count != null && tab.count > 0 && (
+                  <span className="bg-primary text-white text-[9px] font-black rounded-full px-1.5 py-0.5 min-w-[18px] text-center leading-none">
+                    {tab.count}
+                  </span>
+                )}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-2 scroll-smooth scrollbar-hide">
-          {processedLeads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
-              <MessageSquare size={48} className="mb-4 text-slate-200" />
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">Sin conversaciones</p>
+        {/* Conversation list */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {displayedLeads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
+              <MessageSquare size={36} className="mb-3 text-slate-300" />
+              <p className="text-xs font-bold text-slate-400">
+                {tabFilter === 'archived' ? 'Sin conversaciones archivadas' : 'Sin conversaciones'}
+              </p>
             </div>
           ) : (
-            processedLeads.map(lead => (
-              <button
-                key={lead.id}
-                onClick={() => handleSelectLead(lead.id)}
-                className={`w-full flex items-center gap-4 p-4 rounded-3xl transition-all duration-300 mb-3 text-left group box-border border ${
-                  selectedLeadId === lead.id
-                    ? 'bg-primary/5 border-primary/10'
-                    : 'bg-transparent border-transparent hover:bg-slate-50/80 hover:border-slate-100'
-                }`}
-              >
-                <div className="relative shrink-0">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white font-black text-lg shadow-lg ${
-                    lead.isPending ? 'bg-amber-500' : 'bg-primary'
-                  }`}>
+            displayedLeads.map(lead => {
+              const msgUnread = previewMessages.filter(m =>
+                m.lead_id === lead.id && m.direction === 'inbound' && !m.is_read
+              ).length
+              const avatarColor = getAvatarColor(`${lead.first_name}${lead.last_name}`)
+              const lastMsgDate = lead.lastMessage ? new Date(lead.lastMessage.created_at) : null
+              const timeStr = lastMsgDate
+                ? isToday(lastMsgDate)
+                  ? format(lastMsgDate, 'HH:mm')
+                  : isYesterday(lastMsgDate)
+                    ? 'ayer'
+                    : format(lastMsgDate, 'd MMM', { locale: es })
+                : ''
+
+              return (
+                <button
+                  key={lead.id}
+                  onClick={() => handleSelectLead(lead.id)}
+                  className={`w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors border-b border-slate-50 ${
+                    selectedLeadId === lead.id ? 'bg-primary/5' : 'hover:bg-slate-50/80'
+                  }`}
+                >
+                  <div className={`w-11 h-11 rounded-full ${avatarColor} flex items-center justify-center text-white font-black text-sm shrink-0 shadow-sm`}>
                     {lead.first_name?.[0] || '?'}{lead.last_name?.[0] || ''}
                   </div>
-                  {lead.isPending && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 rounded-full border-2 border-white flex items-center justify-center animate-bounce shadow-lg">
-                      <AlertCircle className="w-3 h-3 text-white" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                      <span className={`text-[13px] truncate ${msgUnread > 0 ? 'font-black text-slate-900' : 'font-semibold text-slate-700'}`}>
+                        {lead.first_name} {lead.last_name}
+                      </span>
+                      <span className={`text-[11px] shrink-0 ${msgUnread > 0 ? 'text-primary font-bold' : 'text-slate-400'}`}>
+                        {timeStr}
+                      </span>
                     </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="text-sm font-black text-slate-800 truncate uppercase tracking-tight">{lead.first_name} {lead.last_name}</h3>
-                    <span className="text-[9px] font-bold text-slate-400 shrink-0">
-                      {lead.lastMessage ? format(new Date(lead.lastMessage.created_at), 'hh:mm a') : ''}
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`text-[12px] truncate leading-snug ${msgUnread > 0 ? 'font-semibold text-slate-700' : 'text-slate-400 font-normal'}`}>
+                        {lead.lastMessage?.content || lead.status?.replace(/_/g, ' ') || ''}
+                      </p>
+                      {msgUnread > 0 && (
+                        <span className="min-w-[20px] h-5 px-1.5 bg-primary text-white text-[10px] font-black rounded-full flex items-center justify-center shrink-0">
+                          {msgUnread}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p className={`text-[11px] truncate leading-tight ${lead.isPending ? 'font-bold text-slate-900' : 'text-slate-400 font-medium'}`}>
-                    {lead.lastMessage ? lead.lastMessage.content : lead.status?.replace('_', ' ')}
-                  </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-[8px] font-black text-primary/40 uppercase tracking-widest truncate max-w-[120px]">
-                      {lead.phone && (lead.phone.includes(':') ? 'ID: ' + lead.phone.split(':')[0] + '...' : lead.phone)}
-                    </span>
-                    <span className="text-[8px] font-black text-slate-300">•</span>
-                    <span className="text-[8px] font-black text-slate-300 uppercase tracking-widest truncate">{lead.profiles?.full_name || 'Sin Asignar'}</span>
-                  </div>
-                </div>
-              </button>
-            ))
+                </button>
+              )
+            })
           )}
         </div>
       </div>
 
       {/* ── Chat Pane ────────────────────────────────────────────────────── */}
-      <div className={`${!selectedLeadId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-white/40 backdrop-blur-xl relative`}>
+      <div className={`${!selectedLeadId ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-slate-50/40`}>
         {selectedLead ? (
           <>
-            {/* Header */}
-            <div className="p-4 md:p-8 border-b border-slate-100/50 flex items-center justify-between">
-              <div className="flex items-center gap-3 md:gap-5">
-                <button onClick={() => setSelectedLeadId(null)} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-primary transition-colors">
-                  <ArrowLeft className="w-6 h-6" />
-                </button>
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs md:text-sm">
-                  {selectedLead.first_name?.[0] || '?'}{selectedLead.last_name?.[0] || ''}
-                </div>
-                <div>
-                  <h2 className="text-lg md:text-xl font-black text-slate-900 leading-none uppercase tracking-tighter truncate max-w-[150px] md:max-w-none">
-                    {selectedLead.first_name} {selectedLead.last_name}
-                  </h2>
-                  <div className="flex items-center gap-2 mt-1 md:mt-2">
-                    <span className="text-[10px] font-bold text-slate-400 hidden sm:inline-block">{selectedLead.phone}</span>
-                    <span className="w-1.5 h-1.5 bg-slate-200 rounded-full hidden sm:inline-block" />
-                    <Link href={`/dashboard/leads/${selectedLead.id}`} className="text-[9px] md:text-[10px] font-black text-primary uppercase tracking-widest hover:underline flex items-center gap-1">
-                      <span className="hidden md:inline">Ver Ficha Lead</span>
-                      <span className="md:hidden">Ficha</span>
-                      <ChevronRight className="w-2.5 h-2.5" />
-                    </Link>
-                  </div>
-                </div>
+            {/* Chat header */}
+            <div className="px-5 py-4 bg-white border-b border-slate-100 flex items-center gap-3 shrink-0">
+              <button onClick={() => setSelectedLeadId(null)} className="md:hidden p-1.5 -ml-1 text-slate-400 hover:text-primary transition-colors">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+
+              <div className={`w-10 h-10 rounded-full ${getAvatarColor(`${selectedLead.first_name}${selectedLead.last_name}`)} flex items-center justify-center text-white font-black text-sm shrink-0`}>
+                {selectedLead.first_name?.[0]}{selectedLead.last_name?.[0] || ''}
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Search messages toggle */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-[15px] font-black text-slate-900 leading-none truncate">
+                  {selectedLead.first_name} {selectedLead.last_name}
+                </h2>
+                <p className="text-[12px] text-slate-400 mt-0.5 truncate">
+                  {selectedLead.phone}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {selectedLead.status && (
+                  <span className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-primary/8 text-primary text-[11px] font-bold rounded-full border border-primary/10">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                    {formatStatus(selectedLead.status)}
+                  </span>
+                )}
+                <Link
+                  href={`/dashboard/leads/${selectedLead.id}`}
+                  className="hidden sm:flex items-center gap-0.5 text-[12px] font-bold text-slate-500 hover:text-primary transition-colors"
+                >
+                  Ver lead <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
                 <button
                   onClick={() => { setShowMsgSearch(v => !v); setMsgSearch('') }}
-                  className={`p-2.5 rounded-2xl transition-all ${showMsgSearch ? 'bg-primary/10 text-primary' : 'bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/5'}`}
+                  className={`p-2 rounded-xl transition-colors ${showMsgSearch ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                   title="Buscar en conversación"
                 >
                   <Search className="w-4 h-4" />
                 </button>
-                <div className="hidden lg:flex flex-col items-end mr-2">
-                  <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Estado Lead</span>
-                  <span className="text-[10px] font-black text-primary uppercase tracking-widest">{selectedLead.status?.replace('_', ' ')}</span>
-                </div>
-                <button onClick={() => router.push(`/dashboard/leads/${selectedLead.id}`)} className="p-2.5 md:p-3.5 bg-slate-50 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-2xl transition-all">
-                  <Filter className="w-3.5 h-3.5 md:w-4 h-4" />
+                <button
+                  onClick={() => router.push(`/dashboard/leads/${selectedLead.id}`)}
+                  className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"
+                  title="Opciones"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Message search bar */}
             {showMsgSearch && (
-              <div className="px-6 py-3 border-b border-slate-100/50 bg-white/80 animate-in slide-in-from-top-2">
+              <div className="px-5 py-3 border-b border-slate-100 bg-white animate-in slide-in-from-top-2 shrink-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                   <input
@@ -766,7 +748,7 @@ export default function ChatInboxClient({
                     placeholder="Buscar en esta conversación..."
                     value={msgSearch}
                     onChange={e => setMsgSearch(e.target.value)}
-                    className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    className="w-full bg-slate-50 rounded-xl pl-9 pr-4 py-2.5 text-sm text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                   {msgSearch && (
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase">
@@ -778,14 +760,13 @@ export default function ChatInboxClient({
             )}
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 md:space-y-10 bg-dots scroll-smooth">
-              {/* Load more button */}
+            <div className="flex-1 overflow-y-auto px-5 py-5 scroll-smooth">
               {selectedLeadId && convHasMore[selectedLeadId] && (
-                <div className="flex justify-center">
+                <div className="flex justify-center mb-4">
                   <button
                     onClick={handleLoadMore}
                     disabled={loadingMore}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-500 rounded-full text-xs font-bold hover:bg-slate-50 transition-all disabled:opacity-50 shadow-sm"
                   >
                     <ChevronUp className="w-3 h-3" />
                     {loadingMore ? 'Cargando...' : 'Ver mensajes anteriores'}
@@ -795,94 +776,85 @@ export default function ChatInboxClient({
 
               {loadingConv ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="flex flex-col items-center gap-3 opacity-30">
-                    <Clock className="w-8 h-8 text-slate-300 animate-spin" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Cargando conversación...</p>
+                  <div className="flex flex-col items-center gap-3 opacity-40">
+                    <Clock className="w-7 h-7 text-slate-300 animate-spin" />
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Cargando conversación...</p>
                   </div>
                 </div>
               ) : selectedMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
-                  <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                    <MessageSquare size={32} className="text-slate-200" />
+                  <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <MessageSquare size={24} className="text-slate-300" />
                   </div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] italic">
-                    {msgSearch ? 'Sin resultados' : 'No hay historial de mensajes'}
+                  <p className="text-xs font-bold text-slate-400">
+                    {msgSearch ? 'Sin resultados' : 'No hay mensajes aún'}
                   </p>
                 </div>
               ) : (
-                selectedMessages.map((msg, idx) => {
-                  const currentDate = new Date(msg.created_at)
-                  const prevDate = idx > 0 ? new Date(selectedMessages[idx - 1].created_at) : null
-                  const isNewDay = !prevDate || currentDate.toDateString() !== prevDate.toDateString()
-                  let dateLabel = ''
-                  if (isNewDay) {
-                    if (isToday(currentDate)) dateLabel = 'Hoy'
-                    else if (isYesterday(currentDate)) dateLabel = 'Ayer'
-                    else dateLabel = format(currentDate, "d 'de' MMMM", { locale: es })
-                  }
+                <>
+                  {selectedMessages.map((msg, idx) => {
+                    const currentDate = new Date(msg.created_at)
+                    const prevDate = idx > 0 ? new Date(selectedMessages[idx - 1].created_at) : null
+                    const isNewDay = !prevDate || currentDate.toDateString() !== prevDate.toDateString()
+                    let dateLabel = ''
+                    if (isNewDay) {
+                      if (isToday(currentDate)) dateLabel = 'Hoy'
+                      else if (isYesterday(currentDate)) dateLabel = 'Ayer'
+                      else dateLabel = format(currentDate, "d 'de' MMMM", { locale: es })
+                    }
+                    const isHighlighted = !!(msgSearch && msg.content?.toLowerCase().includes(msgSearch.toLowerCase()))
+                    const isOut = msg.direction === 'outbound'
 
-                  const isHighlighted = msgSearch && msg.content?.toLowerCase().includes(msgSearch.toLowerCase())
-
-                  return (
-                    <React.Fragment key={msg.id || idx}>
-                      {isNewDay && (
-                        <div className="flex justify-center my-6">
-                          <span className="px-4 py-1.5 bg-slate-100/80 text-slate-500 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm backdrop-blur-sm">
-                            {dateLabel}
-                          </span>
-                        </div>
-                      )}
-                      <div className={`flex flex-col ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} group animate-in fade-in slide-in-from-bottom-2 ${isHighlighted ? 'opacity-100' : msgSearch ? 'opacity-30' : ''}`}>
-                        <div className="flex items-end gap-3 max-w-[80%]">
-                          {msg.direction === 'inbound' && (
-                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shrink-0 mb-3 ring-4 ring-white shadow-sm">
-                              {selectedLead.first_name?.[0]}
-                            </div>
-                          )}
-                          <div className="flex flex-col gap-1.5">
-                            <div className={`p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] text-sm font-bold leading-relaxed shadow-sm transition-all group-hover:shadow-md whitespace-pre-wrap break-words ${
-                              msg.direction === 'outbound'
-                                ? 'bg-primary text-white rounded-br-none'
-                                : 'bg-white text-slate-700 rounded-bl-none border border-slate-100'
-                            }`}>
-                              <MessageContent msg={msg} />
-                            </div>
-                            {/* Timestamp + status */}
-                            <div className={`flex items-center gap-1.5 px-2 ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                              <span className="text-[8px] font-black uppercase tracking-widest text-slate-300">
-                                {format(currentDate, 'hh:mm a', { locale: es })}
-                              </span>
-                              {msg.direction === 'outbound' && <MessageStatus status={msg.status} />}
-                            </div>
+                    return (
+                      <React.Fragment key={msg.id || idx}>
+                        {isNewDay && (
+                          <div className="flex justify-center my-4">
+                            <span className="px-4 py-1 bg-slate-200/70 text-slate-500 rounded-full text-[11px] font-semibold">
+                              {dateLabel}
+                            </span>
+                          </div>
+                        )}
+                        <div className={`flex flex-col ${isOut ? 'items-end' : 'items-start'} mb-1.5 ${isHighlighted ? 'opacity-100' : msgSearch ? 'opacity-25' : ''}`}>
+                          <div className={`max-w-[65%] px-4 py-2.5 text-[13px] leading-relaxed shadow-sm whitespace-pre-wrap break-words ${
+                            isOut
+                              ? 'bg-primary text-white rounded-2xl rounded-tr-sm font-medium'
+                              : 'bg-white text-slate-700 rounded-2xl rounded-tl-sm border border-slate-100 font-normal'
+                          }`}>
+                            <MessageContent msg={msg} />
+                          </div>
+                          <div className={`flex items-center gap-1 mt-1 px-1`}>
+                            {isOut && <MessageStatus status={msg.status} />}
+                            <span className="text-[10px] text-slate-400">
+                              {format(currentDate, 'HH:mm')}
+                            </span>
                           </div>
                         </div>
-                      </div>
-                    </React.Fragment>
-                  )
-                })
+                      </React.Fragment>
+                    )
+                  })}
+                </>
               )}
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <div className="p-4 md:p-8 pb-8 md:pb-12 bg-gradient-to-t from-white via-white/80 to-transparent">
-
+            {/* Input area */}
+            <div className="px-5 py-4 bg-white border-t border-slate-100 shrink-0">
               {/* 24h window closed banner */}
               {!isWindowOpen && selectedLeadId && (
-                <div className="max-w-4xl mx-auto mb-3 flex items-center gap-3 px-5 py-3.5 bg-amber-50 border border-amber-200 rounded-2xl animate-in fade-in">
+                <div className="mb-3 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl animate-in fade-in">
                   <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Ventana de 24h cerrada</p>
-                    <p className="text-[9px] font-bold text-amber-500 mt-0.5">
+                    <p className="text-xs font-bold text-amber-700">Ventana de 24h cerrada</p>
+                    <p className="text-[11px] text-amber-500 mt-0.5">
                       {lastInboundAt
-                        ? `Último mensaje del cliente: ${format(lastInboundAt, "d MMM, HH:mm", { locale: es })}`
-                        : 'El cliente aún no ha enviado ningún mensaje'}
-                      {' · '}Solo puedes enviar plantillas hasta que el cliente responda.
+                        ? `Último mensaje: ${format(lastInboundAt, "d MMM, HH:mm", { locale: es })}`
+                        : 'El cliente aún no ha enviado mensajes'
+                      }{' · '}Usa una plantilla para reactivar.
                     </p>
                   </div>
                   <button
                     onClick={() => setShowTemplatePicker(true)}
-                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-600 active:scale-95 transition-all"
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white rounded-lg text-xs font-bold hover:bg-amber-600 transition-all"
                   >
                     <LayoutTemplate className="w-3.5 h-3.5" />
                     Plantilla
@@ -890,61 +862,47 @@ export default function ChatInboxClient({
                 </div>
               )}
 
-              <div className="relative max-w-4xl mx-auto flex items-center gap-2 md:gap-3">
-
+              <div className="flex items-center gap-2">
                 {isRecording ? (
-                  <div className="flex-1 bg-red-50 border border-red-100 rounded-[2.5rem] px-8 py-5 flex items-center justify-between shadow-lg shadow-red-500/5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                      <span className="text-red-500 font-bold tracking-widest">{formatTime(recordingTime)}</span>
-                      <span className="text-[10px] font-black text-red-400 uppercase tracking-widest ml-4 hidden sm:inline-block">Grabando Audio...</span>
+                  <div className="flex-1 bg-red-50 border border-red-100 rounded-2xl px-5 py-3.5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                      <span className="text-red-500 font-bold tracking-widest text-sm">{formatTime(recordingTime)}</span>
+                      <span className="text-xs font-bold text-red-400 hidden sm:inline">Grabando...</span>
                     </div>
-                    <button onClick={stopRecording} className="p-3 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors">
-                      <Square className="w-5 h-5 fill-current" />
+                    <button onClick={stopRecording} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors">
+                      <Square className="w-4 h-4 fill-current" />
                     </button>
                   </div>
                 ) : audioUrl ? (
-                  <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-6 py-4 flex items-center gap-4 shadow-lg shadow-primary/5">
-                    <button onClick={discardAudio} disabled={isUploadingMedia} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
-                      <Trash2 className="w-5 h-5" />
+                  <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                    <button onClick={discardAudio} disabled={isUploadingMedia} className="p-2 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
+                      <Trash2 className="w-4 h-4" />
                     </button>
-                    <div className="flex-1 flex flex-col gap-1">
-                      <audio src={audioUrl} controls className="h-10 w-full outline-none" />
-                      {uploadStatus && (
-                        <p className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse">{uploadStatus}</p>
-                      )}
+                    <div className="flex-1">
+                      <audio src={audioUrl} controls className="h-8 w-full outline-none" />
+                      {uploadStatus && <p className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse mt-1">{uploadStatus}</p>}
                     </div>
                   </div>
                 ) : imagePreviewUrl ? (
-                  <div className="flex-1 bg-slate-50 rounded-[2.5rem] px-4 py-4 flex items-center gap-3 shadow-lg shadow-primary/5">
-                    <button onClick={discardImage} disabled={isUploadingMedia} className="p-3 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
-                      <Trash2 className="w-5 h-5" />
+                  <div className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 flex items-center gap-3">
+                    <button onClick={discardImage} disabled={isUploadingMedia} className="p-2 bg-slate-200 text-slate-500 rounded-full hover:bg-red-100 hover:text-red-500 transition-colors shrink-0 disabled:opacity-40">
+                      <Trash2 className="w-4 h-4" />
                     </button>
                     <div className="flex-1 flex items-center gap-3 min-w-0">
-                      <img
-                        src={imagePreviewUrl}
-                        alt="Preview"
-                        className="h-12 w-12 rounded-xl object-cover shrink-0 ring-2 ring-slate-200"
-                      />
+                      <img src={imagePreviewUrl} alt="Preview" className="h-10 w-10 rounded-lg object-cover shrink-0 ring-2 ring-slate-200" />
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-black text-slate-700 truncate">{imageFile?.name}</p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                          {imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : ''}
-                        </p>
-                        {uploadStatus && (
-                          <p className="text-[9px] font-black text-primary uppercase tracking-widest animate-pulse mt-1">{uploadStatus}</p>
-                        )}
+                        <p className="text-xs font-bold text-slate-700 truncate">{imageFile?.name}</p>
+                        <p className="text-[10px] text-slate-400">{imageFile ? `${(imageFile.size / 1024).toFixed(0)} KB` : ''}</p>
+                        {uploadStatus && <p className="text-[9px] font-black text-primary animate-pulse mt-0.5">{uploadStatus}</p>}
                       </div>
                     </div>
                     <button
                       onClick={handleSendImage}
                       disabled={isUploadingMedia}
-                      className="w-12 h-12 shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
+                      className="w-10 h-10 shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-lg shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                     >
-                      {isUploadingMedia
-                        ? <Clock className="w-5 h-5 animate-spin" />
-                        : <Send className="w-5 h-5 ml-0.5" />
-                      }
+                      {isUploadingMedia ? <Clock className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
                     </button>
                   </div>
                 ) : (
@@ -953,17 +911,16 @@ export default function ChatInboxClient({
                     value={chatMessage}
                     onChange={e => isWindowOpen && setChatMessage(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && isWindowOpen && handleSendMessage()}
-                    placeholder={isWindowOpen ? "Escribe tu respuesta, imagen o graba un audio..." : "Ventana cerrada — usa una plantilla para reactivar la conversación"}
+                    placeholder={isWindowOpen ? 'Escribe un mensaje...' : 'Ventana cerrada — envía una plantilla para reactivar'}
                     disabled={!isWindowOpen}
-                    className={`flex-1 w-full border-none rounded-[2rem] md:rounded-[2.5rem] pl-6 md:pl-8 pr-6 md:pr-8 py-4 md:py-6 text-sm font-bold placeholder:text-slate-300 focus:outline-none focus:ring-4 transition-all shadow-lg ${
+                    className={`flex-1 rounded-2xl px-5 py-3.5 text-sm font-medium transition-all focus:outline-none focus:ring-2 border ${
                       isWindowOpen
-                        ? 'bg-slate-50 text-slate-700 focus:ring-primary/10 shadow-primary/5'
-                        : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                        ? 'bg-slate-50 text-slate-700 focus:ring-primary/15 border-slate-100 focus:border-primary/20'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed border-slate-100'
                     }`}
                   />
                 )}
 
-                {/* Hidden file input for images */}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -972,68 +929,68 @@ export default function ChatInboxClient({
                   onChange={handleImageSelect}
                 />
 
-                {/* Action buttons — only when idle */}
                 {!isRecording && !audioUrl && !imageFile && !chatMessage.trim() && (
                   <>
                     <button
                       onClick={() => setShowTemplatePicker(true)}
-                      className={`w-[60px] h-[60px] shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md border-2 ${
+                      className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center transition-all ${
                         isWindowOpen
-                          ? 'bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/10'
-                          : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                          ? 'bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary'
+                          : 'bg-primary/10 text-primary hover:bg-primary/20'
                       }`}
                       title="Enviar plantilla"
                     >
-                      <LayoutTemplate className="w-5 h-5" />
+                      <LayoutTemplate className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => isWindowOpen && fileInputRef.current?.click()}
                       disabled={!isWindowOpen}
-                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-sky-50 hover:text-sky-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-sky-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
+                      className="w-10 h-10 shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-sky-50 hover:text-sky-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Enviar imagen"
                     >
-                      <Paperclip className="w-5 h-5" />
+                      <Paperclip className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => isWindowOpen && startRecording()}
                       disabled={!isWindowOpen}
-                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-red-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
+                      className="w-10 h-10 shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Grabar audio"
                     >
-                      <Mic className="w-6 h-6" />
+                      <Mic className="w-4 h-4" />
                     </button>
                   </>
                 )}
 
-                {/* Send button — not shown for imageFile (send is inside the image card) */}
                 {!isRecording && !imageFile && (chatMessage.trim() || audioUrl) && (
                   <button
                     onClick={audioUrl ? handleSendAudio : handleSendMessage}
                     disabled={isSendingMessage || isUploadingMedia || !isWindowOpen}
-                    className="w-12 h-12 md:w-[60px] md:h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
+                    className="w-10 h-10 shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                   >
                     {isSendingMessage || isUploadingMedia
-                      ? <Clock className="w-5 h-5 md:w-6 md:h-6 animate-spin" />
-                      : <Send className="w-5 h-5 md:w-6 md:h-6 ml-0.5 md:ml-1" />
+                      ? <Clock className="w-4 h-4 animate-spin" />
+                      : <Send className="w-4 h-4 ml-0.5" />
                     }
                   </button>
                 )}
               </div>
-              <p className="text-[9px] font-black text-slate-300 text-center mt-3 md:mt-6 uppercase tracking-widest opacity-50 hidden sm:block">
+
+              <p className="text-[10px] text-slate-300 text-center mt-3 hidden sm:block">
                 {isWindowOpen
-                  ? 'Enter para enviar • Imagen, plantilla o audio • Conectado a la API Oficial'
-                  : 'Ventana de 24h cerrada • Solo se pueden enviar plantillas de WhatsApp'}
+                  ? 'Enter para enviar · Imagen, plantilla o audio · API Oficial'
+                  : 'Ventana de 24h cerrada · Solo se pueden enviar plantillas de WhatsApp'
+                }
               </p>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center p-20 text-center">
-            <div className="w-32 h-32 bg-primary/5 rounded-full flex items-center justify-center mb-10 animate-pulse">
-              <MessageSquare size={48} className="text-primary/20" />
+          <div className="flex-1 flex flex-col items-center justify-center p-12 text-center">
+            <div className="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
+              <MessageSquare size={32} className="text-primary/20" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase font-sans mb-4">Selecciona un Chat</h2>
-            <p className="text-sm font-bold text-slate-400 max-w-xs leading-relaxed italic">
-              Elige una conversación de la izquierda para comenzar a gestionar el lead o responder mensajes pendientes.
+            <h2 className="text-xl font-black text-slate-900 mb-3">Selecciona un Chat</h2>
+            <p className="text-sm text-slate-400 max-w-xs leading-relaxed">
+              Elige una conversación de la izquierda para comenzar a gestionar el lead.
             </p>
           </div>
         )}
@@ -1079,7 +1036,7 @@ function MessageContent({ msg }: { msg: Message }) {
           <img
             src={msg.media_url}
             alt="Imagen"
-            className="rounded-xl max-w-[260px] max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+            className="rounded-xl max-w-[240px] max-h-[280px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
             onClick={() => window.open(msg.media_url!, '_blank')}
           />
           {msg.content && !msg.content.startsWith('[Imagen]') && !msg.content.startsWith('Media:') && (
@@ -1092,7 +1049,7 @@ function MessageContent({ msg }: { msg: Message }) {
     if (type.startsWith('video/')) {
       return (
         <div className="flex flex-col gap-2">
-          <video src={msg.media_url} controls className="rounded-xl max-w-[260px] max-h-[300px]" />
+          <video src={msg.media_url} controls className="rounded-xl max-w-[240px] max-h-[280px]" />
           {msg.content && !msg.content.startsWith('[Video]') && !msg.content.startsWith('Media:') && (
             <p className="mt-1 text-sm">{msg.content}</p>
           )}
@@ -1100,7 +1057,6 @@ function MessageContent({ msg }: { msg: Message }) {
       )
     }
 
-    // Document / generic media
     return (
       <a
         href={msg.media_url}
@@ -1118,7 +1074,6 @@ function MessageContent({ msg }: { msg: Message }) {
     )
   }
 
-  // Plain text (including template labels)
   if (msg.content?.startsWith('[Plantilla:')) {
     return (
       <div className="flex items-center gap-2">
