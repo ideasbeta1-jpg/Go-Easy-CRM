@@ -603,6 +603,16 @@ export default function ChatInboxClient({
     return msgs.filter(m => m.content?.toLowerCase().includes(msgSearch.toLowerCase()))
   }, [selectedLeadId, convMessages, msgSearch])
 
+  // WhatsApp 24-hour conversation window
+  const { isWindowOpen, lastInboundAt } = useMemo(() => {
+    if (!selectedLeadId) return { isWindowOpen: false, lastInboundAt: null }
+    const msgs = convMessages[selectedLeadId] || []
+    const lastInbound = [...msgs].reverse().find(m => m.direction === 'inbound')
+    if (!lastInbound) return { isWindowOpen: false, lastInboundAt: null }
+    const diff = Date.now() - new Date(lastInbound.created_at).getTime()
+    return { isWindowOpen: diff < 24 * 60 * 60 * 1000, lastInboundAt: new Date(lastInbound.created_at) }
+  }, [selectedLeadId, convMessages])
+
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="h-[calc(100vh-100px)] md:h-[calc(100vh-140px)] bg-slate-50/50 rounded-2xl md:rounded-[3rem] border border-slate-100 overflow-hidden flex animate-in fade-in duration-700">
@@ -856,6 +866,30 @@ export default function ChatInboxClient({
 
             {/* Input */}
             <div className="p-4 md:p-8 pb-8 md:pb-12 bg-gradient-to-t from-white via-white/80 to-transparent">
+
+              {/* 24h window closed banner */}
+              {!isWindowOpen && selectedLeadId && (
+                <div className="max-w-4xl mx-auto mb-3 flex items-center gap-3 px-5 py-3.5 bg-amber-50 border border-amber-200 rounded-2xl animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Ventana de 24h cerrada</p>
+                    <p className="text-[9px] font-bold text-amber-500 mt-0.5">
+                      {lastInboundAt
+                        ? `Último mensaje del cliente: ${format(lastInboundAt, "d MMM, HH:mm", { locale: es })}`
+                        : 'El cliente aún no ha enviado ningún mensaje'}
+                      {' · '}Solo puedes enviar plantillas hasta que el cliente responda.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTemplatePicker(true)}
+                    className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-amber-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-amber-600 active:scale-95 transition-all"
+                  >
+                    <LayoutTemplate className="w-3.5 h-3.5" />
+                    Plantilla
+                  </button>
+                </div>
+              )}
+
               <div className="relative max-w-4xl mx-auto flex items-center gap-2 md:gap-3">
 
                 {isRecording ? (
@@ -917,10 +951,15 @@ export default function ChatInboxClient({
                   <input
                     type="text"
                     value={chatMessage}
-                    onChange={e => setChatMessage(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Escribe tu respuesta, imagen o graba un audio..."
-                    className="flex-1 w-full bg-slate-50 border-none rounded-[2rem] md:rounded-[2.5rem] pl-6 md:pl-8 pr-6 md:pr-8 py-4 md:py-6 text-sm font-bold text-slate-700 placeholder:text-slate-300 focus:outline-none focus:ring-4 focus:ring-primary/10 transition-all shadow-lg shadow-primary/5"
+                    onChange={e => isWindowOpen && setChatMessage(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && isWindowOpen && handleSendMessage()}
+                    placeholder={isWindowOpen ? "Escribe tu respuesta, imagen o graba un audio..." : "Ventana cerrada — usa una plantilla para reactivar la conversación"}
+                    disabled={!isWindowOpen}
+                    className={`flex-1 w-full border-none rounded-[2rem] md:rounded-[2.5rem] pl-6 md:pl-8 pr-6 md:pr-8 py-4 md:py-6 text-sm font-bold placeholder:text-slate-300 focus:outline-none focus:ring-4 transition-all shadow-lg ${
+                      isWindowOpen
+                        ? 'bg-slate-50 text-slate-700 focus:ring-primary/10 shadow-primary/5'
+                        : 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                    }`}
                   />
                 )}
 
@@ -938,21 +977,27 @@ export default function ChatInboxClient({
                   <>
                     <button
                       onClick={() => setShowTemplatePicker(true)}
-                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-primary/10 hover:text-primary active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-primary/10"
+                      className={`w-[60px] h-[60px] shrink-0 rounded-full flex items-center justify-center active:scale-95 transition-all shadow-md border-2 ${
+                        isWindowOpen
+                          ? 'bg-slate-100 text-slate-500 hover:bg-primary/10 hover:text-primary border-transparent hover:border-primary/10'
+                          : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'
+                      }`}
                       title="Enviar plantilla"
                     >
                       <LayoutTemplate className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-sky-50 hover:text-sky-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-sky-100"
+                      onClick={() => isWindowOpen && fileInputRef.current?.click()}
+                      disabled={!isWindowOpen}
+                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-sky-50 hover:text-sky-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-sky-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
                       title="Enviar imagen"
                     >
                       <Paperclip className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={startRecording}
-                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-red-100"
+                      onClick={() => isWindowOpen && startRecording()}
+                      disabled={!isWindowOpen}
+                      className="w-[60px] h-[60px] shrink-0 bg-slate-100 text-slate-500 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all shadow-md border-2 border-transparent hover:border-red-100 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-slate-100 disabled:hover:text-slate-500"
                       title="Grabar audio"
                     >
                       <Mic className="w-6 h-6" />
@@ -964,7 +1009,7 @@ export default function ChatInboxClient({
                 {!isRecording && !imageFile && (chatMessage.trim() || audioUrl) && (
                   <button
                     onClick={audioUrl ? handleSendAudio : handleSendMessage}
-                    disabled={isSendingMessage || isUploadingMedia}
+                    disabled={isSendingMessage || isUploadingMedia || !isWindowOpen}
                     className="w-12 h-12 md:w-[60px] md:h-[60px] shrink-0 bg-primary text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20 disabled:bg-slate-200 disabled:shadow-none"
                   >
                     {isSendingMessage || isUploadingMedia
@@ -975,7 +1020,9 @@ export default function ChatInboxClient({
                 )}
               </div>
               <p className="text-[9px] font-black text-slate-300 text-center mt-3 md:mt-6 uppercase tracking-widest opacity-50 hidden sm:block">
-                Enter para enviar • Imagen, plantilla o audio • Conectado a la API Oficial
+                {isWindowOpen
+                  ? 'Enter para enviar • Imagen, plantilla o audio • Conectado a la API Oficial'
+                  : 'Ventana de 24h cerrada • Solo se pueden enviar plantillas de WhatsApp'}
               </p>
             </div>
           </>

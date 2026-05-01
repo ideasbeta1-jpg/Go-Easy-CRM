@@ -12,7 +12,8 @@
       "Bash(grep -E \"\\\\.\\(js|json|icon|png\\)$\")",
       "Bash(xargs grep *)",
       "Read(//c/Users/razs9/OneDrive/Desktop/Apps/**)",
-      "Bash(xargs wc *)"
+      "Bash(xargs wc *)",
+      "mcp__claude_ai_Supabase__list_projects"
     ],
     "additionalDirectories": [
       "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"
