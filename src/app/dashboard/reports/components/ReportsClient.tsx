@@ -133,7 +133,7 @@ export default function ReportsClient({
     
     return Object.entries(counts)
       .map(([name, value]) => ({ name, value }))
-      .sort((a, b) => b.value - a.value);
+      .sort((a: any, b: any) => b.value - a.value);
   }, [locationData]);
 
   // --- Process Message Activity Over Last 7 Days ---

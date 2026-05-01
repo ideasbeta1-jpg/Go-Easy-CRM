@@ -715,8 +715,19 @@ export default function LeadDetailClient({
                       type="datetime-local"
                       value={formData.return_date}
                       onChange={e => setFormData({ ...formData, return_date: e.target.value })}
-                      className={fieldCls}
+                      className={`${fieldCls} mb-2`}
                     />
+                    <select
+                      value={formData.return_location_id}
+                      onChange={e => {
+                        const loc = locations.find(l => l.id === e.target.value)
+                        setFormData({ ...formData, return_location_id: e.target.value, return_location: loc?.name || formData.return_location })
+                      }}
+                      className={fieldCls}
+                    >
+                      <option value="">— Sin ubicación —</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}{l.code ? ` (${l.code})` : ''}</option>)}
+                    </select>
                   </div>
                 </div>
               </div>
