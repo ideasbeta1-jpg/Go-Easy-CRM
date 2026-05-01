@@ -15,6 +15,11 @@ function getGreeting() {
 export function DashboardHeader({ userProfile }: { userProfile: any }) {
   const [isActive, setIsActive] = useState(userProfile?.is_active ?? false)
   const [loading, setLoading] = useState(userProfile ? false : true)
+  const [greeting, setGreeting] = useState('')
+
+  useEffect(() => {
+    setGreeting(getGreeting())
+  }, [])
 
   useEffect(() => {
     if (userProfile) {
@@ -54,7 +59,7 @@ export function DashboardHeader({ userProfile }: { userProfile: any }) {
     <header className="w-full h-[72px] shrink-0 flex items-center justify-between px-8 bg-white z-40 border-b border-slate-100">
       {/* Left: Greeting + Name */}
       <div>
-        <p className="text-xs text-slate-400 font-medium leading-none">{getGreeting()}</p>
+        <p className="text-xs text-slate-400 font-medium leading-none">{greeting}</p>
         <h2 className="text-lg font-black text-slate-900 leading-tight mt-0.5">{firstName} {lastName}</h2>
       </div>
 

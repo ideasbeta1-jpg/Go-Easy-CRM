@@ -23,7 +23,11 @@
       "mcp__claude_ai_Supabase__execute_sql",
       "mcp__claude_ai_Supabase__list_tables",
       "mcp__claude_ai_Supabase__list_migrations",
-      "mcp__claude_ai_Supabase__apply_migration"
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Vercel__list_deployments",
+      "mcp__claude_ai_Vercel__get_project",
+      "mcp__claude_ai_Vercel__web_fetch_vercel_url",
+      "mcp__claude_ai_Vercel__get_deployment_build_logs"
     ],
     "additionalDirectories": [
       "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"
