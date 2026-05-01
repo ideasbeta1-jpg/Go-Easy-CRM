@@ -49,22 +49,34 @@ export function PWAHead() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
 
-    // Wait until SW is fully registered before listening for updates
+    const trackInstalling = (worker: ServiceWorker) => {
+      worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdateToast(worker)
+        }
+      })
+    }
+
     navigator.serviceWorker.ready.then((reg) => {
-      // A worker was already waiting before we mounted (e.g. background tab)
+      // Force-check for a new SW version on every page load
+      reg.update().catch(() => {})
+
+      // Worker already waiting (e.g. came back to a background tab)
       if (reg.waiting) {
         showUpdateToast(reg.waiting)
+        return
+      }
+
+      // Race condition: updatefound fired before this component mounted
+      if (reg.installing) {
+        trackInstalling(reg.installing)
         return
       }
 
       reg.addEventListener('updatefound', () => {
         const newWorker = reg.installing
         if (!newWorker) return
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            showUpdateToast(newWorker)
-          }
-        })
+        trackInstalling(newWorker)
       })
     })
 
