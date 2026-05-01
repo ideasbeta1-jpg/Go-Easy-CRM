@@ -5,14 +5,15 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   
   // Fetch real counts from DB
-  const { count: newLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'lead_nuevo')
-  const { count: inQuote } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'en_cotizacion')
-  const { count: confirmed } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'reserva_confirmada')
-  const { count: totalLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true })
+  const { count: newLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'lead_nuevo').is('deleted_at', null)
+  const { count: inQuote } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'en_cotizacion').is('deleted_at', null)
+  const { count: confirmed } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'reserva_confirmada').is('deleted_at', null)
+  const { count: totalLeads } = await supabase.from('leads').select('*', { count: 'exact', head: true }).is('deleted_at', null)
 
   const { data: recentLeads } = (await supabase
     .from('leads')
     .select('*, category:categories(name), location:locations(name)')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .limit(4)) as { data: any[] | null }
 

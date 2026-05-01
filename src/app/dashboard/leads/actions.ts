@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
 import { assignLeadToAgent } from '@/utils/assignment'
+import { VALID_TRANSITIONS } from '@/lib/leads/transitions'
 
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
@@ -42,14 +43,6 @@ export async function createLead(formData: FormData) {
   revalidatePath('/dashboard/leads')
 }
 
-// Valid forward-only transitions to avoid re-triggering automations on backward drags
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  lead_nuevo:          ['en_cotizacion', 'cerrado'],
-  en_cotizacion:       ['reserva_confirmada', 'lead_nuevo', 'cerrado'],
-  reserva_confirmada:  ['voucher_enviado', 'cerrado'],
-  voucher_enviado:     ['cerrado'],
-  cerrado:             [],
-}
 
 export async function updateLeadStatus(id: string, status: string) {
   const supabase = await createClient()
@@ -109,7 +102,22 @@ export async function deleteLead(id: string) {
 
   const { error } = await supabase
     .from('leads')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  revalidatePath('/dashboard/leads')
+}
+
+export async function restoreLead(id: string) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .update({ deleted_at: null })
     .eq('id', id)
 
   if (error) {

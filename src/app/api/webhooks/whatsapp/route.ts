@@ -7,7 +7,6 @@ import { broadcastNotification } from '@/app/utils/actions/notifications'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    console.log('--- WhatsApp Webhook received ---', JSON.stringify(body, null, 2))
 
     // --- HANDLE EVOLUTION API ---
     if (body.event === 'messages.upsert' && body.data) {

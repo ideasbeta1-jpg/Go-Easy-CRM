@@ -31,8 +31,6 @@ export default async function ChatsPage() {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  console.log('[ChatsPage] leads:', leads?.length, 'preview messages:', recentMessages?.length)
-
   return (
     <Suspense fallback={
       <div className="h-[calc(100vh-100px)] flex items-center justify-center bg-slate-50/50 rounded-2xl md:rounded-[3rem] border border-slate-100">

@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation'
 import { useKanbanFilter } from './KanbanFilterContext'
 import { isToday, isThisWeek, isThisMonth, differenceInHours } from 'date-fns'
 import { updateLeadStatus } from '../actions'
+import { VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES } from '@/lib/leads/transitions'
+import { calcRentalDays, calcReservationAmount } from '@/lib/leads/calculations'
 
 interface KanbanBoardProps {
   initialLeads: any[]
@@ -25,24 +27,6 @@ interface PendingMove {
   toLabel: string
   automationNote: string
 }
-
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  lead_nuevo:         ['en_cotizacion', 'cerrado'],
-  en_cotizacion:      ['reserva_confirmada', 'lead_nuevo', 'cerrado'],
-  reserva_confirmada: ['voucher_enviado', 'cerrado'],
-  voucher_enviado:    ['cerrado'],
-  cerrado:            [],
-}
-
-const STAGE_AUTOMATION_NOTE: Record<string, string> = {
-  en_cotizacion:      'Enviará cotización por WhatsApp y email al cliente.',
-  reserva_confirmada: 'Enviará confirmación de reserva por WhatsApp y email.',
-  voucher_enviado:    'Enviará el voucher oficial por WhatsApp y email.',
-  cerrado:            'Enviará mensaje de cierre y finalizará el seguimiento.',
-}
-
-// Stages that warrant a confirmation dialog before triggering automations
-const CONFIRM_STAGES = new Set(['voucher_enviado', 'cerrado'])
 
 export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {} }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
@@ -157,16 +141,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
   }
 
   const getReservationAmount = (lead: any) => {
-    let days = 1
-    if (lead.pickup_date && lead.return_date) {
-      const p = new Date(lead.pickup_date)
-      const r = new Date(lead.return_date)
-      if (r >= p) days = Math.max(1, Math.ceil((r.getTime() - p.getTime()) / 86400000))
-    }
-    const rate = lead.agreed_daily_price != null
-      ? parseFloat(lead.agreed_daily_price)
-      : parseFloat(lead.category?.daily_price || 0)
-    return rate * days
+    const days = calcRentalDays(lead.pickup_date, lead.return_date)
+    return calcReservationAmount(lead.agreed_daily_price, lead.category?.daily_price, days)
   }
 
   // Urgency badge based on pickup proximity

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Plus, User, Phone, Mail, Calendar, MapPin, Car, DollarSign, CheckCircle2, Loader2 } from 'lucide-react'
 import { createLead, searchCustomerByContact } from '../actions'
+import { calcTotal } from '@/lib/leads/calculations'
 import { toast } from 'sonner'
 import { Sparkles, History } from 'lucide-react'
 
@@ -52,17 +53,10 @@ export function NewLeadModal({ isOpen, onClose, categories, locations, currentUs
     if (selectedCategoryId && pickupDate && returnDate) {
       const p = new Date(pickupDate)
       const r = new Date(returnDate)
-      
-      // We use 00:00 for the dates to calculate full days correctly
       if (r >= p) {
-        const diffInMs = r.getTime() - p.getTime()
-        const diffInDays = Math.max(1, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)))
-        
+        const diffInDays = Math.max(1, Math.ceil((r.getTime() - p.getTime()) / (1000 * 60 * 60 * 24)))
         const category = categories.find(c => c.id === selectedCategoryId)
-        if (category) {
-          const dailyCost = (parseFloat(category.base_daily_cost) || 0) + (parseFloat(category.daily_price) || 0)
-          setTotalAmount(dailyCost * diffInDays)
-        }
+        if (category) setTotalAmount(calcTotal(category, diffInDays, 'base'))
       }
     }
   }, [selectedCategoryId, pickupDate, returnDate, categories])

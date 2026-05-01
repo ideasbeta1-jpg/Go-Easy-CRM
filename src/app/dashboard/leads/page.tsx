@@ -40,6 +40,7 @@ export default async function LeadsPage() {
       *,
       category:categories(name, image_url, daily_price)
     `)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
 
   if (!isAdmin) {

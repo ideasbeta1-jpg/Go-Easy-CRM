@@ -52,13 +52,9 @@ export default async function LeadDetailPage({
     supabase.from('vouchers').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('locations').select('*').order('name'),
     supabase.from('provider_offices').select('*'),
-    supabase.from('messages').select('*').eq('lead_id', id).order('created_at', { ascending: true }),
+    supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false })
   ])
-
-  if (notesRes.error) {
-    console.error("Notes fetch error:", notesRes.error)
-  }
 
   const lead = {
     ...leadRaw,
@@ -78,7 +74,8 @@ export default async function LeadDetailPage({
       agents={allAgentsRes.data || []}
       locations={locationsRes.data || []}
       providerOffices={providerOfficesRes.data || []}
-      messages={messagesRes.data || []}
+      messages={(messagesRes.data || []).reverse()}
+      totalMessages={messagesRes.count ?? 0}
       leadNotes={notesRes.data || []}
       currentUser={currentUserProfile}
     />

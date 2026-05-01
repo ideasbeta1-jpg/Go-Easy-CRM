@@ -51,28 +51,17 @@ export async function POST(req: NextRequest) {
   }
 
   const event = params.event
-  console.log('[Zadarma Webhook]', event, params)
 
   try {
     switch (event) {
-      case 'NOTIFY_START':
-        await handleCallStart(params)
-        break
-      case 'NOTIFY_ANSWER':
-        await handleCallAnswer(params)
-        break
-      case 'NOTIFY_END':
-        await handleCallEnd(params)
-        break
-      case 'NOTIFY_RECORD':
-        await handleRecordingReady(params)
-        break
-      default:
-        console.log('[Zadarma Webhook] Unhandled event:', event)
+      case 'NOTIFY_START':   await handleCallStart(params);    break
+      case 'NOTIFY_ANSWER':  await handleCallAnswer(params);   break
+      case 'NOTIFY_END':     await handleCallEnd(params);      break
+      case 'NOTIFY_RECORD':  await handleRecordingReady(params); break
     }
-  } catch (err) {
-    console.error('[Zadarma Webhook] Handler error:', err)
-    // Devolvemos 200 de todas formas para que Zadarma no reintente
+  } catch (err: any) {
+    console.error('[Zadarma Webhook] Handler error:', err.message)
+    // Return 200 so Zadarma does not retry
   }
 
   return NextResponse.json({ status: 'ok' })

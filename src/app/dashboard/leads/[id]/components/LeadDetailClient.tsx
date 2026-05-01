@@ -1,56 +1,56 @@
 'use client'
 
-import React, { useState, useTransition, useEffect, useRef } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { 
-  ArrowLeft, 
-  Settings, 
-  MessageSquare, 
-  MoreHorizontal, 
-  Send, 
-  Users, 
-  Calendar, 
-  MapPin, 
-  User, 
-  Car, 
-  ChevronRight, 
-  Clock, 
-  DollarSign, 
-  CheckCircle2, 
+import {
+  ArrowLeft,
+  MessageSquare,
+  Send,
+  Users,
+  MapPin,
+  User,
+  Car,
+  Clock,
+  DollarSign,
+  CheckCircle2,
   AlertCircle,
   Zap,
   Edit2,
-  Save,
   X,
   Trash2,
   Calculator,
   Mic,
-  Square,
   Volume2,
   Hash,
   FileText
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { calcTotal } from '@/lib/leads/calculations'
 import { updateLead, deleteLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
 import { generateVoucherForLead, updateProviderConfirmation } from '@/app/utils/actions/vouchers'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { uploadChatMedia } from '@/app/utils/actions/storage'
+import { fetchMoreMessages } from '@/app/utils/actions/messages'
 import CallLogPanel from './CallLogPanel'
+import { ActivityTimeline } from './sections/ActivityTimeline'
+import { NotesPanel } from './sections/NotesPanel'
+import { PipelineStatusBar } from './sections/PipelineStatusBar'
 
-export default function LeadDetailClient({ 
-  lead, 
-  activeQuote, 
+export default function LeadDetailClient({
+  lead,
+  activeQuote,
   activeVoucher,
   categories,
   providers,
   agents,
   locations,
   providerOffices,
-  messages,
+  messages: initialMessages,
+  totalMessages,
   leadNotes,
   notesError,
   currentUser
@@ -64,6 +64,7 @@ export default function LeadDetailClient({
   locations: any[],
   providerOffices: any[],
   messages: any[],
+  totalMessages: number,
   leadNotes: any[],
   notesError?: any,
   currentUser?: any
@@ -137,6 +138,9 @@ export default function LeadDetailClient({
   const [isPending, startTransition] = useTransition()
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
+  const [messages, setMessages] = useState<any[]>(initialMessages)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const hasMoreMessages = messages.length < totalMessages
   const [providerConfirmation, setProviderConfirmation] = useState(activeVoucher?.provider_confirmation || '')
   const [isUpdatingConfirmation, setIsUpdatingConfirmation] = useState(false)
   const [ctaProviderId, setCtaProviderId] = useState(lead.provider_id || '')
@@ -267,19 +271,34 @@ export default function LeadDetailClient({
     setAudioChunks([])
   }
 
-  const handleSendMessage = async () => {
-    if (!chatMessage.trim() || isSendingMessage) return;
-    setIsSendingMessage(true);
+  const handleLoadMoreMessages = async () => {
+    setIsLoadingMore(true)
     try {
-      const ok = await sendManualWhatsApp(formData.phone || '', chatMessage, lead.id);
-      if (ok) {
-        setChatMessage('');
-        router.refresh(); // Fetch new messages
-      }
+      const older = await fetchMoreMessages(lead.id, messages.length)
+      setMessages(prev => [...older, ...prev])
+    } catch {
+      // silent fail — user can retry
     } finally {
-      setIsSendingMessage(false);
+      setIsLoadingMore(false)
     }
-  };
+  }
+
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || isSendingMessage) return
+    const text = chatMessage
+    const optimistic = { id: `opt-${Date.now()}`, direction: 'outbound', content: text, created_at: new Date().toISOString() }
+    setMessages(prev => [...prev, optimistic])
+    setChatMessage('')
+    setIsSendingMessage(true)
+    try {
+      await sendManualWhatsApp(formData.phone || '', text, lead.id)
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== optimistic.id))
+      setChatMessage(text)
+    } finally {
+      setIsSendingMessage(false)
+    }
+  }
 
   const handleStatusChange = async (newStatus: string) => {
     if (isEditing) {
@@ -320,51 +339,55 @@ export default function LeadDetailClient({
   }
 
   const handleSave = async () => {
-      if (isSaving) return
-      setIsSaving(true)
-      try {
-          const updates = {
-              ...formData,
-              category_id: formData.category_id || null,
-              provider_id: formData.provider_id || null,
-              assigned_to: formData.assigned_to || null,
-              pickup_location_id: formData.pickup_location_id || null,
-              return_location_id: formData.return_location_id || null,
-              total_amount: parseFloat(formData.total_amount as any) || 0,
-              pickup_date: formData.pickup_date || null,
-              return_date: formData.return_date || null,
-              status: formData.status,
-              deposit_paid: !!formData.deposit_paid,
-              notes: formData.notes || '',
-              agreed_daily_price: formData.agreed_daily_price !== null ? parseFloat(formData.agreed_daily_price as any) : null,
-              rate_plan: formData.rate_plan
-          }
-          await updateLead(lead.id, updates)
-          setIsEditing(false)
-          router.refresh()
-      } catch (error: any) {
-          console.error('Error updating lead:', error)
-          alert(`Error al actualizar el lead: ${error.message || 'Unknown error'}`)
-      } finally {
-          setIsSaving(false)
-      }
+    if (isSaving) return
+    setIsSaving(true)
+    setIsEditing(false)
+    const updates = {
+      ...formData,
+      category_id: formData.category_id || null,
+      provider_id: formData.provider_id || null,
+      assigned_to: formData.assigned_to || null,
+      pickup_location_id: formData.pickup_location_id || null,
+      return_location_id: formData.return_location_id || null,
+      total_amount: parseFloat(formData.total_amount as any) || 0,
+      pickup_date: formData.pickup_date || null,
+      return_date: formData.return_date || null,
+      status: formData.status,
+      deposit_paid: !!formData.deposit_paid,
+      notes: formData.notes || '',
+      agreed_daily_price: formData.agreed_daily_price !== null ? parseFloat(formData.agreed_daily_price as any) : null,
+      rate_plan: formData.rate_plan
+    }
+    try {
+      await updateLead(lead.id, updates)
+      router.refresh()
+    } catch (error: any) {
+      setIsEditing(true)
+      alert(`Error al guardar: ${error.message || 'Error desconocido'}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleRatePlanChange = (newPlan: string) => {
+    if (!isEditing) return
+    const days = rentalDays || 1
+    if (formData.agreed_daily_price === null && selectedCategory) {
+      const newTotal = calcTotal(selectedCategory, days, newPlan)
+      setFormData(prev => ({ ...prev, rate_plan: newPlan, total_amount: newTotal }))
+    } else {
+      setFormData(prev => ({ ...prev, rate_plan: newPlan }))
+    }
   }
 
   const handleDeleteLead = async () => {
-    const confirmation = window.prompt(`Para confirmar que deseas ELIMINAR este lead de forma permanente, escribe "ELIMINAR" a continuación:`)
-    if (confirmation !== 'ELIMINAR') {
-      if (confirmation !== null) {
-        alert('Palabra clave incorrecta. El lead no fue eliminado.')
-      }
-      return
-    }
+    if (!confirm('¿Archivar este lead? Quedará oculto del pipeline pero no se perderán sus datos.')) return
 
     try {
       await deleteLead(lead.id)
       router.push('/dashboard/leads')
     } catch (error: any) {
-      console.error('Error deleting lead:', error)
-      alert(`Error al eliminar el lead: ${error.message || 'Unknown error'}`)
+      alert(`Error al archivar el lead: ${error.message || 'Unknown error'}`)
     }
   }
 
@@ -579,7 +602,7 @@ export default function LeadDetailClient({
             <button
                 onClick={handleDeleteLead}
                 className="ml-2 p-2.5 text-slate-400 hover:text-white hover:bg-red-500 rounded-full transition-all border border-transparent hover:border-red-600 hover:shadow-sm"
-                title="Eliminar Lead Permanente"
+                title="Archivar Lead"
             >
                 <Trash2 className="w-4 h-4" />
             </button>
@@ -593,38 +616,7 @@ export default function LeadDetailClient({
         </div>
       )}
 
-      {/* Pipeline Status Bar */}
-      <div className="max-w-[1600px] mx-auto px-1 sm:px-8 lg:px-12 pt-6 md:pt-8 -mb-4">
-         <div className="bg-slate-50/80 backdrop-blur-sm rounded-full border border-slate-100 p-2 flex items-center lg:justify-between shadow-[0_5px_15px_rgba(0,0,0,0.03)] relative overflow-hidden overflow-x-auto hide-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado'].map((stage, idx, arr) => {
-               const stageLabels: Record<string, string> = {
-                  'lead_nuevo': 'Lead Nuevo',
-                  'en_cotizacion': 'En Cotización',
-                  'reserva_confirmada': 'Reserva Confirmada',
-                  'voucher_enviado': 'Voucher Enviado',
-                  'cerrado': 'Cerrado / Perdido'
-               }
-               const isActive = formData.status === stage;
-               const currentIndex = arr.indexOf(formData.status);
-               const isPast = idx < currentIndex;
-               
-               return (
-                 <button 
-                   key={stage}
-                   onClick={() => handleStatusChange(stage)}
-                   className={`flex-none min-w-[150px] flex-1 py-3 px-4 rounded-full text-[10px] lg:text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
-                      isActive ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' : 
-                      isPast ? 'bg-primary/5 text-primary hover:bg-primary/10' : 
-                      'text-slate-400 hover:bg-white hover:shadow-sm'
-                   }`}
-                 >
-                    {isPast && <CheckCircle2 className="w-3.5 h-3.5" />}
-                    <span>{stageLabels[stage]}</span>
-                 </button>
-               )
-            })}
-         </div>
-      </div>
+      <PipelineStatusBar currentStatus={formData.status} onStatusChange={handleStatusChange} />
 
       <div 
         ref={gridRef}
@@ -950,17 +942,17 @@ export default function LeadDetailClient({
                        />
                        <button
                          disabled={!isEditing}
-                         onClick={() => setFormData({...formData, rate_plan: 'base'})}
+                         onClick={() => handleRatePlanChange('base')}
                          className={`relative flex-1 py-3 transition-colors ${formData.rate_plan === 'base' ? 'text-slate-900' : 'text-white/50 hover:text-white disabled:opacity-50'}`}
                        >
                          Tarifa Base
                        </button>
                        <button
                          disabled={!isEditing}
-                         onClick={() => setFormData({...formData, rate_plan: 'premium'})}
+                         onClick={() => handleRatePlanChange('premium')}
                          className={`relative flex-1 py-3 transition-colors flex items-center justify-center gap-1.5 ${formData.rate_plan === 'premium' ? 'text-indigo-900' : 'text-white/50 hover:text-white disabled:opacity-50'}`}
                        >
-                         <Zap className={`w-3 h-3 ${formData.rate_plan === 'premium' ? 'text-indigo-600' : ''}`} /> Premium
+                         <Zap className={`w-3 h-3 ${formData.rate_plan === 'premium' ? 'text-indigo-600' : ''}`} /> Premium +15%
                        </button>
                      </div>
 
@@ -1123,54 +1115,11 @@ export default function LeadDetailClient({
                </div>
            </div>
 
-           {/* Section: Activity Timeline */}
-           <div className="bg-white border border-slate-100 rounded-[2rem] lg:rounded-[3.5rem] p-6 md:p-10 lg:p-16 shadow-[0_15px_40px_rgba(0,0,0,0.02)]">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] pl-1 mb-8 lg:mb-10">Línea de Tiempo</h3>
-              <div className="space-y-8 relative pl-6 border-l-2 border-slate-50">
-                 {timelineEvents.map((event) => {
-                    const EventIcon = event.icon;
-                    return (
-                       <div key={event.id} className="relative">
-                          <div className={`absolute -left-[41px] -top-1 w-10 h-10 rounded-full flex items-center justify-center ring-8 ring-white ${event.color}`}>
-                             <EventIcon className="w-4 h-4" />
-                          </div>
-                          <div className="bg-slate-50 rounded-2xl p-5 ml-4 border border-slate-100/50">
-                             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
-                                <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">{event.title}</h4>
-                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                   {event.date ? format(new Date(event.date), 'dd MMM yyyy · HH:mm', { locale: es }) : ''}
-                                </span>
-                             </div>
-                              <p className="text-xs font-bold text-slate-500 mt-2">{event.desc}</p>
-                              
-                              {event.id === 'quote' && activeQuote && (
-                                 <div className="mt-4 flex flex-wrap gap-3">
-                                    <Link 
-                                      href={`/cotizacion/${activeQuote.id}`}
-                                      target="_blank"
-                                      className="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-200 transition-all border border-amber-200/50"
-                                    >
-                                       <Zap className="w-3" /> Ver Propuesta
-                                    </Link>
-                                 </div>
-                              )}
-
-                              {(event as any).isMismatch && (
-                                 <div className="mt-4">
-                                    <button 
-                                       onClick={handleRegenerateQuote}
-                                       className="inline-flex items-center gap-2 bg-white text-red-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all border border-red-200 shadow-sm"
-                                    >
-                                       <Zap className="w-3" /> Regenerar Cotización con nuevos valores
-                                    </button>
-                                 </div>
-                              )}
-                          </div>
-                       </div>
-                    )
-                 })}
-              </div>
-           </div>
+           <ActivityTimeline
+             events={timelineEvents}
+             activeQuote={activeQuote}
+             onRegenerateQuote={handleRegenerateQuote}
+           />
 
            {/* Large Action Area (CTA) */}
            <div className="bg-oceanic rounded-[2rem] lg:rounded-[4rem] p-8 md:p-12 lg:p-20 relative overflow-hidden group">
@@ -1416,95 +1365,16 @@ export default function LeadDetailClient({
                     )}
                  </div>
 
-                 {/* Agent Notes */}
-                 <div className="pt-6 mt-6 border-t border-slate-100 flex flex-col h-[350px]">
-                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] pl-1 mb-4">Notas Internas del Agente</p>
-                    
-                    {/* Notes Feed */}
-                    <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide mb-4">
-                      {notesError ? (
-                        <div className="bg-red-50/50 rounded-2xl p-4 border border-red-100 flex flex-col items-center justify-center h-full">
-                          <p className="text-xs font-black text-red-500 mb-2">Error cargando notas</p>
-                          <pre className="text-[9px] text-red-400 max-w-full overflow-x-auto">{JSON.stringify(notesError, null, 2)}</pre>
-                        </div>
-                      ) : leadNotes?.length === 0 ? (
-                        <div className="bg-amber-50/50 rounded-2xl p-4 border border-amber-100/50 flex items-center justify-center h-full">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center py-4">Sin notas registradas</p>
-                        </div>
-                      ) : (
-                        leadNotes.map((note) => {
-                          const isVoucherNote = note.content?.includes('[VOUCHER_GENERATED]')
-                          
-                          return (
-                            <div key={note.id} className={`${isVoucherNote ? 'bg-indigo-50/50 border-indigo-100/50' : 'bg-amber-50/50 border-amber-100/50'} rounded-2xl p-4 border group relative`}>
-                              <div className="flex flex-col gap-3">
-                                <p className={`text-sm ${isVoucherNote ? 'font-black text-indigo-900' : 'font-medium text-slate-700'} whitespace-pre-wrap leading-relaxed pr-6`}>
-                                   {isVoucherNote ? note.content.replace('[VOUCHER_GENERATED] ', '') : note.content}
-                                </p>
-                                
-                                {isVoucherNote && activeVoucher && (
-                                   <Link 
-                                     href={`/voucher/${activeVoucher.id}`}
-                                     target="_blank"
-                                     className="inline-flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all self-start shadow-lg shadow-indigo-600/20"
-                                   >
-                                      <FileText className="w-3 h-3" /> Ver Voucher Oficial
-                                   </Link>
-                                )}
-                              </div>
-
-                              <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100/30">
-                                 <div className="flex items-center gap-2">
-                                    {note.profiles?.avatar_url ? (
-                                      <img src={note.profiles.avatar_url} alt="" className="w-4 h-4 rounded-full object-cover" />
-                                    ) : (
-                                      <div className={`w-4 h-4 ${isVoucherNote ? 'bg-indigo-200 text-indigo-800' : 'bg-amber-200 text-amber-800'} rounded-full flex items-center justify-center text-[8px] font-bold`}>
-                                        {note.profiles?.full_name ? note.profiles.full_name[0] : '?'}
-                                      </div>
-                                    )}
-                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isVoucherNote ? 'text-indigo-700' : 'text-amber-700'}`}>
-                                       {note.profiles?.full_name || 'Sistema'}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-slate-400 capitalize">• {format(new Date(note.created_at), "h:mm a · MMM d", { locale: es })}</span>
-                                 </div>
-                              </div>
-                              <button 
-                                 onClick={() => handleDeleteNote(note.id)}
-                                 className="absolute top-4 right-4 text-slate-900/10 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                                 title="Eliminar nota"
-                              >
-                                 <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          )
-                        })
-                      )}
-                    </div>
-
-                    {/* Add Note Input */}
-                    <div className="flex items-end gap-2 shrink-0">
-                      <textarea
-                        value={newNote}
-                        onChange={(e) => setNewNote(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault()
-                            handleAddNote()
-                          }
-                        }}
-                        placeholder="Escribe una nota rápida..."
-                        className="flex-1 bg-slate-50 border border-slate-100 rounded-xl p-3 text-sm font-medium outline-none resize-none min-h-[44px] max-h-[120px] focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-slate-400"
-                        rows={1}
-                      />
-                      <button 
-                        onClick={handleAddNote}
-                        disabled={!newNote.trim() || isAddingNote}
-                        className="w-11 h-[44px] shrink-0 bg-primary hover:bg-primary/90 disabled:bg-slate-100 disabled:text-slate-400 text-white rounded-xl flex items-center justify-center transition-colors"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                 </div>
+                 <NotesPanel
+                   notes={leadNotes}
+                   notesError={notesError}
+                   newNote={newNote}
+                   isAdding={isAddingNote}
+                   activeVoucher={activeVoucher}
+                   onChange={setNewNote}
+                   onAdd={handleAddNote}
+                   onDelete={handleDeleteNote}
+                 />
               </div>
            </div>
 
@@ -1525,6 +1395,17 @@ export default function LeadDetailClient({
 
                {/* Messages Feed */}
                <div className="flex-1 space-y-8 mb-8 overflow-y-auto pr-4 scrollbar-hide py-2">
+                   {hasMoreMessages && (
+                     <div className="flex justify-center">
+                       <button
+                         onClick={handleLoadMoreMessages}
+                         disabled={isLoadingMore}
+                         className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary transition-colors px-4 py-2 rounded-full bg-slate-50 hover:bg-slate-100 disabled:opacity-50"
+                       >
+                         {isLoadingMore ? 'Cargando...' : `Ver mensajes anteriores (${totalMessages - messages.length} más)`}
+                       </button>
+                     </div>
+                   )}
                    {messages?.length > 0 ? messages.map((msg, i) => (
                     <div key={i} className={`flex flex-col ${msg.direction === 'outbound' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
                        <div className={`max-w-[85%] p-4 md:p-6 rounded-[2rem] text-sm font-bold leading-relaxed mb-2 ${

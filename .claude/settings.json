@@ -10,7 +10,12 @@
       "Bash(node -e \"const f = require\\('@ffmpeg-installer/ffmpeg'\\); console.log\\('path:', f.path, 'version:', f.version\\)\")",
       "Bash(node -e \"const f = require\\('@ffmpeg-installer/ffmpeg'\\); const {execSync} = require\\('child_process'\\); try { const out = execSync\\('\\\\\"' + f.path + '\\\\\" -version 2>&1'\\).toString\\(\\); console.log\\(out.split\\('\\\\n'\\)[0]\\); } catch\\(e\\) { console.log\\('Error:', e.message\\); }\")",
       "Bash(grep -E \"\\\\.\\(js|json|icon|png\\)$\")",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Read(//c/Users/razs9/OneDrive/Desktop/Apps/**)",
+      "Bash(xargs wc *)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"
     ]
   }
 }
