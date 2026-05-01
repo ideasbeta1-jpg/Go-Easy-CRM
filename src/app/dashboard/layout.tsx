@@ -35,7 +35,8 @@ export default async function DashboardLayout({
     { name: 'Catálogo Flota', href: '/dashboard/catalog' },
     { name: 'Proveedores', href: '/dashboard/providers' },
     { name: 'Reportes', href: '/dashboard/reports' },
-    { name: 'Automa n8n', href: '/dashboard/automations' },
+    { name: 'Mensajes', href: '/dashboard/messages' },
+    { name: 'Automatizaciones', href: '/dashboard/automations' },
   ]
 
   return (

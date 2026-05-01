@@ -16,7 +16,14 @@
       "mcp__claude_ai_Supabase__list_projects",
       "Read(//c/c/Users/razs9/OneDrive/Desktop/Apps/**)",
       "Read(//c/Users/razs9/OneDHome/Desktop/Apps/**)",
-      "Bash(grep -r \"automation_config\\\\|automation_rules\\\\|automation_logs\" supabase/migrations/)"
+      "Bash(grep -r \"automation_config\\\\|automation_rules\\\\|automation_logs\" supabase/migrations/)",
+      "mcp__claude_ai_Vercel__list_teams",
+      "mcp__claude_ai_Vercel__list_projects",
+      "mcp__claude_ai_Vercel__get_runtime_logs",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__apply_migration"
     ],
     "additionalDirectories": [
       "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"

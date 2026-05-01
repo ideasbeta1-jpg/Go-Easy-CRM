@@ -20,7 +20,8 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
     'Catálogo Flota': 'directions_car',
     'Proveedores': 'inventory_2',
     'Reportes': 'monitoring',
-    'Automa n8n': 'settings_input_component'
+    'Mensajes': 'forum',
+    'Automatizaciones': 'bolt'
   };
 
   return (
