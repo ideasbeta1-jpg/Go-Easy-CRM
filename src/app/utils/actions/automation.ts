@@ -25,7 +25,7 @@ export type AutomationConfigRow = {
 }
 
 export async function getAutomationConfig(): Promise<{ config: AutomationConfigRow[]; error?: string }> {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase
     .from('automation_config')
     .select('stage, channel, enabled')
