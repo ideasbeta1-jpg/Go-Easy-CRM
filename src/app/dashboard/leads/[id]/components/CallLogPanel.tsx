@@ -94,11 +94,9 @@ function AudioPlayer({ url }: { url: string }) {
   )
 }
 
-export default function CallLogPanel({ leadId, leadPhone, agentId, agentSip }: CallLogPanelProps) {
+export default function CallLogPanel({ leadId, leadPhone }: CallLogPanelProps) {
   const [calls, setCalls] = useState<CallLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [calling, setCalling] = useState(false)
-  const [callError, setCallError] = useState<string | null>(null)
 
   const fetchCalls = useCallback(async () => {
     try {
@@ -114,38 +112,9 @@ export default function CallLogPanel({ leadId, leadPhone, agentId, agentSip }: C
 
   useEffect(() => {
     fetchCalls()
-    // Refresh cada 30s para capturar llamadas activas
     const interval = setInterval(fetchCalls, 30_000)
     return () => clearInterval(interval)
   }, [fetchCalls])
-
-  const handleClickToCall = async () => {
-    if (!agentSip) {
-      setCallError('Tu perfil no tiene extensión PBX configurada. Pídele al admin que añada tu zadarma_sip.')
-      return
-    }
-    if (!leadPhone) {
-      setCallError('El lead no tiene número de teléfono registrado.')
-      return
-    }
-    setCalling(true)
-    setCallError(null)
-    try {
-      const res = await fetch('/api/zadarma/click-to-call', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId, agentId }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Error al iniciar llamada')
-      // Esperar 2s y refrescar para mostrar la llamada recién iniciada
-      setTimeout(fetchCalls, 2000)
-    } catch (err: unknown) {
-      setCallError(err instanceof Error ? err.message : 'Error desconocido')
-    } finally {
-      setCalling(false)
-    }
-  }
 
   return (
     <div id="call-log-panel" className="bg-white border border-slate-100 rounded-[2rem] lg:rounded-[3.5rem] p-6 lg:p-10 shadow-[0_15px_40px_rgba(0,0,0,0.02)] scroll-mt-32">
@@ -158,34 +127,21 @@ export default function CallLogPanel({ leadId, leadPhone, agentId, agentSip }: C
           <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em]">Llamadas · Zadarma</h4>
         </div>
 
-        <button
-          onClick={handleClickToCall}
-          disabled={calling || !leadPhone}
-          className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:bg-slate-100 disabled:text-slate-400 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 hover:scale-105 active:scale-95"
-        >
-          {calling ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
+        {leadPhone ? (
+          <a
+            href={`tel:${leadPhone}`}
+            className="flex items-center gap-2 bg-violet-600 hover:bg-violet-700 text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-violet-600/20 hover:scale-105 active:scale-95"
+          >
             <Phone className="w-3.5 h-3.5" />
-          )}
-          {calling ? 'Conectando...' : 'Llamar'}
-        </button>
+            Llamar
+          </a>
+        ) : (
+          <span className="flex items-center gap-2 bg-slate-100 text-slate-400 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest cursor-not-allowed">
+            <Phone className="w-3.5 h-3.5" />
+            Sin teléfono
+          </span>
+        )}
       </div>
-
-      {/* Error Banner */}
-      {callError && (
-        <div className="mb-4 bg-rose-50 border border-rose-100 rounded-2xl p-4 text-xs font-bold text-rose-600">
-          ⚠️ {callError}
-        </div>
-      )}
-
-      {/* No SIP warning */}
-      {!agentSip && (
-        <div className="mb-4 bg-amber-50 border border-amber-100 rounded-2xl p-3 text-[10px] font-bold text-amber-700 flex items-center gap-2">
-          <span>⚡</span>
-          <span>Sin extensión PBX — Configura tu <strong>zadarma_sip</strong> en el perfil para activar Click-to-Call.</span>
-        </div>
-      )}
 
       {/* Call List */}
       <div className="space-y-3">
