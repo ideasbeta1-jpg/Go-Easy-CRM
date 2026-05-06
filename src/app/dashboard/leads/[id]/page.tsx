@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import LeadDetailClient from './components/LeadDetailClient'
+import { ZadarmaWidget } from '@/components/ZadarmaWidget'
 
 export default async function LeadDetailPage({
   params: paramsPromise
@@ -64,20 +65,28 @@ export default async function LeadDetailPage({
   }
 
   return (
-    <LeadDetailClient 
-      lead={lead}
-      notesError={notesRes.error}
-      activeQuote={quotesRes.data?.[0]}
-      activeVoucher={vouchersRes.data?.[0]}
-      categories={categoriesRes.data || []}
-      providers={allProvidersRes.data || []}
-      agents={allAgentsRes.data || []}
-      locations={locationsRes.data || []}
-      providerOffices={providerOfficesRes.data || []}
-      messages={(messagesRes.data || []).reverse()}
-      totalMessages={messagesRes.count ?? 0}
-      leadNotes={notesRes.data || []}
-      currentUser={currentUserProfile}
-    />
+    <>
+      <LeadDetailClient
+        lead={lead}
+        notesError={notesRes.error}
+        activeQuote={quotesRes.data?.[0]}
+        activeVoucher={vouchersRes.data?.[0]}
+        categories={categoriesRes.data || []}
+        providers={allProvidersRes.data || []}
+        agents={allAgentsRes.data || []}
+        locations={locationsRes.data || []}
+        providerOffices={providerOfficesRes.data || []}
+        messages={(messagesRes.data || []).reverse()}
+        totalMessages={messagesRes.count ?? 0}
+        leadNotes={notesRes.data || []}
+        currentUser={currentUserProfile}
+      />
+      {currentUserProfile?.zadarma_sip && process.env.NEXT_PUBLIC_ZADARMA_USER_KEY && (
+        <ZadarmaWidget
+          userKey={process.env.NEXT_PUBLIC_ZADARMA_USER_KEY}
+          sipExtension={currentUserProfile.zadarma_sip}
+        />
+      )}
+    </>
   )
 }

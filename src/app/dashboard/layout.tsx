@@ -11,7 +11,6 @@ import { Toaster } from 'sonner'
 import { ActiveStatusTracker } from './components/ActiveStatusTracker'
 import { getUserProfile } from '@/app/utils/actions/profiles'
 import { getSystemSettings } from '@/app/utils/actions/settings'
-import { ZadarmaWidget } from '@/components/ZadarmaWidget'
 
 export default async function DashboardLayout({
   children,
@@ -124,12 +123,6 @@ export default async function DashboardLayout({
         <Toaster richColors position="top-right" closeButton />
       </div>
       <ActiveStatusTracker />
-      {userProfile?.zadarma_sip && process.env.NEXT_PUBLIC_ZADARMA_USER_KEY && (
-        <ZadarmaWidget
-          userKey={process.env.NEXT_PUBLIC_ZADARMA_USER_KEY}
-          sipExtension={userProfile.zadarma_sip}
-        />
-      )}
     </NotificationProvider>
   )
 }

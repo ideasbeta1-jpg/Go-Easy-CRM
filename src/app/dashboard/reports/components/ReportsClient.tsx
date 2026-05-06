@@ -1,22 +1,24 @@
 'use client'
 
-import React, { useMemo } from 'react'
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, AreaChart, Area, Legend 
+import React, { useMemo, useState } from 'react'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area, Legend
 } from 'recharts'
-import { 
-  TrendingUp, 
-  Users, 
-  DollarSign, 
-  MessageSquare, 
-  Activity, 
-  PieChart as PieIcon, 
+import {
+  TrendingUp,
+  Users,
+  DollarSign,
+  MessageSquare,
+  Activity,
+  PieChart as PieIcon,
   BarChart as BarIcon,
   ChevronUp,
   ChevronDown,
   Clock,
-  Zap
+  Zap,
+  Download,
+  Loader2
 } from 'lucide-react'
 import { format, subDays, isSameDay, startOfDay } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -39,10 +41,37 @@ export default function ReportsClient({
   messageData: any[]
 }) {
   const [isMounted, setIsMounted] = React.useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportFrom, setExportFrom] = useState('')
+  const [exportTo, setExportTo] = useState('')
+  const [exportDirection, setExportDirection] = useState('')
 
   React.useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  async function handleExport() {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (exportFrom) params.set('from', exportFrom)
+      if (exportTo) params.set('to', exportTo)
+      if (exportDirection) params.set('direction', exportDirection)
+
+      const res = await fetch(`/api/export/messages?${params.toString()}`)
+      if (!res.ok) throw new Error('Error al exportar')
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `historial_whatsapp_${new Date().toISOString().slice(0, 10)}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setExporting(false)
+    }
+  }
 
   // --- Process Status Distribution (Pie Chart) ---
   const statusDist = useMemo(() => {
@@ -372,6 +401,71 @@ export default function ReportsClient({
                        </div>
                        <p className="hidden md:block text-[10px] font-black text-white/30 italic uppercase tracking-wider max-w-[100px] text-right">{stat.desc}</p>
                     </div>
+                  ))}
+               </div>
+            </div>
+         </section>
+
+         {/* Export WhatsApp History */}
+         <section className="lg:col-span-12 bg-white rounded-[4rem] p-16 border border-slate-100 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-12">
+               <div>
+                  <h3 className="font-sans text-3xl font-black text-slate-900 uppercase tracking-tighter flex items-center gap-4">
+                     <Download size={28} className="text-primary" />
+                     Exportar Historial de Chats
+                  </h3>
+                  <p className="text-sm font-bold text-slate-400 mt-2 italic">Descarga el historial completo de mensajes enviados y recibidos en formato CSV para análisis externo.</p>
+               </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-6 items-end">
+               <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Desde</label>
+                  <input
+                     type="date"
+                     value={exportFrom}
+                     onChange={e => setExportFrom(e.target.value)}
+                     className="w-full px-6 py-4 rounded-2xl border border-slate-200 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-slate-50"
+                  />
+               </div>
+               <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hasta</label>
+                  <input
+                     type="date"
+                     value={exportTo}
+                     onChange={e => setExportTo(e.target.value)}
+                     className="w-full px-6 py-4 rounded-2xl border border-slate-200 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-slate-50"
+                  />
+               </div>
+               <div className="flex flex-col gap-2 flex-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Dirección</label>
+                  <select
+                     value={exportDirection}
+                     onChange={e => setExportDirection(e.target.value)}
+                     className="w-full px-6 py-4 rounded-2xl border border-slate-200 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 bg-slate-50"
+                  >
+                     <option value="">Todos los mensajes</option>
+                     <option value="inbound">Solo Recibidos</option>
+                     <option value="outbound">Solo Enviados</option>
+                  </select>
+               </div>
+               <button
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="flex items-center gap-3 px-10 py-4 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+               >
+                  {exporting
+                     ? <><Loader2 size={18} className="animate-spin" /> Exportando...</>
+                     : <><Download size={18} /> Descargar CSV</>
+                  }
+               </button>
+            </div>
+
+            <div className="mt-8 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Columnas incluidas en el CSV</p>
+               <div className="flex flex-wrap gap-3">
+                  {['Fecha', 'Cliente', 'Teléfono', 'Dirección', 'Mensaje', 'Estado (sent/delivered/read)', 'Tipo Media', 'URL Media', 'Leído', 'Etapa Pipeline'].map(col => (
+                     <span key={col} className="px-4 py-1.5 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-500 uppercase tracking-wider">{col}</span>
                   ))}
                </div>
             </div>
