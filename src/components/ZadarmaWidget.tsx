@@ -26,11 +26,12 @@ export function ZadarmaWidget({ sipExtension }: ZadarmaWidgetProps) {
     async function init() {
       // Obtener la key dinámica desde el servidor
       const res = await fetch('/api/zadarma/webrtc-key')
+      const data = await res.json()
       if (!res.ok) {
-        console.error('[ZadarmaWidget] No se pudo obtener la key WebRTC')
+        console.error('[ZadarmaWidget] Error obteniendo key WebRTC:', data)
         return
       }
-      const { key } = await res.json()
+      const { key } = data
       if (!key) return
 
       function startWidget() {
