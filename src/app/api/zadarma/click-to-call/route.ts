@@ -94,7 +94,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, callId: callId || null })
   } catch (err) {
-    console.error('[click-to-call]', err)
-    return NextResponse.json({ error: 'Error de conexión con Zadarma' }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[click-to-call]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

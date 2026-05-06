@@ -16,42 +16,54 @@ declare global {
 }
 
 interface ZadarmaWidgetProps {
-  sipExtension: string // formato completo: "548969-103"
+  sipExtension: string // extensión corta: "103"
+  pbxNumber: string    // número PBX: "548969"
 }
 
-export function ZadarmaWidget({ sipExtension }: ZadarmaWidgetProps) {
+export function ZadarmaWidget({ sipExtension, pbxNumber }: ZadarmaWidgetProps) {
   useEffect(() => {
     const BASE = 'https://my.zadarma.com/webphoneWebRTCWidget/v9/js'
 
+    // Zadarma acepta distintos formatos según la configuración de la cuenta.
+    // Intentamos en orden hasta que uno funcione.
+    const sipCandidates = [
+      sipExtension,                          // "103"
+      pbxNumber ? `${pbxNumber}-${sipExtension}` : null,  // "548969-103"
+      pbxNumber ? `${pbxNumber}${sipExtension}` : null,   // "548969103"
+    ].filter(Boolean) as string[]
+
     async function init() {
-      // Obtener la key dinámica desde el servidor
       const res = await fetch('/api/zadarma/webrtc-key')
       const data = await res.json()
-      if (!res.ok) {
+      if (!res.ok || !data.key) {
         console.error('[ZadarmaWidget] Error obteniendo key WebRTC:', data)
         return
       }
-      const { key } = data
-      if (!key) return
 
-      function startWidget() {
-        if (window.zadarmaWidgetFn) {
-          window.zadarmaWidgetFn(key, sipExtension, 'square', 'es', true, {
+      function tryNextSip(candidates: string[]) {
+        if (!candidates.length || !window.zadarmaWidgetFn) return
+        const [sip, ...rest] = candidates
+        console.log('[ZadarmaWidget] Probando SIP:', sip)
+        try {
+          window.zadarmaWidgetFn!(data.key, sip, 'square', 'es', true, {
             right: '10px',
             bottom: '5px',
           })
+        } catch (e) {
+          console.warn('[ZadarmaWidget] SIP falló, probando siguiente:', sip, e)
+          tryNextSip(rest)
         }
       }
 
       function loadFn() {
         const fn = document.createElement('script')
         fn.src = `${BASE}/loader-phone-fn.js?sub_v=1`
-        fn.onload = startWidget
+        fn.onload = () => tryNextSip(sipCandidates)
         document.head.appendChild(fn)
       }
 
       if (document.querySelector(`script[src*="loader-phone-lib"]`)) {
-        startWidget()
+        if (window.zadarmaWidgetFn) tryNextSip(sipCandidates)
         return
       }
 
@@ -62,7 +74,7 @@ export function ZadarmaWidget({ sipExtension }: ZadarmaWidgetProps) {
     }
 
     init()
-  }, [sipExtension])
+  }, [sipExtension, pbxNumber])
 
   return null
 }

@@ -81,9 +81,10 @@ export default async function LeadDetailPage({
         leadNotes={notesRes.data || []}
         currentUser={currentUserProfile}
       />
-      {currentUserProfile?.zadarma_sip && process.env.ZADARMA_PBX_NUMBER && (
+      {currentUserProfile?.zadarma_sip && (
         <ZadarmaWidget
-          sipExtension={`${process.env.ZADARMA_PBX_NUMBER}-${currentUserProfile.zadarma_sip}`}
+          sipExtension={currentUserProfile.zadarma_sip}
+          pbxNumber={process.env.ZADARMA_PBX_NUMBER || ''}
         />
       )}
     </>

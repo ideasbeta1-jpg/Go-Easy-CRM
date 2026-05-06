@@ -53,7 +53,9 @@ export async function zadarmaRequest(
   })
 
   if (!response.ok) {
-    throw new Error(`Zadarma API error: ${response.status} ${response.statusText}`)
+    let body = ''
+    try { body = await response.text() } catch { /* ignore */ }
+    throw new Error(`Zadarma API error: ${response.status} ${response.statusText} — ${body}`)
   }
 
   return response.json()
