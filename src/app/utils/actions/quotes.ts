@@ -18,11 +18,40 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
   if (!lead) throw new Error('Lead not found')
 
   // 1.1 Fetch category separately
-  const { data: category } = lead.category_id 
+  const { data: category } = lead.category_id
     ? await supabase.from('categories').select('*').eq('id', lead.category_id).single()
     : { data: null }
 
-  // 2. Create the quote record first to get the ID for the success URL
+  // 2. Calculate deposit amount (Go Easy Margin) — snapshot before creating the record
+  let depositAmount = Math.round(totalAmount * 0.2 * 100) // Fallback safety (cents)
+  let depositDollars = totalAmount * 0.2
+
+  if (lead.pickup_date && lead.return_date) {
+    const pickup = new Date(lead.pickup_date)
+    const dropoff = new Date(lead.return_date)
+    if (pickup < dropoff) {
+      const diffInDays = Math.ceil((dropoff.getTime() - pickup.getTime()) / (1000 * 60 * 60 * 24))
+
+      const dailyMargin = lead.agreed_daily_price !== null
+        ? Number(lead.agreed_daily_price)
+        : Number(category?.daily_price || 0)
+
+      const totalMargin = dailyMargin * diffInDays
+
+      if (totalMargin > 0) {
+        depositAmount = Math.round(totalMargin * 100) // cents for Stripe
+        depositDollars = totalMargin
+      }
+    }
+  }
+
+  // 3. Invalidate all previous quotes for this lead
+  await supabase
+    .from('quotes')
+    .update({ is_active: false })
+    .eq('lead_id', leadId)
+
+  // 4. Create new quote record (with snapshot of amount and deposit)
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 3)
 
@@ -32,39 +61,17 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
       lead_id: leadId,
       expires_at: expiresAt.toISOString(),
       total_amount: totalAmount,
+      deposit_amount: depositDollars,
       pickup_date: lead.pickup_date,
-      return_date: lead.return_date
+      return_date: lead.return_date,
+      is_active: true,
     })
     .select()
     .single()
 
   if (quoteError) throw new Error(quoteError.message)
 
-  // 2.5 Calculate exact deposit (Go Easy Margin) based on actual negotiation or defaults
-  let depositAmount = Math.round(totalAmount * 0.2 * 100) // Fallback safety
-  
-  if (lead.pickup_date && lead.return_date) {
-      const pickup = new Date(lead.pickup_date)
-      const dropoff = new Date(lead.return_date)
-      if (pickup < dropoff) {
-          const diffInMs = dropoff.getTime() - pickup.getTime()
-          const diffInDays = Math.ceil(diffInMs / (1000 * 60 * 60 * 24))
-          
-          // La ganancia (margen) es la verdad para el depósito
-          const dailyMargin = lead.agreed_daily_price !== null 
-            ? Number(lead.agreed_daily_price) 
-            : Number(category?.daily_price || 0)
-            
-          const totalMargin = dailyMargin * diffInDays
-          
-          if (totalMargin > 0) {
-              depositAmount = Math.round(totalMargin * 100)
-          }
-      }
-  }
-
-  // 3. Create Stripe Checkout Session (Margen de Reserva Go Easy)
-
+  // 5. Create Stripe Checkout Session
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ['card'],
     line_items: [
@@ -85,40 +92,37 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}`,
     metadata: {
-       lead_id: leadId,
-       quote_id: quote.id
-    }
+      lead_id: leadId,
+      quote_id: quote.id,
+    },
   })
 
-  // 4. Update lead status to 'en_cotizacion' and save amount
+  // 6. Update lead status and save amount
   const { error: updateError } = await supabase
     .from('leads')
-    .update({ 
+    .update({
       status: 'en_cotizacion',
-      total_amount: totalAmount 
+      total_amount: totalAmount,
     })
     .eq('id', leadId)
 
   if (updateError) throw new Error(updateError.message)
 
-  // 5. Update the quote record with the stripe_link
+  // 7. Save stripe_link on the quote
   const { error: updateQuoteError } = await supabase
     .from('quotes')
-    .update({
-      stripe_link: session.url
-    })
+    .update({ stripe_link: session.url })
     .eq('id', quote.id)
 
   if (updateQuoteError) throw new Error(updateQuoteError.message)
 
-  // 6. Trigger Automation Engine (Includes n8n fallback)
+  // 8. Trigger Automation Engine
   await executeStageAutomation(leadId, 'en_cotizacion', {
-     amount: totalAmount,
-     stripe_link: session.url
+    amount: totalAmount,
+    stripe_link: session.url,
   })
 
-
   revalidatePath(`/dashboard/leads/${leadId}`)
-  
+
   return quote
 }

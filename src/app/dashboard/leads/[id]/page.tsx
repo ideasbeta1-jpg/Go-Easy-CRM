@@ -64,12 +64,16 @@ export default async function LeadDetailPage({
     assigned_to_profile: profileRes.data
   }
 
+  // The active quote is the one with is_active=true, falling back to the most recent
+  const activeQuote = quotesRes.data?.find((q: any) => q.is_active) ?? quotesRes.data?.[0] ?? null
+
   return (
     <>
       <LeadDetailClient
         lead={lead}
         notesError={notesRes.error}
-        activeQuote={quotesRes.data?.[0]}
+        activeQuote={activeQuote}
+        allQuotes={quotesRes.data || []}
         activeVoucher={vouchersRes.data?.[0]}
         categories={categoriesRes.data || []}
         providers={allProvidersRes.data || []}

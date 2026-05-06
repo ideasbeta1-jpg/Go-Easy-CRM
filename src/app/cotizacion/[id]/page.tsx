@@ -1,20 +1,21 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { notFound } from 'next/navigation'
-import { 
-  Car, 
-  MapPin, 
-  Calendar, 
-  CheckCircle2, 
-  CreditCard, 
-  ShieldCheck, 
-  Tag, 
-  Star, 
-  Clock, 
+import {
+  Car,
+  MapPin,
+  Calendar,
+  CheckCircle2,
+  CreditCard,
+  ShieldCheck,
+  Tag,
+  Star,
+  Clock,
   ArrowRight,
   Sparkles,
   Zap,
   Shield,
-  LayoutGrid
+  LayoutGrid,
+  AlertTriangle
 } from 'lucide-react'
 
 export default async function QuoteLandingPage({
@@ -27,8 +28,7 @@ export default async function QuoteLandingPage({
   const { id } = await params
   const { session_id } = await searchParams
   const supabase = createAdminClient()
-  
-  // Fetch quote and associated lead
+
   const { data: quote, error } = await supabase
     .from('quotes')
     .select(`
@@ -61,36 +61,66 @@ export default async function QuoteLandingPage({
   const { lead } = quote
   const category = lead.category
 
+  // Quote invalidada — precio o enlace cambiado por el agente
+  if (quote.is_active === false) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6">
+        <div className="max-w-md w-full text-center space-y-8">
+          <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-10 h-10 text-amber-400" />
+          </div>
+          <div className="space-y-3">
+            <h1 className="text-3xl font-black text-white tracking-tight">Esta cotización ya no está vigente</h1>
+            <p className="text-slate-400 font-medium leading-relaxed">
+              Hola <span className="text-white font-bold">{lead.first_name}</span>, tu agente ha actualizado
+              los términos de tu reserva. Por favor revisa tu WhatsApp o email para recibir el nuevo enlace con la cotización actualizada.
+            </p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-left space-y-2">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Generada el</p>
+            <p className="text-sm font-bold text-slate-300">
+              {new Date(quote.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          </div>
+          <p className="text-[11px] text-slate-600 font-bold">Go Easy Florida · goeasyflorida.com</p>
+        </div>
+      </div>
+    )
+  }
+
   const isPaid = session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
 
-  // 1. Duración exacta en días
+  // Duración exacta en días
   const pickup = new Date(lead.pickup_date)
   const returnDate = new Date(lead.return_date)
   const diffDays = Math.max(1, Math.ceil((returnDate.getTime() - pickup.getTime()) / (1000 * 3600 * 24)))
-  
-  // 2. Pricing Logic (Using negotiated values from DB)
-  // total_amount is the final price negotiated in the CRM
-  const grandTotal = Number(lead.total_amount || 0)
-  
-  // dailyMargin (agreed_daily_price) is the go easy profit, which is the deposit
-  const dailyMargin = lead.agreed_daily_price !== null ? Number(lead.agreed_daily_price) : Number(category.daily_price || 0)
-  const deposit = dailyMargin * diffDays
-  const balanceAtCounter = Math.max(0, grandTotal - deposit)
 
+  // Usar snapshot de precios guardados en el quote, no del lead (que puede haber cambiado)
+  const grandTotal = Number(quote.total_amount || lead.total_amount || 0)
+
+  // Depósito: usar snapshot si existe, sino calcular
+  const deposit = quote.deposit_amount
+    ? Number(quote.deposit_amount)
+    : (() => {
+        const dailyMargin = lead.agreed_daily_price !== null
+          ? Number(lead.agreed_daily_price)
+          : Number(category?.daily_price || 0)
+        return dailyMargin * diffDays
+      })()
+
+  const balanceAtCounter = Math.max(0, grandTotal - deposit)
   const isPremium = lead.rate_plan === 'premium'
 
   return (
     <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-20">
-       
+
        {/* High-Impact Header */}
        <header className="relative py-28 md:py-40 px-6 overflow-hidden bg-slate-950 text-white rounded-b-[5rem] md:rounded-b-[7rem] shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
-          {/* Animated Background Elements */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)] transition-all duration-1000" />
           <div className="absolute top-0 left-0 w-full h-full bg-grid-white/[0.02] [mask-image:radial-gradient(ellipse_at_center,white,transparent)]" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 blur-[150px] rounded-full" />
-          
-          {/* Success Banner if paid */}
+
           {isPaid && (
             <div className="max-w-4xl mx-auto mb-16 p-8 md:p-10 bg-emerald-500/10 backdrop-blur-xl rounded-[3.5rem] border border-emerald-500/20 text-white animate-in zoom-in-95 duration-700 shadow-2xl relative z-30">
                <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-center md:text-left">
@@ -121,21 +151,20 @@ export default async function QuoteLandingPage({
        {/* Detailed Quote Breakdown */}
        <main className="max-w-6xl mx-auto px-6 -mt-16 md:-mt-24 relative z-20">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
-             
+
              {/* Left Column: Vehicle & Features */}
              <div className="lg:col-span-2 space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
-                
+
                 {/* Vehicle Showcase Card */}
                 <div className="bg-white border border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.04)] rounded-[4rem] p-8 md:p-14 overflow-hidden relative group">
                    <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full -mr-20 -mt-20" />
-                   
+
                    <div className="flex flex-col xl:flex-row items-start gap-12 md:gap-16">
                       <div className="w-full xl:w-1/2 relative">
-                         {/* Removed clunky gray container, using cleaner presentation */}
                          <div className="relative z-10 group-hover:scale-110 transition-transform duration-1000 ease-out">
-                            <img 
-                              src={category.image_url} 
-                              className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]" 
+                            <img
+                              src={category.image_url}
+                              className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]"
                               alt={category.name}
                             />
                          </div>
@@ -150,25 +179,25 @@ export default async function QuoteLandingPage({
                          <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-md">
                             {category.description}
                          </p>
-                         
+
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
-                             {(isPremium 
+                             {(isPremium
                                ? [
-                                   'Protección Total (Robo y Choque)', 
-                                   'Seguro a Terceros ($1M)', 
-                                   'Asistencia Carretera 24/7', 
-                                   'GPS Incluido', 
-                                   'Conductor Adicional', 
-                                   'Kilometraje Ilimitado', 
+                                   'Protección Total (Robo y Choque)',
+                                   'Seguro a Terceros ($1M)',
+                                   'Asistencia Carretera 24/7',
+                                   'GPS Incluido',
+                                   'Conductor Adicional',
+                                   'Kilometraje Ilimitado',
                                    'Combustible: Lleno/Lleno'
-                                 ] 
+                                 ]
                                : [
-                                   'Protección Básica (Deducible)', 
-                                   'Seguro a Terceros Básico', 
-                                   'Asistencia Carretera 24/7', 
-                                   'GPS Incluido', 
-                                   'Conductor Adicional', 
-                                   'Millas Sólo Florida', 
+                                   'Protección Básica (Deducible)',
+                                   'Seguro a Terceros Básico',
+                                   'Asistencia Carretera 24/7',
+                                   'GPS Incluido',
+                                   'Conductor Adicional',
+                                   'Millas Sólo Florida',
                                    'Combustible: Lleno/Lleno'
                                  ]
                              ).map(item => (
@@ -184,7 +213,7 @@ export default async function QuoteLandingPage({
                    </div>
 
                    <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pt-12 border-t border-slate-50">
-                      {[ 
+                      {[
                         { label: 'Entrega', val: lead.pickup_location, date: lead.pickup_date, icon: MapPin, color: 'text-blue-500' },
                         { label: 'Devolución', val: lead.return_location, date: lead.return_date, icon: MapPin, color: 'text-indigo-500' },
                         { label: 'Duración', val: `${diffDays} días`, icon: Calendar, color: 'text-emerald-500' },
@@ -213,7 +242,7 @@ export default async function QuoteLandingPage({
                       <div className="bg-indigo-600 rounded-[3.5rem] p-10 md:p-14 text-white group overflow-hidden relative shadow-[0_30px_60px_rgba(79,70,229,0.25)] border border-white/10">
                          <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] rounded-full -mr-40 -mt-40" />
                          <Zap className="absolute top-12 right-12 w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-1000" />
-                         
+
                          <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
                             <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-[2rem] flex items-center justify-center text-white border border-white/20 shrink-0">
                                <Sparkles className="w-10 h-10" />
@@ -251,7 +280,7 @@ export default async function QuoteLandingPage({
              <div className="animate-in fade-in slide-in-from-right-10 duration-1000 delay-500">
                 <div className="bg-white border border-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.06)] rounded-[4.5rem] p-10 md:p-12 sticky top-12 space-y-10 group overflow-hidden">
                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
-                   
+
                    <div className="space-y-3">
                       <div className="flex items-center gap-3">
                          <div className="w-1 h-6 bg-indigo-600 rounded-full" />
@@ -269,7 +298,7 @@ export default async function QuoteLandingPage({
                          <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Depósito de Garantía</span>
                          <span className="text-lg font-black text-indigo-600 tracking-tight">-${deposit.toFixed(2)}</span>
                       </div>
-                      
+
                       <div className="pt-10 mt-6 border-t border-slate-100">
                          <div className="flex justify-between items-end mb-2">
                             <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Saldo en Counter</span>
@@ -290,15 +319,15 @@ export default async function QuoteLandingPage({
                          </div>
                          <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest pt-2">Asegura tu tarifa y disponibilidad</p>
                       </div>
-                      
+
                       {isPaid ? (
                         <div className="w-full bg-emerald-500 text-white font-black py-6 rounded-[2rem] shadow-[0_20px_40px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 animate-in fade-in zoom-in-95">
                            <CheckCircle2 className="w-6 h-6 animate-pulse" /> RESERVA PAGADA
                         </div>
                       ) : (
                         <div className="space-y-4 relative z-10">
-                           <a 
-                             href={quote.stripe_link || '#'} 
+                           <a
+                             href={quote.stripe_link || '#'}
                              className="w-full bg-indigo-600 text-white font-black text-xl py-6 rounded-[2.5rem] hover:bg-indigo-700 hover:shadow-[0_25px_50px_rgba(79,70,229,0.4)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 group/btn shadow-[0_20px_40px_rgba(79,70,229,0.2)] active:scale-95"
                            >
                               Confirmar Ahora
@@ -328,7 +357,6 @@ export default async function QuoteLandingPage({
           </div>
        </main>
 
-       {/* Floating Footer Decor */}
        <footer className="mt-40 py-16 text-center space-y-8 max-w-4xl mx-auto border-t border-slate-100">
           <div className="flex items-center justify-center gap-4">
              <div className="h-px w-12 bg-slate-200" />

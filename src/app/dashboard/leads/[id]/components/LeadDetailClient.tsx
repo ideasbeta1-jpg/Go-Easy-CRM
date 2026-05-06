@@ -60,6 +60,7 @@ const STATUS_FLOW = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'vouch
 export default function LeadDetailClient({
   lead,
   activeQuote,
+  allQuotes,
   activeVoucher,
   categories,
   providers,
@@ -74,6 +75,7 @@ export default function LeadDetailClient({
 }: {
   lead: any
   activeQuote?: any
+  allQuotes: any[]
   activeVoucher?: any
   categories: any[]
   providers: any[]
@@ -185,6 +187,16 @@ export default function LeadDetailClient({
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
   const handleRegenerateQuote = async () => {
+    const priceChanged = activeQuote && Math.abs(Number(activeQuote.total_amount) - formData.total_amount) > 0.01
+    const hasExistingQuote = !!activeQuote
+
+    if (hasExistingQuote) {
+      const msg = priceChanged
+        ? `¿Regenerar cotización?\n\nEl precio cambió de $${Number(activeQuote.total_amount).toFixed(2)} → $${formData.total_amount.toFixed(2)}.\n\nEl enlace anterior quedará invalidado y el cliente recibirá uno nuevo.`
+        : `¿Regenerar cotización con el mismo precio ($${formData.total_amount.toFixed(2)})?\n\nEl enlace anterior quedará invalidado y se creará uno nuevo.`
+      if (!confirm(msg)) return
+    }
+
     startTransition(async () => {
       try {
         await generateQuoteForLead(lead.id, formData.total_amount)
@@ -369,18 +381,58 @@ export default function LeadDetailClient({
   const isUrgent = ['lead_nuevo', 'en_cotizacion'].includes(formData.status) && hoursOld > 48
 
   // Timeline events
-  interface TimelineEvent { id: string; title: string; date: string | any; icon: any; color: string; desc: string; isMismatch?: boolean }
+  interface TimelineEvent { id: string; title: string; date: string | any; icon: any; color: string; desc: string; isMismatch?: boolean; quoteId?: string }
   const timelineEvents: TimelineEvent[] = [
     { id: 'created', title: 'Lead Capturado', date: lead.created_at || new Date().toISOString(), icon: User, color: 'bg-primary text-white', desc: 'Registro inicial creado en el CRM' }
   ]
-  if (activeQuote) {
-    timelineEvents.push({ id: 'quote', title: 'Cotización Generada', date: activeQuote.created_at, icon: Zap, color: 'bg-amber-100 text-amber-600', desc: activeQuote.expires_at ? `Oferta válida hasta ${format(new Date(activeQuote.expires_at), 'dd MMM')}` : 'Cotización enviada al cliente' })
-    const hasMismatch = parseFloat(activeQuote.total_amount || 0) !== lead.total_amount ||
-      (activeQuote.pickup_date && lead.pickup_date && new Date(activeQuote.pickup_date).getTime() !== new Date(lead.pickup_date).getTime())
-    if (hasMismatch && lead.status === 'en_cotizacion') {
-      timelineEvents.push({ id: 'quote-mismatch', title: 'Cotización Desactualizada', date: lead.updated_at || new Date().toISOString(), icon: AlertCircle, color: 'bg-red-500 text-white', desc: 'Has editado el lead después de generar la cotización.', isMismatch: true })
+
+  // Build quote history events from all quotes (sorted oldest first)
+  const sortedQuotes = [...allQuotes].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  sortedQuotes.forEach((q, idx) => {
+    const isFirst = idx === 0
+    const prevQuote = sortedQuotes[idx - 1]
+    const priceChanged = prevQuote && Math.abs(Number(q.total_amount) - Number(prevQuote.total_amount)) > 0.01
+
+    if (isFirst) {
+      timelineEvents.push({
+        id: `quote-${q.id}`,
+        title: 'Cotización Generada',
+        date: q.created_at,
+        icon: Zap,
+        color: q.is_active ? 'bg-amber-400 text-white' : 'bg-amber-100 text-amber-500',
+        desc: q.expires_at
+          ? `$${Number(q.total_amount).toFixed(2)} · Oferta válida hasta ${format(new Date(q.expires_at), 'dd MMM')}`
+          : `$${Number(q.total_amount).toFixed(2)} · Cotización enviada al cliente`,
+        quoteId: q.id,
+      })
+    } else {
+      timelineEvents.push({
+        id: `quote-${q.id}`,
+        title: 'Cotización Regenerada',
+        date: q.created_at,
+        icon: Zap,
+        color: q.is_active ? 'bg-amber-400 text-white' : 'bg-amber-100 text-amber-500',
+        desc: priceChanged
+          ? `Precio actualizado: $${Number(prevQuote.total_amount).toFixed(2)} → $${Number(q.total_amount).toFixed(2)}${q.is_active ? ' · Enlace activo' : ' · Enlace invalidado'}`
+          : `Mismo precio ($${Number(q.total_amount).toFixed(2)}) · Nuevo enlace generado${q.is_active ? '' : ' · Invalidado'}`,
+        quoteId: q.id,
+      })
     }
+  })
+
+  // Mismatch warning if active quote price differs from current form total
+  if (activeQuote && Math.abs(parseFloat(activeQuote.total_amount || 0) - formData.total_amount) > 0.01 && lead.status === 'en_cotizacion') {
+    timelineEvents.push({
+      id: 'quote-mismatch',
+      title: 'Precio Modificado sin Regenerar',
+      date: lead.updated_at || new Date().toISOString(),
+      icon: AlertCircle,
+      color: 'bg-red-500 text-white',
+      desc: `El formulario tiene $${formData.total_amount.toFixed(2)} pero la cotización activa es $${Number(activeQuote.total_amount).toFixed(2)}. Regenera para actualizar el enlace del cliente.`,
+      isMismatch: true,
+    })
   }
+
   if (activeVoucher) {
     timelineEvents.push({ id: 'voucher', title: 'Voucher Enviado', date: activeVoucher.created_at, icon: FileText, color: 'bg-indigo-600 text-white', desc: `Voucher (${activeVoucher.confirmation_number}) enviado al cliente.` })
   }
@@ -781,6 +833,20 @@ export default function LeadDetailClient({
                   </>
                 )}
 
+                {/* Price change warning banner */}
+                {activeQuote && Math.abs(Number(activeQuote.total_amount) - formData.total_amount) > 0.01 && (
+                  <div className="flex items-start gap-3 p-3.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-[11px] font-bold text-amber-800">Precio modificado</p>
+                      <p className="text-[10px] text-amber-600 mt-0.5">
+                        La cotización activa es <span className="font-black">${Number(activeQuote.total_amount).toFixed(2)}</span>.
+                        Al regenerar, el cliente recibirá un enlace nuevo con <span className="font-black">${formData.total_amount.toFixed(2)}</span> y el anterior quedará invalidado.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={handleRegenerateQuote}
                   disabled={isPending}
@@ -795,7 +861,7 @@ export default function LeadDetailClient({
                     target="_blank"
                     className="mt-2 w-full flex items-center justify-center py-2.5 text-primary border border-primary/20 rounded-xl text-sm font-bold hover:bg-primary/5 transition-all"
                   >
-                    Ver Propuesta →
+                    Ver Propuesta Activa →
                   </Link>
                 )}
               </div>
