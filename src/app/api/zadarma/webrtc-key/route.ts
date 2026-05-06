@@ -7,7 +7,9 @@ const BASE_URL = 'https://api.zadarma.com/v1'
 
 /**
  * GET /api/zadarma/webrtc-key
- * Genera la clave temporal para el widget WebRTC de Zadarma.
+ * Devuelve la clave para el widget WebRTC de Zadarma.
+ * Intenta obtener un token dinámico de Zadarma (/v1/webrtc/get_key).
+ * Si falla, usa la contraseña SIP del perfil del usuario como fallback.
  */
 export async function GET() {
   const supabase = await createClient()
@@ -16,42 +18,52 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  try {
-    const method = '/webrtc/get_key'
-    const sign = buildZadarmaSignature(method, {})
-    const url = `${BASE_URL}${method}`
+  // Obtener SIP del perfil para pasarlo como parámetro a /webrtc/get_key
+  const { data: profileForSip } = await supabase
+    .from('profiles')
+    .select('zadarma_sip, zadarma_sip_password')
+    .eq('id', user.id)
+    .single()
 
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `${USER_KEY}:${sign}`,
-      },
-    })
+  const pbxNumber = process.env.ZADARMA_PBX_NUMBER || ''
+  const sipExt = profileForSip?.zadarma_sip || ''
+  const sip = pbxNumber && sipExt ? `${pbxNumber}-${sipExt}` : sipExt
 
-    const text = await response.text()
-    console.log('[webrtc-key] Zadarma status:', response.status, 'body:', text)
-
-    let result: Record<string, unknown>
+  // Intentar obtener la key dinámica de Zadarma (requiere sip como parámetro)
+  if (sip) {
     try {
-      result = JSON.parse(text)
-    } catch {
-      return NextResponse.json({ error: 'Respuesta inválida de Zadarma', raw: text }, { status: 502 })
-    }
+      const method = '/webrtc/get_key'
+      const params = { sip }
+      const sign = buildZadarmaSignature(method, params)
+      const qs = new URLSearchParams(params).toString()
+      const url = `${BASE_URL}${method}?${qs}`
+      console.log('[webrtc-key] Llamando:', url)
+      const response = await fetch(url, {
+        headers: { Authorization: `${USER_KEY}:${sign}` },
+      })
 
-    if (result.status !== 'success') {
-      console.error('[webrtc-key] Zadarma error:', result)
-      // Fallback: usar el API user key directamente como widget key
-      // (funciona en cuentas donde /webrtc/get_key no está habilitado)
-      const fallbackKey = process.env.ZADARMA_USER_KEY
-      if (fallbackKey) {
-        console.warn('[webrtc-key] Usando user key como fallback')
-        return NextResponse.json({ key: fallbackKey })
+      const text = await response.text()
+      console.log('[webrtc-key] Zadarma status:', response.status, 'body:', text)
+
+      const result = JSON.parse(text)
+      if (result.status === 'success' && result.key) {
+        return NextResponse.json({ key: result.key, sip })
       }
-      return NextResponse.json({ error: result.message || 'Error de Zadarma', detail: result }, { status: 400 })
+      console.warn('[webrtc-key] Zadarma dynamic key failed:', result.message)
+    } catch (err) {
+      console.warn('[webrtc-key] Zadarma request error:', err)
     }
-
-    return NextResponse.json({ key: result.key })
-  } catch (err) {
-    console.error('[webrtc-key] Exception:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
+
+  // Fallback: usar contraseña SIP del perfil del usuario
+  if (profileForSip?.zadarma_sip_password) {
+    console.log('[webrtc-key] Usando contraseña SIP del perfil como fallback')
+    return NextResponse.json({ key: profileForSip.zadarma_sip_password, sip })
+  }
+
+
+  return NextResponse.json(
+    { error: 'No se pudo obtener la key WebRTC. Configura la contraseña SIP en Ajustes → Usuarios.', sip },
+    { status: 400 }
+  )
 }

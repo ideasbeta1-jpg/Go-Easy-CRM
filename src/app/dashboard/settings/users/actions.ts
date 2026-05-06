@@ -62,6 +62,7 @@ export async function updateSystemUser(userId: string, formData: FormData) {
     const lastName = formData.get('lastName') as string
     const role = formData.get('role') as string
     const zadarmaSip = formData.get('zadarmaSip') as string
+    const zadarmaSipPassword = formData.get('zadarmaSipPassword') as string
 
     if (!firstName || !lastName || !role) {
       return { error: 'Nombre, apellido y rol son requeridos.' }
@@ -73,7 +74,8 @@ export async function updateSystemUser(userId: string, formData: FormData) {
         last_name: lastName,
         full_name: `${firstName} ${lastName}`,
         role: role,
-        zadarma_sip: zadarmaSip || null
+        zadarma_sip: zadarmaSip || null,
+        zadarma_sip_password: zadarmaSipPassword || null,
     }).eq('id', userId)
 
     if (profileError) {

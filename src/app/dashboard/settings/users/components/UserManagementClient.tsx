@@ -17,6 +17,7 @@ type UserData = {
   avatar_url: string | null
   is_active: boolean
   zadarma_sip?: string | null
+  zadarma_sip_password?: string | null
 }
 
 export default function UserManagementClient({ users }: { users: UserData[] }) {
@@ -33,7 +34,8 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
     email: '',
     password: '',
     role: 'agente',
-    zadarmaSip: ''
+    zadarmaSip: '',
+    zadarmaSipPassword: ''
   })
 
   const filteredUsers = users.filter(u => 
@@ -63,6 +65,7 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
     payload.append('lastName', formData.lastName)
     payload.append('role', formData.role)
     if (formData.zadarmaSip) payload.append('zadarmaSip', formData.zadarmaSip)
+    if (formData.zadarmaSipPassword) payload.append('zadarmaSipPassword', formData.zadarmaSipPassword)
 
     if (isEditMode && editingUserId) {
       const res = await updateSystemUser(editingUserId, payload)
@@ -96,7 +99,8 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
         email: '',
         password: '',
         role: 'agente',
-        zadarmaSip: ''
+        zadarmaSip: '',
+        zadarmaSipPassword: ''
     })
     setIsModalOpen(true)
   }
@@ -108,9 +112,10 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
         firstName: user.first_name || '',
         lastName: user.last_name || '',
         email: user.email || '',
-        password: '', // En edición no forzamos cambiar clave por ahora en este form
+        password: '',
         role: user.role || 'agente',
-        zadarmaSip: user.zadarma_sip || ''
+        zadarmaSip: user.zadarma_sip || '',
+        zadarmaSipPassword: user.zadarma_sip_password || ''
     })
     setIsModalOpen(true)
   }
@@ -311,6 +316,10 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                       <div className="space-y-3">
                           <label className="text-[10px] font-black uppercase tracking-widest text-violet-500 ml-2">Extensión Zadarma</label>
                           <input name="zadarmaSip" value={formData.zadarmaSip} onChange={handleInputChange} type="text" className="w-full bg-violet-50/50 border-2 border-transparent focus:border-violet-200 focus:bg-white focus:ring-4 focus:ring-violet-500/10 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-violet-700 outline-none placeholder:text-violet-300" placeholder="Ej: 100" />
+                      </div>
+                      <div className="space-y-3">
+                          <label className="text-[10px] font-black uppercase tracking-widest text-violet-500 ml-2">Contraseña SIP Zadarma</label>
+                          <input name="zadarmaSipPassword" value={formData.zadarmaSipPassword} onChange={handleInputChange} type="password" className="w-full bg-violet-50/50 border-2 border-transparent focus:border-violet-200 focus:bg-white focus:ring-4 focus:ring-violet-500/10 rounded-[1.25rem] px-5 py-3.5 transition-all font-bold text-violet-700 outline-none placeholder:text-violet-300" placeholder="Contraseña de la extensión en Zadarma" />
                       </div>
                   </div>
 
