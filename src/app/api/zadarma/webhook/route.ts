@@ -82,12 +82,13 @@ async function handleCallStart(p: Record<string, string>) {
     .eq('zadarma_sip', internalNumber)
     .maybeSingle()
 
-  // Intentar vincular con lead por número de teléfono del cliente
-  const normalizedPhone = normalizePhone(callerNumber)
+  // Vincular con lead por número de teléfono — suffix matching para cubrir variantes de código de país
+  const normalized10 = normalizePhone(callerNumber)        // últimos 10 dígitos
+  const normalizedFull = callerNumber.replace(/^\+/, '')   // sin prefijo +
   const { data: lead } = await supabase
     .from('leads')
     .select('id')
-    .or(`phone.eq.${normalizedPhone},phone.eq.${callerNumber}`)
+    .or(`phone.ilike.%${normalized10},phone.eq.${normalizedFull},phone.eq.${callerNumber}`)
     .maybeSingle()
 
   const direction = p.direction === 'outgoing' ? 'outbound' : 'inbound'
@@ -112,10 +113,17 @@ async function handleCallStart(p: Record<string, string>) {
 
 async function handleCallAnswer(p: Record<string, string>) {
   const callId = p.call_id || p.pbx_call_id
-  const { error } = await supabase
-    .from('call_logs')
-    .update({ status: 'answered', answered_at: new Date().toISOString() })
-    .eq('zadarma_call_id', callId)
+  const { error } = await supabase.from('call_logs').upsert(
+    {
+      zadarma_call_id: callId,
+      status: 'answered',
+      answered_at: new Date().toISOString(),
+      caller_number: p.caller_id || '',
+      called_number: p.called_did || '',
+      direction: p.direction === 'outgoing' ? 'outbound' : 'inbound',
+    },
+    { onConflict: 'zadarma_call_id' }
+  )
 
   if (error) console.error('[handleCallAnswer]', error)
 }
@@ -127,14 +135,18 @@ async function handleCallEnd(p: Record<string, string>) {
 
   const status = DISPOSITION_MAP[disposition] || 'ended'
 
-  const { error } = await supabase
-    .from('call_logs')
-    .update({
+  const { error } = await supabase.from('call_logs').upsert(
+    {
+      zadarma_call_id: callId,
       status,
       duration,
       ended_at: new Date().toISOString(),
-    })
-    .eq('zadarma_call_id', callId)
+      caller_number: p.caller_id || '',
+      called_number: p.called_did || '',
+      direction: p.direction === 'outgoing' ? 'outbound' : 'inbound',
+    },
+    { onConflict: 'zadarma_call_id' }
+  )
 
   if (error) {
     console.error('[handleCallEnd]', error)
@@ -195,7 +207,7 @@ async function handleRecordingReady(p: Record<string, string>) {
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
 
-/** Normaliza el teléfono eliminando el + inicial para comparar */
+/** Retorna los últimos 10 dígitos del teléfono para suffix matching entre formatos internacionales */
 function normalizePhone(phone: string): string {
-  return phone.replace(/^\+/, '')
+  return phone.replace(/\D/g, '').slice(-10)
 }

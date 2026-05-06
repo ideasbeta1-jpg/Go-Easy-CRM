@@ -82,5 +82,16 @@ export function verifyZadarmaWebhook(
     .update(queryString + hashMd5)
     .digest('base64')
 
+  // Diagnóstico temporal: loguear firma calculada vs recibida para verificar algoritmo
+  if (expectedSign !== signature) {
+    console.warn('[Zadarma Webhook] Signature mismatch', {
+      expected: expectedSign,
+      received: signature,
+      queryString,
+      hashMd5,
+      paramKeys: Object.keys(sorted),
+    })
+  }
+
   return expectedSign === signature
 }

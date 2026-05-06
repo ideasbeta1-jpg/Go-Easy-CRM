@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createClient } from '@/utils/supabase/server'
 import { zadarmaRequest } from '@/lib/zadarma'
 
-const supabase = createClient(
+const supabase = createServiceClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
@@ -15,10 +16,22 @@ const supabase = createClient(
  * y cuando contesta, conecta automáticamente al cliente (teléfono del lead).
  */
 export async function POST(req: NextRequest) {
+  // Verificar sesión del usuario autenticado
+  const supabaseAuth = await createClient()
+  const { data: { user } } = await supabaseAuth.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const { leadId, agentId } = await req.json()
 
   if (!leadId || !agentId) {
     return NextResponse.json({ error: 'leadId y agentId son requeridos' }, { status: 400 })
+  }
+
+  // Solo el propio agente puede iniciar una llamada en su nombre
+  if (agentId !== user.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Obtener datos del lead
@@ -62,21 +75,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Registrar la llamada saliente en call_logs
-    const callId = (result as { call_id?: string }).call_id || `manual_${Date.now()}`
-    await supabase.from('call_logs').insert({
-      zadarma_call_id: callId,
-      lead_id: leadId,
-      agent_id: agentId,
-      caller_number: agent.zadarma_sip,
-      called_number: lead.phone,
-      pbx_extension: agent.zadarma_sip,
-      direction: 'outbound',
-      status: 'initiated',
-      started_at: new Date().toISOString(),
-    })
+    // Solo registrar en call_logs si Zadarma devuelve un callId real.
+    // Si no, el webhook NOTIFY_START lo creará con el ID correcto evitando duplicados.
+    const callId = (result as { call_id?: string }).call_id
+    if (callId) {
+      await supabase.from('call_logs').insert({
+        zadarma_call_id: callId,
+        lead_id: leadId,
+        agent_id: agentId,
+        caller_number: agent.zadarma_sip,
+        called_number: lead.phone,
+        pbx_extension: agent.zadarma_sip,
+        direction: 'outbound',
+        status: 'initiated',
+        started_at: new Date().toISOString(),
+      })
+    }
 
-    return NextResponse.json({ success: true, callId })
+    return NextResponse.json({ success: true, callId: callId || null })
   } catch (err) {
     console.error('[click-to-call]', err)
     return NextResponse.json({ error: 'Error de conexión con Zadarma' }, { status: 500 })
