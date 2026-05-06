@@ -27,7 +27,10 @@
       "mcp__claude_ai_Vercel__list_deployments",
       "mcp__claude_ai_Vercel__get_project",
       "mcp__claude_ai_Vercel__web_fetch_vercel_url",
-      "mcp__claude_ai_Vercel__get_deployment_build_logs"
+      "mcp__claude_ai_Vercel__get_deployment_build_logs",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const c=require\\('crypto'\\),s='617fb97234eadfc68c43',m='/info/',q='',h=c.createHash\\('md5'\\).update\\(q\\).digest\\('hex'\\),sig=c.createHmac\\('sha1',s\\).update\\(m+q+h\\).digest\\('base64'\\);process.stdout.write\\(encodeURIComponent\\(sig\\)\\)\")",
+      "Bash(curl -s -H \"Authorization: d488ffa492aecfb618c2:$\\(node -e \"const c=require\\('crypto'\\),s='617fb97234eadfc68c43',m='/info/',q='',h=c.createHash\\('md5'\\).update\\(q\\).digest\\('hex'\\),sig=c.createHmac\\('sha1',s\\).update\\(m+q+h\\).digest\\('base64'\\);process.stdout.write\\(encodeURIComponent\\(sig\\)\\)\"\\)\" \"https://api.zadarma.com/v1/info/\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\razs9\\OneDrive\\Desktop\\Apps\\Go Easy CRM\\src\\app\\dashboard\\leads\\[id]\\components"

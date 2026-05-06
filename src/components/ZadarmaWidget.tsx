@@ -16,42 +16,52 @@ declare global {
 }
 
 interface ZadarmaWidgetProps {
-  userKey: string
-  sipExtension: string
+  sipExtension: string // formato completo: "548969-103"
 }
 
-export function ZadarmaWidget({ userKey, sipExtension }: ZadarmaWidgetProps) {
+export function ZadarmaWidget({ sipExtension }: ZadarmaWidgetProps) {
   useEffect(() => {
-    // Carga loader-phone-lib.js primero, luego loader-phone-fn.js en cadena
     const BASE = 'https://my.zadarma.com/webphoneWebRTCWidget/v9/js'
 
-    function initWidget() {
-      if (window.zadarmaWidgetFn) {
-        window.zadarmaWidgetFn(userKey, sipExtension, 'square', 'es', true, {
-          right: '10px',
-          bottom: '5px',
-        })
+    async function init() {
+      // Obtener la key dinámica desde el servidor
+      const res = await fetch('/api/zadarma/webrtc-key')
+      if (!res.ok) {
+        console.error('[ZadarmaWidget] No se pudo obtener la key WebRTC')
+        return
       }
+      const { key } = await res.json()
+      if (!key) return
+
+      function startWidget() {
+        if (window.zadarmaWidgetFn) {
+          window.zadarmaWidgetFn(key, sipExtension, 'square', 'es', true, {
+            right: '10px',
+            bottom: '5px',
+          })
+        }
+      }
+
+      function loadFn() {
+        const fn = document.createElement('script')
+        fn.src = `${BASE}/loader-phone-fn.js?sub_v=1`
+        fn.onload = startWidget
+        document.head.appendChild(fn)
+      }
+
+      if (document.querySelector(`script[src*="loader-phone-lib"]`)) {
+        startWidget()
+        return
+      }
+
+      const lib = document.createElement('script')
+      lib.src = `${BASE}/loader-phone-lib.js?sub_v=1`
+      lib.onload = loadFn
+      document.head.appendChild(lib)
     }
 
-    function loadFn() {
-      const fn = document.createElement('script')
-      fn.src = `${BASE}/loader-phone-fn.js?sub_v=1`
-      fn.onload = initWidget
-      document.head.appendChild(fn)
-    }
-
-    // Evitar doble carga si el componente se remonta
-    if (document.querySelector(`script[src*="loader-phone-lib"]`)) {
-      if (window.zadarmaWidgetFn) initWidget()
-      return
-    }
-
-    const lib = document.createElement('script')
-    lib.src = `${BASE}/loader-phone-lib.js?sub_v=1`
-    lib.onload = loadFn
-    document.head.appendChild(lib)
-  }, [userKey, sipExtension])
+    init()
+  }, [sipExtension])
 
   return null
 }
