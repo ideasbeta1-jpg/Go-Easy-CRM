@@ -72,30 +72,39 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
   if (quoteError) throw new Error(quoteError.message)
 
   // 5. Create Stripe Checkout Session
-  const session = await stripe.checkout.sessions.create({
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price_data: {
-          currency: 'usd',
-          product_data: {
-            name: `Depósito Reserva: ${category?.name || 'Categoría General'}`,
-            description: `Reserva para ${lead.first_name} ${lead.last_name}. Pick-up: ${lead.pickup_location}`,
-            images: category?.image_url ? [category.image_url] : [],
+  const safeImageUrl = category?.image_url?.startsWith('https://') ? category.image_url : undefined
+  const safeDepositAmount = Math.max(depositAmount, 50) // Stripe minimum is 50 cents
+
+  let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>
+  try {
+    session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Depósito Reserva: ${category?.name || 'Categoría General'}`,
+              description: `Reserva para ${lead.first_name} ${lead.last_name}. Pick-up: ${lead.pickup_location}`,
+              ...(safeImageUrl ? { images: [safeImageUrl] } : {}),
+            },
+            unit_amount: safeDepositAmount,
           },
-          unit_amount: depositAmount,
+          quantity: 1,
         },
-        quantity: 1,
+      ],
+      mode: 'payment',
+      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}`,
+      metadata: {
+        lead_id: leadId,
+        quote_id: quote.id,
       },
-    ],
-    mode: 'payment',
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}`,
-    metadata: {
-      lead_id: leadId,
-      quote_id: quote.id,
-    },
-  })
+    })
+  } catch (stripeError: any) {
+    console.error('[generateQuoteForLead] Stripe error:', stripeError?.message, stripeError?.raw)
+    throw new Error(`Error al crear sesión de pago: ${stripeError?.message || 'Error de Stripe'}`)
+  }
 
   // 6. Update lead status and save amount
   const { error: updateError } = await supabase
