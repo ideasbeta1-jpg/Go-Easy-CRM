@@ -14,6 +14,7 @@ export async function assignLeadToAgent(leadId: string) {
       .from('profiles')
       .select('id, full_name, first_name, last_name')
       .eq('role', 'agente')
+      .eq('disabled', false)
       .order('last_assigned_at', { ascending: true, nullsFirst: true })
       .limit(1)
 

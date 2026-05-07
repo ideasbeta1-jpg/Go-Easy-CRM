@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, UserPlus, Users, Search, ShieldCheck, Mail, ShieldAlert, Shield, ShieldHalf, Trash2, Loader2, User as UserIcon, Edit2, Phone } from 'lucide-react'
-import { createSystemUser, deleteSystemUser, updateSystemUser } from '../actions'
+import { Plus, UserPlus, Users, Search, ShieldCheck, Mail, ShieldAlert, Shield, ShieldHalf, Trash2, Loader2, User as UserIcon, Edit2, Phone, PowerOff, Power } from 'lucide-react'
+import { createSystemUser, deleteSystemUser, updateSystemUser, toggleAgentDisabled } from '../actions'
 import { Toaster, toast } from 'sonner'
 import Image from 'next/image'
 
@@ -16,6 +16,7 @@ type UserData = {
   role: string
   avatar_url: string | null
   is_active: boolean
+  disabled: boolean
   zadarma_sip?: string | null
   zadarma_sip_password?: string | null
 }
@@ -134,6 +135,15 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
       }
   }
 
+  const handleToggleDisabled = async (user: UserData) => {
+    const action = user.disabled ? 'reactivar' : 'desactivar'
+    const userName = `${user.first_name} ${user.last_name}`
+    if (!confirm(`¿Estás seguro que deseas ${action} a ${userName}?`)) return
+    const res = await toggleAgentDisabled(user.id, !user.disabled)
+    if (res.error) toast.error(res.error)
+    else toast.success(user.disabled ? `${userName} reactivado. Volverá a recibir leads.` : `${userName} desactivado. No recibirá nuevos leads.`)
+  }
+
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
       
@@ -188,11 +198,11 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
         {/* Users Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 relative z-10">
           {filteredUsers.map((user) => (
-             <div key={user.id} className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:scale-[1.01] transition-all group flex flex-col justify-between overflow-hidden">
-               
+             <div key={user.id} className={`bg-white border p-6 rounded-[2rem] shadow-sm hover:shadow-xl hover:scale-[1.01] transition-all group flex flex-col justify-between overflow-hidden ${user.disabled ? 'border-rose-100 bg-rose-50/30' : 'border-slate-100'}`}>
+
                <div className="flex items-start justify-between mb-6">
                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-slate-100 border border-slate-200 rounded-2xl overflow-hidden relative shrink-0">
+                    <div className={`w-14 h-14 border rounded-2xl overflow-hidden relative shrink-0 ${user.disabled ? 'bg-rose-100 border-rose-200 opacity-60' : 'bg-slate-100 border-slate-200'}`}>
                        {user.avatar_url ? (
                          <img src={user.avatar_url} alt={user.first_name} className="w-full h-full object-cover" />
                        ) : (
@@ -202,7 +212,7 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                        )}
                     </div>
                     <div className="min-w-0">
-                       <h3 className="font-black text-slate-800 text-lg tracking-tight truncate max-w-[150px]">{user.first_name} {user.last_name}</h3>
+                       <h3 className={`font-black text-lg tracking-tight truncate max-w-[150px] ${user.disabled ? 'text-slate-400' : 'text-slate-800'}`}>{user.first_name} {user.last_name}</h3>
                        <p className="text-xs font-semibold text-slate-400 truncate max-w-[150px]">{user.email}</p>
                        {user.zadarma_sip && (
                          <div className="flex items-center gap-1 mt-1 text-[10px] font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full w-max">
@@ -212,12 +222,21 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                     </div>
                  </div>
 
-                 {/* Role Badge */}
-                 <div className={`px-3 py-1 flex items-center gap-1.5 rounded-full border shadow-sm shrink-0 ${
-                     user.role === 'admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                 }`}>
-                    {user.role === 'admin' ? <ShieldAlert className="w-3 h-3" /> : <ShieldHalf className="w-3 h-3" />}
-                    <span className="text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">{user.role}</span>
+                 <div className="flex flex-col items-end gap-1.5 shrink-0">
+                   {/* Role Badge */}
+                   <div className={`px-3 py-1 flex items-center gap-1.5 rounded-full border shadow-sm ${
+                       user.role === 'admin' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' : 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                   }`}>
+                      {user.role === 'admin' ? <ShieldAlert className="w-3 h-3" /> : <ShieldHalf className="w-3 h-3" />}
+                      <span className="text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">{user.role}</span>
+                   </div>
+                   {/* Disabled Badge */}
+                   {user.disabled && (
+                     <div className="px-3 py-1 flex items-center gap-1.5 rounded-full border bg-rose-50 border-rose-200 text-rose-500 shadow-sm">
+                       <PowerOff className="w-3 h-3" />
+                       <span className="text-[9px] font-black uppercase tracking-widest leading-none mt-0.5">Sin asignación</span>
+                     </div>
+                   )}
                  </div>
                </div>
 
@@ -230,14 +249,25 @@ export default function UserManagementClient({ users }: { users: UserData[] }) {
                  </div>
 
                  <div className="flex items-center gap-2">
-                   <button 
+                   <button
+                     onClick={() => handleToggleDisabled(user)}
+                     title={user.disabled ? 'Reactivar agente' : 'Desactivar agente'}
+                     className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm ${
+                       user.disabled
+                         ? 'bg-emerald-50 text-emerald-500 hover:bg-emerald-500 hover:text-white'
+                         : 'bg-amber-50 text-amber-500 hover:bg-amber-500 hover:text-white'
+                     }`}
+                   >
+                     {user.disabled ? <Power className="w-3.5 h-3.5" /> : <PowerOff className="w-3.5 h-3.5" />}
+                   </button>
+                   <button
                      onClick={() => openEditUserModal(user)}
                      title="Editar usuario"
                      className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:bg-primary hover:text-white flex items-center justify-center transition-colors shadow-sm"
                    >
                      <Edit2 className="w-3.5 h-3.5" />
                    </button>
-                   <button 
+                   <button
                      onClick={() => handleDelete(user.id, `${user.first_name} ${user.last_name}`)}
                      title="Eliminar usuario"
                      className="w-8 h-8 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm"

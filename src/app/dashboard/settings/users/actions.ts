@@ -54,6 +54,23 @@ export async function deleteSystemUser(userId: string) {
     }
 }
 
+export async function toggleAgentDisabled(userId: string, disabled: boolean) {
+  try {
+    const supabase = createAdminClient()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ disabled })
+      .eq('id', userId)
+
+    if (error) return { error: error.message }
+
+    revalidatePath('/dashboard/settings/users')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Error inesperado.' }
+  }
+}
+
 export async function updateSystemUser(userId: string, formData: FormData) {
   try {
     const supabase = createAdminClient()

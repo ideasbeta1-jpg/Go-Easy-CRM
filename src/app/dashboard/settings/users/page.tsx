@@ -40,7 +40,7 @@ export default async function UsersSettingsPage() {
   // Fetch Public Profiles to get avatars and other metadata synced by triggers
   const { data: profiles, error: profileError } = await supabase
     .from('profiles')
-    .select('id, is_active, avatar_url, first_name, last_name, role, zadarma_sip')
+    .select('id, is_active, disabled, avatar_url, first_name, last_name, role, zadarma_sip')
 
   if (profileError) {
     console.error('Error fetching profiles', profileError)
@@ -59,6 +59,7 @@ export default async function UsersSettingsPage() {
       role: p?.role || u.user_metadata?.role || 'agente',
       avatar_url: p?.avatar_url || null,
       is_active: p?.is_active || false,
+      disabled: p?.disabled || false,
       zadarma_sip: p?.zadarma_sip || null,
     }
   }) || []
