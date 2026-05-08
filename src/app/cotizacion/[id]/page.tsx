@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/utils/supabase/admin'
-import { notFound } from 'next/navigation'
 import {
   Car,
   MapPin,
@@ -7,15 +6,11 @@ import {
   CheckCircle2,
   CreditCard,
   ShieldCheck,
-  Tag,
-  Star,
   Clock,
   ArrowRight,
-  Sparkles,
-  Zap,
+  AlertTriangle,
   Shield,
-  LayoutGrid,
-  AlertTriangle
+  Sparkles,
 } from 'lucide-react'
 
 export default async function QuoteLandingPage({
@@ -42,47 +37,46 @@ export default async function QuoteLandingPage({
     .single()
 
   if (error || !quote) {
-     return (
-       <div className="min-h-screen py-20 px-6 bg-slate-50 flex items-center justify-center">
-         <div className="max-w-md w-full bg-white p-12 rounded-[3rem] shadow-xl border border-slate-100 text-center space-y-6">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto">
-               <Shield className="w-10 h-10" />
-            </div>
-            <h1 className="text-2xl font-black text-slate-900 leading-none tracking-tight">Error al cargar cotización</h1>
-            <p className="text-slate-500 font-medium">No hemos podido encontrar los detalles de tu cotización en este momento.</p>
-            <div className="text-[10px] font-mono text-slate-400 bg-slate-50 p-3 rounded-xl overflow-auto">
-               ID: {id}
-            </div>
-         </div>
-       </div>
-     )
+    return (
+      <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center space-y-5">
+          <div className="w-12 h-12 bg-red-50 rounded-xl flex items-center justify-center mx-auto">
+            <Shield className="w-6 h-6 text-red-500" />
+          </div>
+          <div>
+            <h1 className="text-lg font-black text-slate-900">Cotización no encontrada</h1>
+            <p className="text-sm text-slate-500 font-medium mt-1">No pudimos cargar los detalles en este momento.</p>
+          </div>
+          <p className="text-[10px] font-mono text-slate-400 bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg">ID: {id}</p>
+        </div>
+      </div>
+    )
   }
 
   const { lead } = quote
   const category = lead.category
 
-  // Quote invalidada — precio o enlace cambiado por el agente
   if (quote.is_active === false) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center px-6">
-        <div className="max-w-md w-full text-center space-y-8">
-          <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/20 rounded-3xl flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-10 h-10 text-amber-400" />
+      <div className="min-h-screen bg-[#F0F4F8] flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center space-y-5">
+          <div className="w-12 h-12 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-6 h-6 text-amber-500" />
           </div>
-          <div className="space-y-3">
-            <h1 className="text-3xl font-black text-white tracking-tight">Esta cotización ya no está vigente</h1>
-            <p className="text-slate-400 font-medium leading-relaxed">
-              Hola <span className="text-white font-bold">{lead.first_name}</span>, tu agente ha actualizado
-              los términos de tu cotización. Por favor revisa tu WhatsApp o email para recibir el nuevo enlace con la cotización actualizada.
+          <div>
+            <h1 className="text-lg font-black text-slate-900">Esta cotización ya no está vigente</h1>
+            <p className="text-sm text-slate-500 font-medium mt-2 leading-relaxed">
+              Hola <span className="font-black text-slate-800">{lead.first_name}</span>, tu agente actualizó
+              los términos de tu cotización. Revisa tu WhatsApp o email para el nuevo enlace.
             </p>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-left space-y-2">
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Generada el</p>
-            <p className="text-sm font-bold text-slate-300">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-left">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Generada el</p>
+            <p className="text-sm font-black text-slate-700 mt-0.5">
               {new Date(quote.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           </div>
-          <p className="text-[11px] text-slate-600 font-bold">Go Easy Florida · goeasyflorida.com</p>
+          <p className="text-[11px] text-slate-400 font-bold">Go Easy Florida · goeasyflorida.com</p>
         </div>
       </div>
     )
@@ -90,19 +84,15 @@ export default async function QuoteLandingPage({
 
   const isPaid = session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
 
-  // Use quote snapshot dates when available, fall back to lead dates
   const pickupDateStr = quote.pickup_date || lead.pickup_date
   const returnDateStr = quote.return_date || lead.return_date
 
-  // Duración exacta en días
   const pickup = new Date(pickupDateStr)
   const returnDate = new Date(returnDateStr)
   const diffDays = Math.max(1, Math.ceil((returnDate.getTime() - pickup.getTime()) / (1000 * 3600 * 24)))
 
-  // Usar snapshot de precios guardados en el quote, no del lead (que puede haber cambiado)
   const grandTotal = Number(quote.total_amount || lead.total_amount || 0)
 
-  // Depósito: usar snapshot si existe, sino calcular
   const deposit = quote.deposit_amount
     ? Number(quote.deposit_amount)
     : (() => {
@@ -115,274 +105,338 @@ export default async function QuoteLandingPage({
   const balanceAtCounter = Math.max(0, grandTotal - deposit)
   const isPremium = lead.rate_plan === 'premium'
 
+  const expiryDate = new Date(quote.expires_at || Date.now() + 86400000).toLocaleDateString('es-ES', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  })
+
+  const pickupFormatted = new Date(pickupDateStr).toLocaleDateString('es-ES', {
+    weekday: 'short', day: 'numeric', month: 'short'
+  }) + ' · ' + new Date(pickupDateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+
+  const returnFormatted = new Date(returnDateStr).toLocaleDateString('es-ES', {
+    weekday: 'short', day: 'numeric', month: 'short'
+  }) + ' · ' + new Date(returnDateStr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+
+  const premiumFeatures = [
+    'Protección Total (Robo y Choque)',
+    'Seguro a Terceros ($1M)',
+    'Asistencia Carretera 24/7',
+    'GPS Incluido',
+    'Conductor Adicional',
+    'Kilometraje Ilimitado',
+    'Combustible: Lleno/Lleno',
+  ]
+
+  const standardFeatures = [
+    'Protección Básica (con Deducible)',
+    'Seguro a Terceros Básico',
+    'Asistencia Carretera 24/7',
+    'GPS Incluido',
+    'Conductor Adicional',
+    'Millas Solo Florida',
+    'Combustible: Lleno/Lleno',
+  ]
+
+  const features = isPremium ? premiumFeatures : standardFeatures
+
   return (
-    <div className="min-h-screen bg-[#FDFDFF] text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900 pb-20">
+    <div className="min-h-screen bg-[#F0F4F8] font-sans text-slate-900">
 
-       {/* High-Impact Header */}
-       <header className="relative py-28 md:py-40 px-6 overflow-hidden bg-slate-950 text-white rounded-b-[5rem] md:rounded-b-[7rem] shadow-[0_30px_60px_rgba(0,0,0,0.1)]">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.15),transparent)] transition-all duration-1000" />
-          <div className="absolute top-0 left-0 w-full h-full bg-grid-white/[0.02] [mask-image:radial-gradient(ellipse_at_center,white,transparent)]" />
-          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 blur-[120px] rounded-full animate-pulse" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 blur-[150px] rounded-full" />
-
-          {isPaid && (
-            <div className="max-w-4xl mx-auto mb-16 p-8 md:p-10 bg-emerald-500/10 backdrop-blur-xl rounded-[3.5rem] border border-emerald-500/20 text-white animate-in zoom-in-95 duration-700 shadow-2xl relative z-30">
-               <div className="flex flex-col md:flex-row items-center justify-center gap-6 text-center md:text-left">
-                  <div className="w-16 h-16 bg-emerald-500 rounded-[1.5rem] flex items-center justify-center text-white shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-                     <CheckCircle2 className="w-8 h-8" />
-                  </div>
-                  <div className="space-y-1">
-                     <h2 className="text-3xl font-black tracking-tight leading-none uppercase italic">¡Reserva Asegurada! 🌴</h2>
-                     <p className="text-emerald-100/70 font-medium">Tu pago ha sido procesado con éxito. Un agente te contactará pronto.</p>
-                  </div>
-               </div>
+      {/* Top bar */}
+      <header className="bg-white border-b border-slate-200">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-[#1a2035] rounded-xl flex items-center justify-center shrink-0">
+              <span className="text-white font-black text-sm">G</span>
             </div>
-          )}
-
-          <div className="max-w-5xl mx-auto text-center relative z-10 space-y-10">
-             <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <Sparkles className="w-4 h-4" /> {isPaid ? 'Reserva Confirmada · Florida' : 'Cotización Personalizada · Florida'}
-             </div>
-             <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-none animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-                {isPaid ? (
-                  <>Tu Reserva <br/>está <span className="text-emerald-400 italic">Confirmada</span></>
-                ) : (
-                  <>Tu Cotización <br/>está <span className="text-indigo-400 italic">Lista</span></>
-                )}
-             </h1>
-             <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-                {isPaid
-                  ? <>Hola <span className="text-white font-black">{lead.first_name}</span>! Tu pago fue recibido. Un agente te contactará pronto con todos los detalles.</>
-                  : <>Hola <span className="text-white font-black">{lead.first_name}</span>. Esta cotización tiene disponibilidad reservada — confírmala antes de que expire.</>
-                }
-             </p>
+            <div>
+              <p className="font-black text-slate-900 text-sm leading-none">Go Easy Florida</p>
+              <p className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">Renta de Autos · Premium Fleet</p>
+            </div>
           </div>
-       </header>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+            isPaid
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+              : 'bg-indigo-50 border-indigo-200 text-indigo-700'
+          }`}>
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isPaid ? 'bg-emerald-500' : 'bg-indigo-500 animate-pulse'}`} />
+            {isPaid ? 'Reserva Confirmada' : 'Cotización Activa'}
+          </div>
+        </div>
+      </header>
 
-       {/* Detailed Quote Breakdown */}
-       <main className="max-w-6xl mx-auto px-6 -mt-16 md:-mt-24 relative z-20">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12">
+      {/* Paid banner */}
+      {isPaid && (
+        <div className="bg-emerald-500 text-white">
+          <div className="max-w-5xl mx-auto px-6 py-3 flex items-center gap-3">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <p className="text-sm font-bold">
+              ¡Reserva confirmada! Tu pago fue procesado con éxito. Un agente te contactará pronto con todos los detalles.
+            </p>
+          </div>
+        </div>
+      )}
 
-             {/* Left Column: Vehicle & Features */}
-             <div className="lg:col-span-2 space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-10 duration-1000 delay-300">
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
-                {/* Vehicle Showcase Card */}
-                <div className="bg-white border border-slate-100 shadow-[0_40px_100px_rgba(0,0,0,0.04)] rounded-[4rem] p-8 md:p-14 overflow-hidden relative group">
-                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 blur-[100px] rounded-full -mr-20 -mt-20" />
+        {/* Page title row */}
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-1">
+              {isPaid ? 'Reserva Confirmada' : 'Cotización Personalizada'}
+            </p>
+            <h1 className="text-2xl font-black text-slate-900">Hola, {lead.first_name}</h1>
+            <p className="text-sm text-slate-500 font-medium mt-1 max-w-md">
+              {isPaid
+                ? 'Tu pago fue recibido con éxito. Aquí tienes el resumen completo de tu reserva.'
+                : 'Revisa los detalles y confirma con el depósito para asegurar tu disponibilidad.'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3 bg-white border border-amber-200 rounded-xl px-4 py-3 shadow-sm shrink-0 self-start">
+            <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Oferta vence</p>
+              <p className="text-sm font-black text-slate-800 leading-tight mt-0.5">{expiryDate}</p>
+            </div>
+          </div>
+        </div>
 
-                   <div className="flex flex-col xl:flex-row items-start gap-12 md:gap-16">
-                      <div className="w-full xl:w-1/2 relative">
-                         <div className="relative z-10 group-hover:scale-110 transition-transform duration-1000 ease-out">
-                            <img
-                              src={category.image_url}
-                              className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.15)]"
-                              alt={category.name}
-                            />
-                         </div>
-                         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[80%] h-4 bg-black/10 blur-2xl rounded-full" />
+        {/* KPI stats row — 4 cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Duración</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">{diffDays} días</p>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+              {new Date(pickupDateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} →{' '}
+              {new Date(returnDateStr).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+            </p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Total Renta</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">${grandTotal.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Incluye seguro y fees</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400">Depósito Online</p>
+            <p className="text-2xl font-black text-indigo-700 mt-1">${deposit.toFixed(2)}</p>
+            <p className="text-[11px] text-indigo-400 font-medium mt-0.5">Para confirmar ahora</p>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Saldo en Counter</p>
+            <p className="text-2xl font-black text-slate-900 mt-1">${balanceAtCounter.toFixed(2)}</p>
+            <p className="text-[11px] text-slate-400 font-medium mt-0.5">Se paga al recoger</p>
+          </div>
+        </div>
+
+        {/* Main 2-col grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+          {/* Left: Vehicle + trip + protection */}
+          <div className="lg:col-span-2 space-y-5">
+
+            {/* Vehicle card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Car className="w-4 h-4 text-slate-400" />
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Vehículo</span>
+                </div>
+                <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                  isPremium ? 'bg-indigo-50 text-indigo-600 border border-indigo-200' : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                }`}>
+                  {isPremium ? 'Premium Full Cover' : 'Protección Estándar'}
+                </span>
+              </div>
+              <div className="p-6 flex flex-col md:flex-row gap-8 items-center">
+                <div className="w-full md:w-48 shrink-0">
+                  <img
+                    src={category.image_url}
+                    alt={category.name}
+                    className="w-full h-auto object-contain drop-shadow-md"
+                  />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900">{category.name}</h2>
+                    <p className="text-sm text-slate-500 font-medium mt-1 leading-relaxed">{category.description}</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-4">
+                    {features.map(feature => (
+                      <div key={feature} className="flex items-center gap-2">
+                        <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${isPremium ? 'text-indigo-500' : 'text-emerald-500'}`} />
+                        <span className="text-xs font-medium text-slate-600">{feature}</span>
                       </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
 
-                      <div className="w-full xl:w-1/2 space-y-6">
-                         <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-indigo-50/50 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-xl border border-indigo-100/50">
-                            <Car className="w-3 h-3" /> Categoría Seleccionada
-                         </div>
-                         <h2 className="text-5xl md:text-6xl font-black text-slate-900 tracking-tighter leading-none italic">{category.name}</h2>
-                         <p className="text-slate-500 font-medium text-lg leading-relaxed max-w-md">
-                            {category.description}
-                         </p>
+            {/* Trip details card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Detalles del Viaje</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1 mb-1.5">
+                    <MapPin className="w-3 h-3 text-blue-400" /> Entrega
+                  </p>
+                  <p className="text-sm font-black text-slate-800 leading-tight">{lead.pickup_location}</p>
+                  <p className="text-[11px] text-indigo-500 font-bold mt-1">{pickupFormatted}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1 mb-1.5">
+                    <MapPin className="w-3 h-3 text-indigo-400" /> Devolución
+                  </p>
+                  <p className="text-sm font-black text-slate-800 leading-tight">{lead.return_location}</p>
+                  <p className="text-[11px] text-indigo-500 font-bold mt-1">{returnFormatted}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1 mb-1.5">
+                    <Calendar className="w-3 h-3 text-emerald-400" /> Duración
+                  </p>
+                  <p className="text-sm font-black text-slate-800">{diffDays} días</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 flex items-center gap-1 mb-1.5">
+                    <ShieldCheck className="w-3 h-3 text-amber-400" /> Protección
+                  </p>
+                  <p className="text-sm font-black text-slate-800">{isPremium ? 'Premium VIP' : 'Estándar'}</p>
+                </div>
+              </div>
+            </div>
 
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-4">
-                             {(isPremium
-                               ? [
-                                   'Protección Total (Robo y Choque)',
-                                   'Seguro a Terceros ($1M)',
-                                   'Asistencia Carretera 24/7',
-                                   'GPS Incluido',
-                                   'Conductor Adicional',
-                                   'Kilometraje Ilimitado',
-                                   'Combustible: Lleno/Lleno'
-                                 ]
-                               : [
-                                   'Protección Básica (Deducible)',
-                                   'Seguro a Terceros Básico',
-                                   'Asistencia Carretera 24/7',
-                                   'GPS Incluido',
-                                   'Conductor Adicional',
-                                   'Millas Sólo Florida',
-                                   'Combustible: Lleno/Lleno'
-                                 ]
-                             ).map(item => (
-                               <div key={item} className="flex items-center gap-3 px-3 py-2 bg-slate-50/50 border border-slate-100 rounded-2xl group/item hover:bg-white hover:shadow-sm transition-all duration-300">
-                                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${isPremium ? 'bg-indigo-100 text-indigo-600' : 'bg-emerald-100 text-emerald-600'}`}>
-                                     {isPremium ? <Sparkles className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                                  </div>
-                                  <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{item}</span>
-                               </div>
-                            ))}
-                         </div>
+            {/* Protection card */}
+            <div className={`rounded-2xl border p-6 ${
+              isPremium
+                ? 'bg-indigo-600 border-indigo-500'
+                : 'bg-white border-slate-200'
+            }`}>
+              <div className="flex items-start gap-4">
+                <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+                  isPremium ? 'bg-white/20' : 'bg-emerald-50 border border-emerald-200'
+                }`}>
+                  {isPremium
+                    ? <Sparkles className="w-5 h-5 text-white" />
+                    : <ShieldCheck className="w-5 h-5 text-emerald-500" />
+                  }
+                </div>
+                <div>
+                  <h3 className={`text-base font-black ${isPremium ? 'text-white' : 'text-slate-900'}`}>
+                    {isPremium ? 'Premium Full Cover 👑' : 'Protección Estándar'}
+                  </h3>
+                  <p className={`text-sm font-medium mt-1 leading-relaxed ${isPremium ? 'text-indigo-200' : 'text-slate-500'}`}>
+                    {isPremium
+                      ? 'Protección total contra robo y choque, seguro a terceros de $1M, asistencia 24/7 y kilometraje ilimitado. Sin costos ocultos en el counter.'
+                      : 'Cobertura básica con deducible, asistencia 24/7, GPS, conductor adicional y política combustible lleno/lleno.'
+                    }
+                  </p>
+                  {isPremium && (
+                    <div className="flex items-center gap-2 mt-3 text-[10px] font-black uppercase tracking-wider text-indigo-200">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                      100% Sin Costos Ocultos en el Counter
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Right: Pricing + CTA */}
+          <div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden sticky top-6">
+
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-slate-400" />
+                <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Resumen de Pago</span>
+              </div>
+
+              <div className="p-6 space-y-6">
+
+                {/* Breakdown */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                    <span className="text-sm font-medium text-slate-500">Total Renta ({diffDays} días)</span>
+                    <span className="text-sm font-black text-slate-900">${grandTotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-slate-100">
+                    <span className="text-sm font-medium text-slate-500">Depósito online</span>
+                    <span className="text-sm font-black text-indigo-600">−${deposit.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-700">Saldo en counter</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <CreditCard className="w-3 h-3 text-emerald-500" />
+                        <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wide">Pay at Pickup</span>
                       </div>
-                   </div>
-
-                   <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pt-12 border-t border-slate-50">
-                      {[
-                        { label: 'Entrega', val: lead.pickup_location, date: pickupDateStr, icon: MapPin, color: 'text-blue-500' },
-                        { label: 'Devolución', val: lead.return_location, date: returnDateStr, icon: MapPin, color: 'text-indigo-500' },
-                        { label: 'Duración', val: `${diffDays} días`, icon: Calendar, color: 'text-emerald-500' },
-                        { label: 'Protección', val: isPremium ? 'Premium VIP' : 'Estándar', icon: ShieldCheck, color: 'text-amber-500' }
-                       ].map(item => (
-                         <div key={item.label} className="space-y-2 group/info">
-                            <span className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] flex items-center gap-2">
-                               <item.icon className={`w-3.5 h-3.5 ${item.color}`} /> {item.label}
-                            </span>
-                            <div className="space-y-1">
-                               <p className="font-extrabold text-slate-900 tracking-tight leading-tight md:text-lg group-hover:text-indigo-600 transition-colors">{item.val}</p>
-                               {item.date && (
-                                 <p className="text-xs font-black text-indigo-600 uppercase tracking-tight">
-                                   {new Date(item.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', weekday: 'short' })} • {new Date(item.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                                 </p>
-                               )}
-                            </div>
-                         </div>
-                       ))}
-                   </div>
+                    </div>
+                    <span className="text-2xl font-black text-slate-900">${balanceAtCounter.toFixed(2)}</span>
+                  </div>
                 </div>
 
-                {/* Benefits / Assurance */}
-                <div className="grid grid-cols-1 md:grid-cols-1 gap-8">
-                   {isPremium ? (
-                      <div className="bg-indigo-600 rounded-[3.5rem] p-10 md:p-14 text-white group overflow-hidden relative shadow-[0_30px_60px_rgba(79,70,229,0.25)] border border-white/10">
-                         <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 blur-[100px] rounded-full -mr-40 -mt-40" />
-                         <Zap className="absolute top-12 right-12 w-24 h-24 text-white/5 group-hover:scale-125 transition-transform duration-1000" />
+                {/* CTA block */}
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-4">
+                  <div className="text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Confirma hoy con solo</p>
+                    <p className="text-4xl font-black text-indigo-700 mt-1.5">${deposit.toFixed(2)}</p>
+                    <p className="text-[11px] text-slate-400 font-medium mt-1">Asegura tarifa y disponibilidad</p>
+                  </div>
 
-                         <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
-                            <div className="w-20 h-20 bg-white/20 backdrop-blur-xl rounded-[2rem] flex items-center justify-center text-white border border-white/20 shrink-0">
-                               <Sparkles className="w-10 h-10" />
-                            </div>
-                            <div className="space-y-4 text-center md:text-left">
-                               <h3 className="text-4xl font-black tracking-tight leading-none italic uppercase">Premium Full Cover 👑</h3>
-                               <p className="text-indigo-100 text-lg font-medium leading-relaxed max-w-2xl opacity-90">
-                                  Viaja con absoluta tranquilidad. Protección total contra robo y choque, seguro a terceros de $1M, asistencia 24/7 y kilometraje ilimitado. Sin costos ocultos.
-                               </p>
-                               <div className="flex items-center justify-center md:justify-start gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">
-                                  <CheckCircle2 className="w-4 h-4 text-white" /> 100% Sin Costos Ocultos en el Counter
-                               </div>
-                            </div>
-                         </div>
-                      </div>
-                   ) : (
-                      <div className="bg-white border border-slate-100 rounded-[3.5rem] p-10 md:p-14 text-slate-900 group overflow-hidden relative shadow-sm">
-                         <div className="flex flex-col md:flex-row gap-10 relative z-10 items-center">
-                            <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center text-emerald-500 border border-emerald-100 shrink-0 shadow-sm">
-                               <ShieldCheck className="w-10 h-10" />
-                            </div>
-                            <div className="space-y-3 text-center md:text-left">
-                               <h3 className="text-3xl font-black tracking-tight leading-none italic uppercase">Protección Estándar</h3>
-                               <p className="text-slate-500 font-medium leading-relaxed max-w-2xl">
-                                  Cobertura básica contra robo y choque con deducible. Incluye asistencia 24/7, GPS, conductor adicional y kilometraje ilimitado en Florida. Política de combustible lleno/lleno.
-                               </p>
-                            </div>
-                         </div>
-                      </div>
-                   )}
+                  {isPaid ? (
+                    <div className="w-full bg-emerald-500 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm">
+                      <CheckCircle2 className="w-4 h-4" /> Reserva Pagada
+                    </div>
+                  ) : (
+                    <a
+                      href={quote.stripe_link || '#'}
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-black py-3.5 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors shadow-sm"
+                    >
+                      Confirmar Ahora
+                      <ArrowRight className="w-4 h-4" />
+                    </a>
+                  )}
+
+                  <div className="flex items-center justify-center gap-1.5 text-[10px] font-bold text-slate-400">
+                    <CreditCard className="w-3 h-3" /> Checkout seguro · Stripe
+                  </div>
                 </div>
-             </div>
 
-             {/* Right Column: Pricing & Payment */}
-             <div className="animate-in fade-in slide-in-from-right-10 duration-1000 delay-500">
-                <div className="bg-white border border-slate-100 shadow-[0_30px_80px_rgba(0,0,0,0.06)] rounded-[4.5rem] p-10 md:p-12 sticky top-12 space-y-10 group overflow-hidden">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full" />
-
-                   <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                         <div className="w-1 h-6 bg-indigo-600 rounded-full" />
-                         <h3 className="text-2xl font-black tracking-tight uppercase italic">Resumen</h3>
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest pl-4">Detalles de Facturación</p>
-                   </div>
-
-                   <div className="space-y-6 pl-4">
-                      <div className="flex justify-between items-center group/price">
-                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Total Renta ({diffDays} días)</span>
-                         <span className="text-lg font-black text-slate-900 tracking-tight">${grandTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center group/price">
-                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Depósito de Garantía</span>
-                         <span className="text-lg font-black text-indigo-600 tracking-tight">-${deposit.toFixed(2)}</span>
-                      </div>
-
-                      <div className="pt-10 mt-6 border-t border-slate-100">
-                         <div className="flex justify-between items-end mb-2">
-                            <span className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Saldo en Counter</span>
-                            <div className="flex items-center gap-1.5 text-[9px] text-emerald-600 font-black uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-full animate-bounce">
-                               <CreditCard className="w-3 h-3" /> Pay at Pickup
-                            </div>
-                         </div>
-                         <div className="text-6xl font-black text-slate-950 tracking-tighter leading-none">${balanceAtCounter.toFixed(2)}</div>
-                      </div>
-                   </div>
-
-                   <div className="bg-slate-50 border border-slate-100 rounded-[3.5rem] p-10 space-y-8 text-center relative overflow-hidden group/pay shadow-inner">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-3xl rounded-full" />
-                      <div className="space-y-2 relative z-10">
-                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Confirma hoy con tan solo</p>
-                         <div className="inline-flex items-baseline gap-1">
-                            <span className="text-6xl font-black text-indigo-700 tracking-tighter">${deposit.toFixed(2)}</span>
-                         </div>
-                         <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest pt-2">Asegura tu tarifa y disponibilidad</p>
-                      </div>
-
-                      {isPaid ? (
-                        <div className="w-full bg-emerald-500 text-white font-black py-6 rounded-[2rem] shadow-[0_20px_40px_rgba(16,185,129,0.3)] flex items-center justify-center gap-3 animate-in fade-in zoom-in-95">
-                           <CheckCircle2 className="w-6 h-6 animate-pulse" /> RESERVA PAGADA
-                        </div>
-                      ) : (
-                        <div className="space-y-4 relative z-10">
-                           <a
-                             href={quote.stripe_link || '#'}
-                             className="w-full bg-indigo-600 text-white font-black text-xl py-6 rounded-[2.5rem] hover:bg-indigo-700 hover:shadow-[0_25px_50px_rgba(79,70,229,0.4)] hover:-translate-y-1 transition-all duration-300 flex items-center justify-center gap-4 group/btn shadow-[0_20px_40px_rgba(79,70,229,0.2)] active:scale-95"
-                           >
-                              Confirmar Ahora
-                              <ArrowRight className="w-6 h-6 group-hover/btn:translate-x-3 transition-transform duration-500" />
-                           </a>
-                           <div className="flex items-center justify-center gap-2 opacity-30 group-hover/pay:opacity-60 transition-opacity">
-                              <CreditCard className="w-5 h-5" />
-                              <span className="text-[8px] font-black uppercase tracking-[0.3em]">Checkout Seguro · Stripe</span>
-                           </div>
-                        </div>
-                      )}
-                   </div>
-
-                   <div className="flex items-center gap-5 p-6 bg-slate-50/50 rounded-[2rem] border border-dashed border-slate-200 group/vence">
-                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 shadow-sm group-hover/vence:rotate-12 transition-transform duration-500">
-                         <Clock className="w-5 h-5 text-indigo-400" />
-                      </div>
-                      <div className="space-y-0.5">
-                         <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 leading-none">Esta oferta vence el</p>
-                         <p className="text-sm font-black text-slate-800 tracking-tight">
-                            {new Date(quote.expires_at || Date.now() + 86400000).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                         </p>
-                      </div>
-                   </div>
+                {/* Expiry */}
+                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">Oferta vence</p>
+                    <p className="text-sm font-black text-slate-800 mt-0.5">{expiryDate}</p>
+                  </div>
                 </div>
-             </div>
-          </div>
-       </main>
 
-       <footer className="mt-40 py-16 text-center space-y-8 max-w-4xl mx-auto border-t border-slate-100">
-          <div className="flex items-center justify-center gap-4">
-             <div className="h-px w-12 bg-slate-200" />
-             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.6em]">Go Easy Florida · Premium Fleet</p>
-             <div className="h-px w-12 bg-slate-200" />
+              </div>
+            </div>
           </div>
-          <p className="text-[10px] font-bold text-slate-400 px-6 max-w-xl mx-auto leading-relaxed">
-             © 2026 Go Easy CRM. Todos los derechos reservados. Las imágenes son ilustrativas y pueden variar según disponibilidad técnica al momento de la entrega.
-          </p>
-          <div className="flex items-center justify-center gap-12 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Ayuda</a>
-             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Condiciones</a>
-             <a href="#" className="hover:text-indigo-600 transition-all hover:scale-105">Privacidad</a>
+
+        </div>
+      </main>
+
+      <footer className="border-t border-slate-200 bg-white mt-10 py-6">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 bg-[#1a2035] rounded-lg flex items-center justify-center">
+              <span className="text-white font-black text-[9px]">G</span>
+            </div>
+            <p className="text-[11px] font-bold text-slate-400">© 2026 Go Easy Florida. Las imágenes son ilustrativas.</p>
           </div>
-       </footer>
+          <div className="flex items-center gap-6 text-[11px] font-black uppercase tracking-widest text-slate-400">
+            <a href="#" className="hover:text-indigo-600 transition-colors">Ayuda</a>
+            <a href="#" className="hover:text-indigo-600 transition-colors">Condiciones</a>
+            <a href="#" className="hover:text-indigo-600 transition-colors">Privacidad</a>
+          </div>
+        </div>
+      </footer>
+
     </div>
   )
 }
