@@ -73,7 +73,7 @@ export default async function QuoteLandingPage({
             <h1 className="text-3xl font-black text-white tracking-tight">Esta cotización ya no está vigente</h1>
             <p className="text-slate-400 font-medium leading-relaxed">
               Hola <span className="text-white font-bold">{lead.first_name}</span>, tu agente ha actualizado
-              los términos de tu reserva. Por favor revisa tu WhatsApp o email para recibir el nuevo enlace con la cotización actualizada.
+              los términos de tu cotización. Por favor revisa tu WhatsApp o email para recibir el nuevo enlace con la cotización actualizada.
             </p>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-left space-y-2">
@@ -141,13 +141,20 @@ export default async function QuoteLandingPage({
 
           <div className="max-w-5xl mx-auto text-center relative z-10 space-y-10">
              <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-[0.4em] mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <Sparkles className="w-4 h-4" /> Oferta Personalizada Florida
+                <Sparkles className="w-4 h-4" /> {isPaid ? 'Reserva Confirmada · Florida' : 'Cotización Personalizada · Florida'}
              </div>
              <h1 className="text-6xl md:text-9xl font-black tracking-tighter leading-none animate-in fade-in slide-in-from-bottom-6 duration-700 delay-100">
-                Tu Reserva <br/>está <span className="text-indigo-400 italic">Lista</span>
+                {isPaid ? (
+                  <>Tu Reserva <br/>está <span className="text-emerald-400 italic">Confirmada</span></>
+                ) : (
+                  <>Tu Cotización <br/>está <span className="text-indigo-400 italic">Lista</span></>
+                )}
              </h1>
              <p className="text-xl md:text-2xl text-slate-400 font-medium max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-                Hola <span className="text-white font-black">{lead.first_name}</span>! Hemos bloqueado esta oferta exclusiva para ti.
+                {isPaid
+                  ? <>Hola <span className="text-white font-black">{lead.first_name}</span>! Tu pago fue recibido. Un agente te contactará pronto con todos los detalles.</>
+                  : <>Hola <span className="text-white font-black">{lead.first_name}</span>. Esta cotización tiene disponibilidad reservada — confírmala antes de que expire.</>
+                }
              </p>
           </div>
        </header>
@@ -295,7 +302,7 @@ export default async function QuoteLandingPage({
 
                    <div className="space-y-6 pl-4">
                       <div className="flex justify-between items-center group/price">
-                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Reserva ({diffDays} días)</span>
+                         <span className="text-sm font-bold text-slate-400 uppercase tracking-wider group-hover:text-slate-600 transition-colors">Total Renta ({diffDays} días)</span>
                          <span className="text-lg font-black text-slate-900 tracking-tight">${grandTotal.toFixed(2)}</span>
                       </div>
                       <div className="flex justify-between items-center group/price">
@@ -317,7 +324,7 @@ export default async function QuoteLandingPage({
                    <div className="bg-slate-50 border border-slate-100 rounded-[3.5rem] p-10 space-y-8 text-center relative overflow-hidden group/pay shadow-inner">
                       <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 blur-3xl rounded-full" />
                       <div className="space-y-2 relative z-10">
-                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Reserva hoy con tan solo</p>
+                         <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.25em]">Confirma hoy con tan solo</p>
                          <div className="inline-flex items-baseline gap-1">
                             <span className="text-6xl font-black text-indigo-700 tracking-tighter">${deposit.toFixed(2)}</span>
                          </div>
