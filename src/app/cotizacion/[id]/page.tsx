@@ -90,9 +90,13 @@ export default async function QuoteLandingPage({
 
   const isPaid = session_id || lead.status === 'reserva_confirmada' || lead.status === 'voucher_enviado'
 
+  // Use quote snapshot dates when available, fall back to lead dates
+  const pickupDateStr = quote.pickup_date || lead.pickup_date
+  const returnDateStr = quote.return_date || lead.return_date
+
   // Duración exacta en días
-  const pickup = new Date(lead.pickup_date)
-  const returnDate = new Date(lead.return_date)
+  const pickup = new Date(pickupDateStr)
+  const returnDate = new Date(returnDateStr)
   const diffDays = Math.max(1, Math.ceil((returnDate.getTime() - pickup.getTime()) / (1000 * 3600 * 24)))
 
   // Usar snapshot de precios guardados en el quote, no del lead (que puede haber cambiado)
@@ -214,8 +218,8 @@ export default async function QuoteLandingPage({
 
                    <div className="mt-16 grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 pt-12 border-t border-slate-50">
                       {[
-                        { label: 'Entrega', val: lead.pickup_location, date: lead.pickup_date, icon: MapPin, color: 'text-blue-500' },
-                        { label: 'Devolución', val: lead.return_location, date: lead.return_date, icon: MapPin, color: 'text-indigo-500' },
+                        { label: 'Entrega', val: lead.pickup_location, date: pickupDateStr, icon: MapPin, color: 'text-blue-500' },
+                        { label: 'Devolución', val: lead.return_location, date: returnDateStr, icon: MapPin, color: 'text-indigo-500' },
                         { label: 'Duración', val: `${diffDays} días`, icon: Calendar, color: 'text-emerald-500' },
                         { label: 'Protección', val: isPremium ? 'Premium VIP' : 'Estándar', icon: ShieldCheck, color: 'text-amber-500' }
                        ].map(item => (

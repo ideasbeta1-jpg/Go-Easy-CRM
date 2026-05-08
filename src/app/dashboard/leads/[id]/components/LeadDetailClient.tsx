@@ -199,6 +199,21 @@ export default function LeadDetailClient({
 
     startTransition(async () => {
       try {
+        // Save lead with current form data first so generateQuoteForLead reads fresh dates/prices
+        await updateLead(lead.id, {
+          ...formData,
+          category_id: formData.category_id || null,
+          provider_id: formData.provider_id || null,
+          assigned_to: formData.assigned_to || null,
+          pickup_location_id: formData.pickup_location_id || null,
+          return_location_id: formData.return_location_id || null,
+          pickup_date: formData.pickup_date || null,
+          return_date: formData.return_date || null,
+          total_amount: parseFloat(formData.total_amount as any) || 0,
+          agreed_daily_price: formData.agreed_daily_price !== null ? parseFloat(formData.agreed_daily_price as any) : null,
+          deposit_paid: !!formData.deposit_paid,
+          notes: formData.notes || '',
+        })
         await generateQuoteForLead(lead.id, formData.total_amount)
         setFormData(prev => ({ ...prev, status: 'en_cotizacion' }))
         router.refresh()
