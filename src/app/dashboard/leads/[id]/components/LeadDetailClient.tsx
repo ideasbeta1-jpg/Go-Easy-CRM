@@ -96,6 +96,8 @@ export default function LeadDetailClient({
   const [newNote, setNewNote] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSavingCotizacion, setIsSavingCotizacion] = useState(false)
+  const [cotizacionSaved, setCotizacionSaved] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
@@ -357,6 +359,32 @@ export default function LeadDetailClient({
       alert(`Error al guardar: ${error.message || 'Error desconocido'}`)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleSaveCotizacion = async () => {
+    if (isSavingCotizacion) return
+    setIsSavingCotizacion(true)
+    try {
+      await updateLead(lead.id, {
+        category_id: formData.category_id || null,
+        pickup_location_id: formData.pickup_location_id || null,
+        return_location_id: formData.return_location_id || null,
+        pickup_location: formData.pickup_location || null,
+        return_location: formData.return_location || null,
+        pickup_date: formData.pickup_date || null,
+        return_date: formData.return_date || null,
+        total_amount: parseFloat(formData.total_amount as any) || 0,
+        agreed_daily_price: formData.agreed_daily_price !== null ? parseFloat(formData.agreed_daily_price as any) : null,
+        rate_plan: formData.rate_plan,
+      })
+      setCotizacionSaved(true)
+      setTimeout(() => setCotizacionSaved(false), 2500)
+      router.refresh()
+    } catch (error: any) {
+      alert(`Error al guardar: ${error.message || 'Error desconocido'}`)
+    } finally {
+      setIsSavingCotizacion(false)
     }
   }
 
@@ -797,6 +825,36 @@ export default function LeadDetailClient({
                     </select>
                   </div>
                 </div>
+              </div>
+
+              {/* Save cotización fields */}
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    category_id: lead.category_id || '',
+                    pickup_date: lead.pickup_date ? lead.pickup_date.slice(0, 16) : '',
+                    return_date: lead.return_date ? lead.return_date.slice(0, 16) : '',
+                    pickup_location: lead.pickup_location || '',
+                    return_location: lead.return_location || '',
+                    pickup_location_id: lead.pickup_location_id || '',
+                    return_location_id: lead.return_location_id || '',
+                    total_amount: lead.total_amount || 0,
+                    agreed_daily_price: lead.agreed_daily_price || null,
+                    rate_plan: lead.rate_plan || 'base',
+                  }))}
+                  className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveCotizacion}
+                  disabled={isSavingCotizacion}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-dim transition-all shadow-lg shadow-primary/20 disabled:opacity-50"
+                >
+                  <Check className="w-4 h-4" />
+                  {isSavingCotizacion ? 'Guardando...' : cotizacionSaved ? '¡Guardado!' : 'Guardar cambios'}
+                </button>
               </div>
 
               {/* Total + Generate Quote */}
