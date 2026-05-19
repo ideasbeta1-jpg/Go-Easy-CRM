@@ -78,7 +78,8 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
   let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>
   try {
     session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      payment_method_types: ['card', 'klarna'],
+      billing_address_collection: 'required',
       line_items: [
         {
           price_data: {
