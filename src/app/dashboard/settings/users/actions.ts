@@ -57,6 +57,13 @@ export async function deleteSystemUser(userId: string) {
 export async function toggleAgentDisabled(userId: string, disabled: boolean) {
   try {
     const supabase = createAdminClient()
+
+    // Ban/unban at auth level so the user cannot log in while disabled
+    const { error: authError } = await supabase.auth.admin.updateUserById(userId, {
+      ban_duration: disabled ? '876000h' : 'none',
+    })
+    if (authError) return { error: authError.message }
+
     const { error } = await supabase
       .from('profiles')
       .update({ disabled })
