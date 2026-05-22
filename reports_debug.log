@@ -1,0 +1,126 @@
+{
+  "timestamp": "2026-05-22T02:28:24.141Z",
+  "user": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "email": "admin@goeasy.com"
+  },
+  "profile": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "role": "admin",
+    "full_name": "Robinson Zapata"
+  },
+  "leads": {
+    "error": {
+      "code": "PGRST201",
+      "details": [
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_pickup_location_id_fkey using leads(pickup_location_id) and locations(id)"
+        },
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_return_location_id_fkey using leads(return_location_id) and locations(id)"
+        }
+      ],
+      "hint": "Try changing 'locations' to one of the following: 'locations!leads_pickup_location_id_fkey', 'locations!leads_return_location_id_fkey'. Find the desired relationship in the 'details' key.",
+      "message": "Could not embed because more than one relationship was found for 'leads' and 'locations'"
+    },
+    "count": 0,
+    "sample": null
+  },
+  "messages": {
+    "error": null,
+    "count": 720
+  },
+  "agents": {
+    "error": null,
+    "count": 4
+  }
+}
+
+{
+  "timestamp": "2026-05-22T02:28:24.317Z",
+  "user": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "email": "admin@goeasy.com"
+  },
+  "profile": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "role": "admin",
+    "full_name": "Robinson Zapata"
+  },
+  "leads": {
+    "error": {
+      "code": "PGRST201",
+      "details": [
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_pickup_location_id_fkey using leads(pickup_location_id) and locations(id)"
+        },
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_return_location_id_fkey using leads(return_location_id) and locations(id)"
+        }
+      ],
+      "hint": "Try changing 'locations' to one of the following: 'locations!leads_pickup_location_id_fkey', 'locations!leads_return_location_id_fkey'. Find the desired relationship in the 'details' key.",
+      "message": "Could not embed because more than one relationship was found for 'leads' and 'locations'"
+    },
+    "count": 0,
+    "sample": null
+  },
+  "messages": {
+    "error": null,
+    "count": 720
+  },
+  "agents": {
+    "error": null,
+    "count": 4
+  }
+}
+
+{
+  "timestamp": "2026-05-22T02:28:24.557Z",
+  "user": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "email": "admin@goeasy.com"
+  },
+  "profile": {
+    "id": "6b44ad46-f306-414c-bbb0-7e4d80822205",
+    "role": "admin",
+    "full_name": "Robinson Zapata"
+  },
+  "leads": {
+    "error": {
+      "code": "PGRST201",
+      "details": [
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_pickup_location_id_fkey using leads(pickup_location_id) and locations(id)"
+        },
+        {
+          "cardinality": "many-to-one",
+          "embedding": "leads with locations",
+          "relationship": "leads_return_location_id_fkey using leads(return_location_id) and locations(id)"
+        }
+      ],
+      "hint": "Try changing 'locations' to one of the following: 'locations!leads_pickup_location_id_fkey', 'locations!leads_return_location_id_fkey'. Find the desired relationship in the 'details' key.",
+      "message": "Could not embed because more than one relationship was found for 'leads' and 'locations'"
+    },
+    "count": 0,
+    "sample": null
+  },
+  "messages": {
+    "error": null,
+    "count": 720
+  },
+  "agents": {
+    "error": null,
+    "count": 4
+  }
+}
+
