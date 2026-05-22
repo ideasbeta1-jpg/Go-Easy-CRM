@@ -20,6 +20,7 @@ import {
   X,
   Paperclip,
   MoreHorizontal,
+  Filter,
 } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -250,7 +251,9 @@ export default function ChatInboxClient({
 
   const [searchTerm, setSearchTerm] = useState('')
   const [tabFilter, setTabFilter] = useState<TabFilter>('all')
-  const [filterType] = useState<'my' | 'all'>('all')
+  const [filterType, setFilterType] = useState<'my' | 'all' | 'unassigned'>('my')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [chatMessage, setChatMessage] = useState('')
   const [isSendingMessage, setIsSendingMessage] = useState(false)
@@ -536,15 +539,31 @@ export default function ChatInboxClient({
     .filter(lead => {
       const matchesSearch = `${lead.first_name} ${lead.last_name} ${lead.phone}`.toLowerCase().includes(searchTerm.toLowerCase())
       if (!matchesSearch) return false
-      if (isAdmin || filterType === 'all') return true
-      return lead.assigned_to === currentUserId
+
+      // Assignment Filter
+      if (filterType === 'my') {
+        if (lead.assigned_to !== currentUserId) return false
+      } else if (filterType === 'unassigned') {
+        if (lead.assigned_to) return false
+      }
+
+      // Status Filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'active') {
+          if (lead.status === 'cerrado_ganado' || lead.status === 'cerrado_perdido') return false
+        } else if (lead.status !== statusFilter) {
+          return false
+        }
+      }
+
+      return true
     })
     .sort((a, b) => {
       const da = a.lastMessage?.created_at || a.created_at
       const db = b.lastMessage?.created_at || b.created_at
       return new Date(db).getTime() - new Date(da).getTime()
     })
-  }, [leads, previewMessages, searchTerm, filterType, currentUserId, isAdmin])
+  }, [leads, previewMessages, searchTerm, filterType, statusFilter, currentUserId, isAdmin])
 
   const totalUnread = useMemo(() => processedLeads.filter(l => l.isPending).length, [processedLeads])
 
@@ -583,17 +602,116 @@ export default function ChatInboxClient({
         <div className="px-5 pt-5 pb-0">
           <h1 className="text-xl font-black text-slate-900 mb-4">Conversaciones</h1>
 
-          {/* Search */}
-          <div className="relative mb-4">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-            <input
-              type="text"
-              placeholder="Buscar..."
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white border border-transparent focus:border-primary/10 transition-all"
-            />
+          {/* Segmented Control for Assignment */}
+          <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100/80 rounded-xl mb-4 text-[11px] font-bold text-slate-500 shrink-0">
+            <button
+              type="button"
+              onClick={() => setFilterType('my')}
+              className={`py-1.5 rounded-lg transition-all text-center cursor-pointer ${
+                filterType === 'my'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Mis chats
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('unassigned')}
+              className={`py-1.5 rounded-lg transition-all text-center cursor-pointer ${
+                filterType === 'unassigned'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Sin asignar
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterType('all')}
+              className={`py-1.5 rounded-lg transition-all text-center cursor-pointer ${
+                filterType === 'all'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              Todos
+            </button>
           </div>
+
+          {/* Search & Status Filter Button */}
+          <div className="flex gap-2 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="w-full bg-slate-50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-600 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/10 focus:bg-white border border-transparent focus:border-primary/10 transition-all font-semibold"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowFilters(v => !v)}
+              className={`p-2.5 rounded-xl border transition-all flex items-center justify-center shrink-0 cursor-pointer ${
+                showFilters || statusFilter !== 'all'
+                  ? 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-slate-50 text-slate-400 border-slate-100 hover:text-slate-600 hover:bg-slate-100'
+              }`}
+              title="Filtros de estado"
+            >
+              <Filter className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Collapsible Advanced Filters */}
+          {showFilters && (
+            <div className="mb-4 p-3 bg-slate-50 rounded-2xl border border-slate-100/50 space-y-3 animate-in slide-in-from-top-2 duration-200">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">
+                  Estado del Lead
+                </label>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    { id: 'all', label: 'Todos' },
+                    { id: 'active', label: 'Activos' },
+                    { id: 'lead_nuevo', label: 'Nuevo' },
+                    { id: 'en_cotizacion', label: 'Cotización' },
+                    { id: 'reserva_confirmada', label: 'Confirmada' },
+                    { id: 'voucher_enviado', label: 'Voucher' },
+                    { id: 'cerrado_ganado', label: 'Ganado' },
+                    { id: 'cerrado_perdido', label: 'Perdido' },
+                  ]).map(status => (
+                    <button
+                      key={status.id}
+                      type="button"
+                      onClick={() => setStatusFilter(status.id)}
+                      className={`px-2 py-1.5 rounded-lg text-left text-[11px] font-bold transition-all border cursor-pointer ${
+                        statusFilter === status.id
+                          ? 'bg-white text-primary border-primary/20 shadow-xs'
+                          : 'bg-transparent text-slate-500 border-transparent hover:bg-slate-100 hover:text-slate-700'
+                      }`}
+                    >
+                      {status.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {statusFilter !== 'all' && (
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    className="text-[10px] font-black text-primary uppercase tracking-widest hover:underline cursor-pointer"
+                  >
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex border-b border-slate-100">

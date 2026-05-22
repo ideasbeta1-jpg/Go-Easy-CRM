@@ -9,6 +9,7 @@ const WEBHOOK_PATHS: Record<string, string> = {
   // Stage events fired by automation-engine
   lead_nuevo:          'nuevo-lead-whatsapp',
   reserva_confirmada:  'pago-recibido-whatsapp',
+  voucher_enviado:     'confirmacion-proveedor-whatsapp',
   // Zadarma call events (fired from /api/zadarma/calls)
   llamada_perdida:     'llamada-perdida-whatsapp',
   // Legacy aliases kept for backward compatibility

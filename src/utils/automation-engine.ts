@@ -33,10 +33,10 @@ export async function executeStageAutomation(
       return row === undefined ? true : row.enabled
     }
 
-    // 1. Obtener datos del lead y su categoría
+    // 1. Obtener datos del lead, su categoría y su proveedor
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('*, category:categories(name)')
+      .select('*, category:categories(*), provider:providers(*)')
       .eq('id', leadId)
       .single();
 
@@ -232,6 +232,24 @@ export async function executeStageAutomation(
       }
     }
 
+    // Calcular balance en counter
+    let balanceAtCounter = 0;
+    if (lead.pickup_date && lead.return_date) {
+      const pickup = new Date(lead.pickup_date);
+      const returnDate = new Date(lead.return_date);
+      const diffDays = Math.max(1, Math.ceil((returnDate.getTime() - pickup.getTime()) / (1000 * 3600 * 24)));
+      const grandTotal = Number(lead.total_amount || (quote && quote.total_amount) || 0);
+      const deposit = (quote && quote.deposit_amount)
+        ? Number(quote.deposit_amount)
+        : (() => {
+            const dailyMargin = lead.agreed_daily_price !== null
+              ? Number(lead.agreed_daily_price)
+              : Number(lead.category?.daily_price || 0);
+            return dailyMargin * diffDays;
+          })();
+      balanceAtCounter = Math.max(0, grandTotal - deposit);
+    }
+
     // 5. Fallback a n8n — pasamos datos enriquecidos para los mensajes de WhatsApp
     if (isEnabled('n8n')) {
       await sendLeadToN8n(leadId, stage, {
@@ -243,6 +261,8 @@ export async function executeStageAutomation(
         email:          lead.email,
         source:         lead.source,
         assigned_agent: lead.assigned_agent,
+        provider:       lead.provider,
+        balance_at_counter: balanceAtCounter
       });
     }
 

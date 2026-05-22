@@ -1,0 +1,126 @@
+{
+  "name": "📋 Confirmación Proveedor → WhatsApp Grupo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "confirmacion-proveedor-whatsapp",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-confirmacion-proveedor",
+      "name": "Webhook Confirmación",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "confirmacion-proveedor-whatsapp"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer datos del payload del CRM\nconst body = $input.first().json.body || $input.first().json;\nconst provider = body.provider;\nconst leadName = body.lead_name || 'Cliente';\nconst leadPhone = body.lead_phone || body.phone || '—';\nconst pickupLocation = body.pickup_location || '—';\nconst returnLocation = body.return_location || '—';\nconst categoryName = body.category?.name || body.category_name || '—';\nconst balanceAtCounter = body.balance_at_counter || 0;\n\n// Formatear fechas y horas en horario de Florida (America/New_York)\nconst pickupDateStr = body.pickup_date;\nconst returnDateStr = body.return_date;\n\nconst formatDateTime = (dateStr) => {\n  if (!dateStr) return '—';\n  const date = new Date(dateStr);\n  const dateFormatted = date.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/New_York' });\n  const timeFormatted = date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });\n  return `${dateFormatted} ${timeFormatted}`;\n};\n\nconst pickupDateTime = formatDateTime(pickupDateStr);\nconst returnDateTime = formatDateTime(returnDateStr);\n\n// Formatear valor a pagar en counter: $00.00 + Sun Pass + Taxes\nconst formattedBalance = `$${Number(balanceAtCounter).toFixed(2)} + Sun Pass + Taxes`;\n\nconst message = [\n  '📋 *CONFIRMACIÓN DE RESERVA AL PROVEEDOR*',\n  '',\n  `Nombre del cliente: ${leadName}`,\n  `Teléfono del cliente: ${leadPhone}`,\n  `Lugar de llegada: ${pickupLocation}`,\n  `Fecha y hora de llegada: ${pickupDateTime}`,\n  `Lugar de devolución: ${returnLocation}`,\n  `Fecha y hora de devolución: ${returnDateTime}`,\n  `Tipo de vehículo: ${categoryName}`,\n  `Valor a pagar en counter: ${formattedBalance}`,\n].join('\\n');\n\nconst whatsappGroupId = provider?.whatsapp_group_id;\nconst send = !!whatsappGroupId;\n\nreturn [{ json: { send, whatsapp_group_id: whatsappGroupId, message } }];"
+      },
+      "id": "format-mensaje-proveedor",
+      "name": "Formatear Mensaje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-send",
+              "leftValue": "={{ $json.send }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-group-id-configurado",
+      "name": "¿Tiene Group ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionib.ideasbeta.com/message/sendText/IB Prueba",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.whatsapp_group_id }}\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "options": {}
+      },
+      "id": "send-whatsapp-proveedor",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"message\": \"Notificación enviada al proveedor\" }"
+      },
+      "id": "respond-proveedor-enviado",
+      "name": "Responder OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1200, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": false, \"message\": \"Proveedor sin whatsapp_group_id configurado\" }"
+      },
+      "id": "respond-proveedor-omitido",
+      "name": "Omitir Notificación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [960, 420]
+    }
+  ],
+  "connections": {
+    "Webhook Confirmación": {
+      "main": [[{ "node": "Formatear Mensaje", "type": "main", "index": 0 }]]
+    },
+    "Formatear Mensaje": {
+      "main": [[{ "node": "¿Tiene Group ID?", "type": "main", "index": 0 }]]
+    },
+    "¿Tiene Group ID?": {
+      "main": [
+        [{ "node": "Enviar WhatsApp", "type": "main", "index": 0 }],
+        [{ "node": "Omitir Notificación", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [[{ "node": "Responder OK", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import { sendLeadToN8n } from '@/utils/n8n'
+import { assignLeadToAgent } from '@/utils/assignment'
+import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function submitPublicLead(formData: FormData) {
   const supabase = await createClient()
@@ -31,12 +32,11 @@ export async function submitPublicLead(formData: FormData) {
     throw new Error(error.message)
   }
 
-  // Trigger n8n
-  await sendLeadToN8n(lead.id, 'lead_created', {
-     name: `${data.first_name} ${data.last_name}`,
-     phone: data.phone,
-     category: data.category_id
-  })
+  // Trigger assignment and stage automation
+  if (lead?.id) {
+    const assignedAgent = await assignLeadToAgent(lead.id)
+    await executeStageAutomation(lead.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
+  }
 
   // Success: Redirect to a "thank you" or back with a partial success message
   redirect('/cotizar?success=true')

@@ -42,6 +42,7 @@ export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const supabase = createClient()
@@ -60,6 +61,15 @@ export function NotificationBell() {
     setLoading(false)
   }, [supabase])
 
+  // Get current user ID once on mount
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setUserId(data.user.id)
+      }
+    })
+  }, [supabase])
+
   // Initial fetch
   useEffect(() => {
     fetchNotifications()
@@ -67,12 +77,15 @@ export function NotificationBell() {
 
   // Realtime subscription
   useEffect(() => {
+    if (!userId) return
+
     const channel = supabase
       .channel('notifications-bell')
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
+        filter: `user_id=eq.${userId}`,
       }, (payload) => {
         const newNotif = payload.new as Notification
         setNotifications(prev => [newNotif, ...prev.slice(0, 29)])
@@ -82,17 +95,20 @@ export function NotificationBell() {
         event: 'UPDATE',
         schema: 'public',
         table: 'notifications',
+        filter: `user_id=eq.${userId}`,
       }, (payload) => {
         const updated = payload.new as Notification
-        setNotifications(prev =>
-          prev.map(n => n.id === updated.id ? updated : n)
-        )
+        setNotifications(prev => {
+          const exists = prev.some(n => n.id === updated.id)
+          if (!exists) return prev
+          return prev.map(n => n.id === updated.id ? updated : n)
+        })
         setUnreadCount(prev => updated.is_read ? Math.max(0, prev - 1) : prev)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [supabase])
+  }, [supabase, userId])
 
   // Close on outside click
   useEffect(() => {

@@ -134,19 +134,7 @@ export async function POST(req: NextRequest) {
       console.error('Error sending event to Meta CAPI:', metaError)
     }
 
-    // Trigger n8n for lead_created (legacy automation)
-    try {
-      await sendLeadToN8n(data.id, 'lead_created', {
-        first_name,
-        last_name,
-        phone,
-        email,
-        category_id,
-        event_id: data.id
-      })
-    } catch (n8nError) {
-      console.error('Error sending lead to n8n:', n8nError)
-    }
+
 
     return NextResponse.json({ success: true, id: data.id }, { status: 201 })
   } catch (err) {

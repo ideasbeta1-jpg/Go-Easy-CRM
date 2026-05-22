@@ -1,56 +1,47 @@
 {
-  "name": "📊 Reporte Diario 8PM → WhatsApp Grupo",
+  "name": "📊 Reporte Diario 8PM -> WhatsApp Grupo",
   "nodes": [
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "cronExpression",
-              "expression": "0 20 * * *"
+              "triggerAtHour": 20
             }
           ]
-        },
-        "timezone": "America/Bogota"
+        }
       },
-      "id": "schedule-reporte",
-      "name": "Programar 8PM Colombia",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
-      "position": [240, 300]
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "abd531b0-1af9-40b3-a8f8-f44dee2f92af",
+      "name": "Schedule Trigger"
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://oupphpttipkedntaxizk.supabase.co/rest/v1/rpc/get_daily_leads_report",
+        "url": "https://goeasyflorida.com/api/cron/daily-report",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91cHBocHR0aXBrZWRudGF4aXprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDEwNDY4MiwiZXhwIjoyMDg5NjgwNjgyfQ.0U2J2MumDfpJ6xstL_ptVS6pD2vtniIuXKuZXvsAKDc" },
-            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im91cHBocHR0aXBrZWRudGF4aXprIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDEwNDY4MiwiZXhwIjoyMDg5NjgwNjgyfQ.0U2J2MumDfpJ6xstL_ptVS6pD2vtniIuXKuZXvsAKDc" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_CRON_SECRET"
+            }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{}",
         "options": {}
       },
-      "id": "query-supabase-reporte",
-      "name": "Consultar Supabase - Leads Hoy",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [480, 300]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Si no tienes la función RPC, usamos la query directa vía REST\n// Nota: Este nodo procesa la respuesta de Supabase\nconst data = $input.first().json;\n\n// Manejar array de resultados o un objeto con total\nlet totalLeads = 0;\nlet byAgent = {};\nlet bySource = {};\n\nif (Array.isArray(data)) {\n  totalLeads = data.length;\n  for (const lead of data) {\n    const agent = lead.assigned_agent || lead.asesor || 'Sin asignar';\n    byAgent[agent] = (byAgent[agent] || 0) + 1;\n    const source = lead.source || lead.fuente || 'Directo';\n    bySource[source] = (bySource[source] || 0) + 1;\n  }\n} else {\n  // Si es un objeto con totales pre-calculados\n  totalLeads = data.total_leads || data.count || 0;\n  byAgent = data.by_agent || {};\n  bySource = data.by_source || {};\n}\n\n// Construir líneas por asesor\nconst agentLines = Object.entries(byAgent)\n  .sort((a, b) => b[1] - a[1])\n  .map(([name, count]) => `   • ${name}: ${count} lead${count !== 1 ? 's' : ''}`)\n  .join('\\n');\n\n// Construir líneas por fuente\nconst sourceLines = Object.entries(bySource)\n  .sort((a, b) => b[1] - a[1])\n  .map(([src, count]) => `   • ${src}: ${count}`)\n  .join('\\n');\n\nconst today = new Date().toLocaleDateString('es-CO', {\n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',\n  timeZone: 'America/Bogota'\n});\n\nconst emoji = totalLeads >= 10 ? '🔥' : totalLeads >= 5 ? '✅' : totalLeads > 0 ? '📋' : '😴';\n\nconst message = [\n  `${emoji} *REPORTE DIARIO - GO EASY CRM*`,\n  `📅 ${today}`,\n  '',\n  `📊 *Total leads hoy: ${totalLeads}*`,\n  '',\n  agentLines ? `🧑‍💼 *Por asesor:*\\n${agentLines}` : null,\n  sourceLines ? `\\n🔗 *Por fuente:*\\n${sourceLines}` : null,\n  '',\n  '_Reporte automático - Go Easy CRM_ 🤖',\n].filter(Boolean).join('\\n');\n\nreturn [{ json: { message, totalLeads } }];"
-      },
-      "id": "format-reporte",
-      "name": "Formatear Reporte",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [720, 300]
+      "typeVersion": 4.4,
+      "position": [
+        250,
+        0
+      ],
+      "id": "23915a4c-6dba-48b5-8a39-db03891bf7cc",
+      "name": "Obtener Reporte del CRM"
     },
     {
       "parameters": {
@@ -59,31 +50,63 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5" },
-            { "name": "Content-Type", "value": "application/json" }
+            {
+              "name": "apikey",
+              "value": "E40F1C1E8028-4A4B-8941-F5EDD72F5FD5"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"number\": \"120363425734892399@g.us\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "120363425734892399@g.us"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.message }}"
+            }
+          ]
+        },
         "options": {}
       },
-      "id": "send-whatsapp-reporte",
-      "name": "Enviar Reporte WhatsApp",
       "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [960, 300]
+      "typeVersion": 4.4,
+      "position": [
+        500,
+        0
+      ],
+      "id": "72c8ddf3-d60c-4954-b9e2-1c712bc00cc5",
+      "name": "Enviar a WhatsApp"
     }
   ],
   "connections": {
-    "Programar 8PM Colombia": {
-      "main": [[{ "node": "Consultar Supabase - Leads Hoy", "type": "main", "index": 0 }]]
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Obtener Reporte del CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
-    "Consultar Supabase - Leads Hoy": {
-      "main": [[{ "node": "Formatear Reporte", "type": "main", "index": 0 }]]
-    },
-    "Formatear Reporte": {
-      "main": [[{ "node": "Enviar Reporte WhatsApp", "type": "main", "index": 0 }]]
+    "Obtener Reporte del CRM": {
+      "main": [
+        [
+          {
+            "node": "Enviar a WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {

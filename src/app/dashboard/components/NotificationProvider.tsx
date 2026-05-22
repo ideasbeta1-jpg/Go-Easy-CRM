@@ -165,110 +165,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const isAdmin = currentUser.role === 'admin'
 
-    // 1. Messages channel — only admins or messages for assigned leads
-    const messagesChannel = supabase
-      .channel('messages-notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: 'direction=eq.inbound',
-      }, async (payload) => {
-        const newMessage = payload.new as any
-
-        const { data: lead } = await supabase
-          .from('leads')
-          .select('first_name, last_name, assigned_to')
-          .eq('id', newMessage.lead_id)
-          .single()
-
-        if (!isAdmin && lead?.assigned_to !== currentUser.id) return
-
-        playBeepThrottled()
-        const senderName = lead ? `${lead.first_name} ${lead.last_name}` : 'Nuevo Cliente'
-        const messagePreview = newMessage.content?.substring(0, 50) || 'Mensaje multimedia'
-
-        toast.message(`Mensaje de ${senderName}`, {
-          description: messagePreview,
-          icon: <MessageSquare className="w-4 h-4 text-primary" />,
-          action: {
-            label: 'Ver Chat',
-            onClick: () => router.push(`/dashboard/chats?leadId=${newMessage.lead_id}`),
-          },
-          duration: TOAST_DURATION.message,
-        })
-
-        showDesktopNotification(
-          `Nuevo mensaje: ${senderName}`,
-          messagePreview,
-          `/dashboard/chats?leadId=${newMessage.lead_id}`
-        )
-        setUnreadCount(prev => prev + 1)
-      })
-      .subscribe()
-
-    // 2. Leads channel — new leads and payment confirmations
-    const leadsChannel = supabase
-      .channel('leads-notifications')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'leads',
-      }, async (payload) => {
-        const newLead = payload.new as any
-        const oldLead = payload.old as any
-
-        if (!isAdmin && newLead.assigned_to !== currentUser.id) return
-
-        const leadName = `${newLead.first_name} ${newLead.last_name}`
-
-        if (payload.eventType === 'INSERT') {
-          playBeepThrottled()
-          toast.message('🟢 ¡Nuevo Lead Registrado!', {
-            description: `Se ha creado el lead: ${leadName}`,
-            icon: <UserPlus className="w-4 h-4 text-emerald-500" />,
-            action: {
-              label: 'Ver Pipeline',
-              onClick: () => router.push('/dashboard/leads'),
-            },
-            duration: TOAST_DURATION.lead,
-          })
-          showDesktopNotification('Nuevo Lead Registrado', leadName, '/dashboard/leads')
-        }
-
-        if (payload.eventType === 'UPDATE') {
-          if (oldLead?.status !== 'reserva_confirmada' && newLead?.status === 'reserva_confirmada') {
-            playBeepThrottled()
-            toast.success('💰 ¡Reserva Confirmada!', {
-              description: `El cliente ${leadName} ha realizado el pago.`,
-              icon: <DollarSign className="w-4 h-4 text-amber-500" />,
-              action: {
-                label: 'Ver Lead',
-                onClick: () => router.push(`/dashboard/leads/${newLead.id}`),
-              },
-              duration: TOAST_DURATION.payment,
-            })
-            showDesktopNotification('💰 Pago Recibido', `${leadName} confirmó su reserva.`, `/dashboard/leads/${newLead.id}`)
-          }
-
-          if (oldLead?.assigned_to !== currentUser.id && newLead?.assigned_to === currentUser.id) {
-            playBeepThrottled()
-            toast.message('👤 ¡Nuevo Lead Asignado!', {
-              description: `Se te ha asignado el lead: ${leadName}`,
-              icon: <UserPlus className="w-4 h-4 text-blue-500" />,
-              action: {
-                label: 'Atender Lead',
-                onClick: () => router.push(`/dashboard/leads/${newLead.id}`),
-              },
-              duration: TOAST_DURATION.assignment,
-            })
-            showDesktopNotification('¡Lead Asignado!', `Tienes un nuevo cliente: ${leadName}`, `/dashboard/leads/${newLead.id}`)
-          }
-        }
-      })
-      .subscribe()
-
-    // 3. Notifications table — scoped to current user via RLS + filter
+    // Notifications table — scoped to current user via RLS + filter
     const notificationsChannel = supabase
       .channel('notifications-realtime')
       .on('postgres_changes', {
@@ -279,27 +176,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }, (payload) => {
         const notif = payload.new as any
 
-        const typeIcons: Record<string, string> = {
-          quote_generated: '📄',
-          voucher_sent: '📋',
-          lead_closed: '✅',
-          new_lead: '🟢',
-          payment_confirmed: '💰',
-          lead_assigned: '👤',
-          new_message: '💬',
-          status_changed: '🔄',
-        }
-        const icon = typeIcons[notif.type] || '🔔'
+        // Resolve icon based on notification type
+        const LucideIcon = ({
+          new_lead:          UserPlus,
+          lead_assigned:     UserPlus,
+          payment_confirmed: DollarSign,
+          new_message:       MessageSquare,
+        } as Record<string, any>)[notif.type] || Bell
+
+        const iconColor = ({
+          new_lead:          'text-emerald-500',
+          lead_assigned:     'text-blue-500',
+          payment_confirmed: 'text-amber-500',
+          new_message:       'text-violet-500',
+        } as Record<string, string>)[notif.type] || 'text-primary'
+
+        const duration = ({
+          new_lead:          TOAST_DURATION.lead,
+          lead_assigned:     TOAST_DURATION.assignment,
+          payment_confirmed: TOAST_DURATION.payment,
+          new_message:       TOAST_DURATION.message,
+        } as Record<string, number>)[notif.type] || TOAST_DURATION.message
 
         playBeepThrottled()
-        toast.message(`${icon} ${notif.title}`, {
+        toast.message(notif.title, {
           description: notif.body || undefined,
-          icon: <Bell className="w-4 h-4 text-primary" />,
+          icon: <LucideIcon className={`w-4 h-4 ${iconColor}`} />,
           action: notif.link ? {
             label: 'Ver',
             onClick: () => router.push(notif.link),
           } : undefined,
-          duration: TOAST_DURATION.message,
+          duration,
         })
 
         if (notif.title && notif.body) {
@@ -311,8 +218,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       .subscribe()
 
     return () => {
-      supabase.removeChannel(messagesChannel)
-      supabase.removeChannel(leadsChannel)
       supabase.removeChannel(notificationsChannel)
     }
   }, [currentUser, supabase, router, showDesktopNotification, playBeepThrottled])
