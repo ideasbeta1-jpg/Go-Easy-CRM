@@ -15,7 +15,7 @@ import { calcTotal } from '@/lib/leads/calculations'
 import { updateLead, deleteLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
-import { generateVoucherForLead, updateProviderConfirmation } from '@/app/utils/actions/vouchers'
+import { generateVoucherForLead, updateProviderConfirmation, saveVoucherDraft } from '@/app/utils/actions/vouchers'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { uploadChatMedia } from '@/app/utils/actions/storage'
 import { fetchMoreMessages } from '@/app/utils/actions/messages'
@@ -105,10 +105,16 @@ export default function LeadDetailClient({
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const hasMoreMessages = messages.length < totalMessages
   const [providerConfirmation, setProviderConfirmation] = useState(activeVoucher?.provider_confirmation || '')
+  const [conductorNombre, setConductorNombre] = useState(activeVoucher?.conductor_nombre || `${lead.first_name} ${lead.last_name}`.trim())
+  const [conductorTelefono, setConductorTelefono] = useState(activeVoucher?.conductor_telefono || lead.phone || '')
   const [isUpdatingConfirmation, setIsUpdatingConfirmation] = useState(false)
   const [ctaProviderId, setCtaProviderId] = useState(lead.provider_id || '')
-  const [ctaProviderConfirmation, setCtaProviderConfirmation] = useState('')
+  const [ctaProviderConfirmation, setCtaProviderConfirmation] = useState(lead.draft_provider_confirmation || '')
+  const [ctaConductorNombre, setCtaConductorNombre] = useState(lead.draft_conductor_nombre || `${lead.first_name} ${lead.last_name}`.trim())
+  const [ctaConductorTelefono, setCtaConductorTelefono] = useState(lead.draft_conductor_telefono || lead.phone || '')
   const [ctaError, setCtaError] = useState<string | null>(null)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [draftSaved, setDraftSaved] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // ─── Form State ────────────────────────────────────────────────────────────
@@ -229,7 +235,7 @@ export default function LeadDetailClient({
     if (!confirm('¿Anular el voucher anterior y generar uno nuevo?')) return
     startTransition(async () => {
       try {
-        await generateVoucherForLead(lead.id, formData.provider_id || ctaProviderId, providerConfirmation || ctaProviderConfirmation)
+        await generateVoucherForLead(lead.id, formData.provider_id || ctaProviderId, providerConfirmation || ctaProviderConfirmation, conductorNombre || ctaConductorNombre, conductorTelefono || ctaConductorTelefono)
         router.refresh()
       } catch {
         alert('Error al regenerar voucher')
@@ -953,6 +959,7 @@ export default function LeadDetailClient({
                 </div>
 
                 <div className="space-y-3">
+                  {/* Proveedor */}
                   <div>
                     <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 flex items-center gap-2">
                       <Users className="w-3 h-3" /> Proveedor
@@ -969,6 +976,8 @@ export default function LeadDetailClient({
                       {providers.map(p => <option key={p.id} value={p.id} className="text-slate-900">{p.name}</option>)}
                     </select>
                   </div>
+
+                  {/* N° Confirmación */}
                   <div>
                     <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 flex items-center gap-2">
                       <Hash className="w-3 h-3" /> N° Confirmación
@@ -981,6 +990,34 @@ export default function LeadDetailClient({
                       className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-white placeholder:text-white/20 outline-none"
                     />
                   </div>
+
+                  {/* Conductor Principal */}
+                  <div className="pt-1 border-t border-white/10">
+                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                      <User className="w-3 h-3" /> Conductor Principal
+                    </label>
+                    <input
+                      type="text"
+                      value={activeVoucher ? conductorNombre : ctaConductorNombre}
+                      onChange={e => activeVoucher ? setConductorNombre(e.target.value) : setCtaConductorNombre(e.target.value)}
+                      placeholder="Nombre del conductor"
+                      className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-white placeholder:text-white/20 outline-none"
+                    />
+                  </div>
+
+                  {/* Teléfono del conductor */}
+                  <div>
+                    <label className="block text-[10px] font-black text-white/40 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                      <Phone className="w-3 h-3" /> Teléfono del Conductor
+                    </label>
+                    <input
+                      type="text"
+                      value={activeVoucher ? conductorTelefono : ctaConductorTelefono}
+                      onChange={e => activeVoucher ? setConductorTelefono(e.target.value) : setCtaConductorTelefono(e.target.value)}
+                      placeholder="+1 305 000 0000"
+                      className="w-full bg-white/10 border border-white/10 rounded-xl px-4 py-2.5 text-sm font-bold text-white placeholder:text-white/20 outline-none"
+                    />
+                  </div>
                 </div>
 
                 {ctaError && (
@@ -988,45 +1025,86 @@ export default function LeadDetailClient({
                 )}
 
                 {activeVoucher ? (
-                  <div className="flex gap-3">
-                    <Link href={`/voucher/${activeVoucher.id}`} target="_blank"
-                      className="flex-1 text-center py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-sm hover:bg-white/20 transition-all">
-                      Ver Voucher
-                    </Link>
+                  <div className="space-y-3">
+                    {/* Guardar cambios del voucher existente */}
                     <button
-                      onClick={async () => { setIsUpdatingConfirmation(true); try { await updateProviderConfirmation(activeVoucher.id, providerConfirmation, lead.id) } finally { setIsUpdatingConfirmation(false) } }}
+                      onClick={async () => {
+                        setIsUpdatingConfirmation(true)
+                        try { await updateProviderConfirmation(activeVoucher.id, providerConfirmation, conductorNombre, conductorTelefono, lead.id) }
+                        finally { setIsUpdatingConfirmation(false) }
+                      }}
                       disabled={isUpdatingConfirmation}
-                      className="flex-1 py-3 bg-white text-primary rounded-xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50"
+                      className="w-full py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-sm hover:bg-white/20 transition-all disabled:opacity-50"
                     >
-                      {isUpdatingConfirmation ? 'Guardando...' : 'Actualizar'}
+                      {isUpdatingConfirmation ? 'Guardando...' : 'Guardar Información de Voucher'}
                     </button>
-                    <button
-                      onClick={handleRegenerateVoucher}
-                      disabled={isPending}
-                      className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50"
-                    >
-                      Regenerar
-                    </button>
+                    <div className="flex gap-3">
+                      <Link href={`/voucher/${activeVoucher.id}`} target="_blank"
+                        className="flex-1 text-center py-3 bg-white/5 text-white/60 border border-white/10 rounded-xl font-bold text-sm hover:bg-white/10 transition-all">
+                        Ver Voucher
+                      </Link>
+                      <button
+                        onClick={handleRegenerateVoucher}
+                        disabled={isPending}
+                        className="flex-1 py-3 bg-primary text-white rounded-xl font-bold text-sm hover:opacity-90 transition-all disabled:opacity-50"
+                      >
+                        Regenerar
+                      </button>
+                    </div>
                   </div>
                 ) : (
-                  <button
-                    onClick={async () => {
-                      if (!ctaProviderId) { setCtaError('Debes seleccionar un proveedor.'); return }
-                      if (!ctaProviderConfirmation) { setCtaError('El n° de confirmación es obligatorio.'); return }
-                      setCtaError(null)
-                      startTransition(async () => {
-                        try { await generateVoucherForLead(lead.id, ctaProviderId, ctaProviderConfirmation); router.refresh() }
-                        catch { alert('Error al generar voucher') }
-                      })
-                    }}
-                    disabled={isPending}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-white text-primary rounded-xl font-black text-sm hover:opacity-90 transition-all shadow-lg shadow-black/20 disabled:opacity-50"
-                  >
-                    {isPending
-                      ? <><div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span>Generando...</span></>
-                      : <><CheckCircle2 className="w-4 h-4" /><span>Generar Voucher Oficial</span></>
-                    }
-                  </button>
+                  <div className="space-y-3">
+                    {/* Guardar sin generar */}
+                    <button
+                      onClick={async () => {
+                        setIsSavingDraft(true)
+                        setDraftSaved(false)
+                        setCtaError(null)
+                        try {
+                          await saveVoucherDraft(lead.id, ctaProviderId, ctaProviderConfirmation, ctaConductorNombre, ctaConductorTelefono)
+                          setDraftSaved(true)
+                          setTimeout(() => setDraftSaved(false), 3000)
+                        } catch {
+                          setCtaError('Error al guardar la información.')
+                        } finally {
+                          setIsSavingDraft(false)
+                        }
+                      }}
+                      disabled={isSavingDraft}
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-white/10 text-white border border-white/20 rounded-xl font-bold text-sm hover:bg-white/20 transition-all disabled:opacity-50"
+                    >
+                      {isSavingDraft
+                        ? <><div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /><span>Guardando...</span></>
+                        : draftSaved
+                          ? <><Check className="w-4 h-4 text-emerald-400" /><span className="text-emerald-400">Información guardada</span></>
+                          : <span>Guardar Información de Voucher</span>
+                      }
+                    </button>
+
+                    {/* Generar voucher oficial */}
+                    <button
+                      onClick={async () => {
+                        if (!ctaProviderId) { setCtaError('Debes seleccionar un proveedor.'); return }
+                        if (!ctaProviderConfirmation) { setCtaError('El n° de confirmación es obligatorio.'); return }
+                        setCtaError(null)
+                        startTransition(async () => {
+                          try {
+                            await generateVoucherForLead(lead.id, ctaProviderId, ctaProviderConfirmation, ctaConductorNombre, ctaConductorTelefono)
+                            router.refresh()
+                          } catch {
+                            alert('Error al generar voucher')
+                          }
+                        })
+                      }}
+                      disabled={isPending}
+                      className="w-full flex items-center justify-center gap-2 py-3.5 bg-white text-primary rounded-xl font-black text-sm hover:opacity-90 transition-all shadow-lg shadow-black/20 disabled:opacity-50"
+                    >
+                      {isPending
+                        ? <><div className="w-4 h-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /><span>Generando...</span></>
+                        : <><CheckCircle2 className="w-4 h-4" /><span>Generar Voucher Oficial</span></>
+                      }
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

@@ -4,15 +4,24 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
 
-export async function generateVoucherForLead(leadId: string, providerId: string, providerConfirmation: string) {
+export async function generateVoucherForLead(
+  leadId: string,
+  providerId: string,
+  providerConfirmation: string,
+  conductorNombre: string,
+  conductorTelefono: string
+) {
   const supabase = await createClient()
 
-  // 1. Update Lead Provider (in case it was changed in the CTA)
+  // 1. Update Lead Provider and status
   const { error: leadUpdateError } = await supabase
     .from('leads')
-    .update({ 
+    .update({
       provider_id: providerId,
-      status: 'voucher_enviado' 
+      status: 'voucher_enviado',
+      draft_provider_confirmation: null,
+      draft_conductor_nombre: null,
+      draft_conductor_telefono: null,
     })
     .eq('id', leadId)
 
@@ -21,13 +30,15 @@ export async function generateVoucherForLead(leadId: string, providerId: string,
   // 2. Generate a voucher number (GF-XXXXXX)
   const voucherNumber = `GF-${Math.floor(100000 + Math.random() * 900000)}`
 
-  // 3. Create the Voucher record with confirmation from the start
+  // 3. Create the Voucher record
   const { data: voucher, error: voucherError } = await supabase
     .from('vouchers')
     .insert({
       lead_id: leadId,
       confirmation_number: voucherNumber,
-      provider_confirmation: providerConfirmation
+      provider_confirmation: providerConfirmation,
+      conductor_nombre: conductorNombre,
+      conductor_telefono: conductorTelefono,
     })
     .select()
     .single()
@@ -54,17 +65,49 @@ export async function generateVoucherForLead(leadId: string, providerId: string,
   })
 
   revalidatePath(`/dashboard/leads/${leadId}`)
-  
+
   return voucher
 }
 
-export async function updateProviderConfirmation(voucherId: string, providerConfirmation: string, leadId: string) {
+export async function saveVoucherDraft(
+  leadId: string,
+  providerId: string,
+  providerConfirmation: string,
+  conductorNombre: string,
+  conductorTelefono: string
+) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('leads')
+    .update({
+      provider_id: providerId || null,
+      draft_provider_confirmation: providerConfirmation,
+      draft_conductor_nombre: conductorNombre,
+      draft_conductor_telefono: conductorTelefono,
+    })
+    .eq('id', leadId)
+
+  if (error) throw new Error(error.message)
+
+  revalidatePath(`/dashboard/leads/${leadId}`)
+}
+
+export async function updateProviderConfirmation(
+  voucherId: string,
+  providerConfirmation: string,
+  conductorNombre: string,
+  conductorTelefono: string,
+  leadId: string
+) {
   const supabase = await createClient()
 
   const { error } = await supabase
     .from('vouchers')
-    .update({ 
-      provider_confirmation: providerConfirmation 
+    .update({
+      provider_confirmation: providerConfirmation,
+      conductor_nombre: conductorNombre,
+      conductor_telefono: conductorTelefono,
     })
     .eq('id', voucherId)
 

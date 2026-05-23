@@ -152,6 +152,21 @@ export default async function VoucherPage({
                             </span>
                          </div>
                       </div>
+
+                      {/* Conductor Principal */}
+                      {(voucher.conductor_nombre || voucher.conductor_telefono) && (
+                        <div className="pt-4 border-t border-slate-100 space-y-2">
+                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
+                              <User className="w-3.5 h-3.5 text-indigo-400" /> Conductor Principal
+                           </p>
+                           <p className="text-xl font-black text-slate-900 tracking-tight uppercase">{voucher.conductor_nombre}</p>
+                           {voucher.conductor_telefono && (
+                              <span className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 font-bold text-sm text-slate-600">
+                                 <Phone className="w-4 h-4 text-indigo-500" /> {voucher.conductor_telefono}
+                              </span>
+                           )}
+                        </div>
+                      )}
                    </div>
 
                    <div className="space-y-6">
