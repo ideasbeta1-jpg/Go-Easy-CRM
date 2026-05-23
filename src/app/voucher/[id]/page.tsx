@@ -1,39 +1,35 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { notFound } from 'next/navigation'
-import { 
-  FileText, 
-  MapPin, 
-  Calendar, 
-  Car, 
-  User, 
-  ShieldCheck, 
-  QrCode, 
-  Hash, 
-  CheckCircle2, 
-  Printer, 
-  Download,
+
+export const dynamic = 'force-dynamic'
+import {
+  MapPin,
+  Calendar,
+  Car,
+  User,
+  Hash,
+  CheckCircle2,
   Phone,
   Info,
   UserPlus,
   Zap,
   Globe,
   Mail,
-  ShieldCheck as Shield,
+  ShieldCheck,
   Navigation,
   Fuel,
-  Gauge
+  Gauge,
 } from 'lucide-react'
 import { VoucherActions } from './components/VoucherActions'
 
 export default async function VoucherPage({
-  params: paramsPromise
+  params: paramsPromise,
 }: {
   params: Promise<{ id: string }>
 }) {
   const { id } = await paramsPromise
   const supabase = createAdminClient()
-  
-  // Fetch voucher and associated lead
+
   const { data: voucher, error } = await supabase
     .from('vouchers')
     .select(`
@@ -48,7 +44,7 @@ export default async function VoucherPage({
     .single()
 
   if (error || !voucher) {
-     return notFound()
+    return notFound()
   }
 
   const { lead } = voucher
@@ -56,374 +52,399 @@ export default async function VoucherPage({
   const provider = lead.provider
   const isPremium = lead.rate_plan === 'premium'
 
-  // Attempt to find the specific office for this provider and location
-  const { data: office } = await supabase
-    .from('provider_offices')
-    .select('*, locations!inner(name)')
-    .eq('provider_id', lead.provider_id)
-    .eq('locations.name', lead.pickup_location)
-    .maybeSingle()
+  const diffDays = Math.max(1, Math.ceil(
+    (new Date(lead.return_date).getTime() - new Date(lead.pickup_date).getTime()) / 86400000
+  ))
+
+  const [{ data: activeQuote }, { data: office }] = await Promise.all([
+    supabase
+      .from('quotes')
+      .select('deposit_amount, total_amount')
+      .eq('lead_id', lead.id)
+      .eq('is_active', true)
+      .maybeSingle(),
+    supabase
+      .from('provider_offices')
+      .select('*, locations!inner(name)')
+      .eq('provider_id', lead.provider_id)
+      .eq('locations.name', lead.pickup_location)
+      .maybeSingle(),
+  ])
+
+  const grandTotal = Number(lead.total_amount || 0)
+  const deposit = activeQuote?.deposit_amount
+    ? Number(activeQuote.deposit_amount)
+    : lead.agreed_daily_price != null
+      ? Number(lead.agreed_daily_price) * diffDays
+      : Number(category?.daily_price || 0) * diffDays
+  const balanceAtCounter = Math.max(0, grandTotal - deposit)
+
+  const pickupFormatted = new Date(lead.pickup_date).toLocaleDateString('es-ES', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+  const pickupTime = new Date(lead.pickup_date).toLocaleTimeString('es-ES', {
+    hour: '2-digit', minute: '2-digit',
+  })
+  const returnFormatted = new Date(lead.return_date).toLocaleDateString('es-ES', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  })
+  const returnTime = new Date(lead.return_date).toLocaleTimeString('es-ES', {
+    hour: '2-digit', minute: '2-digit',
+  })
+  const issueDate = new Date(voucher.created_at).toLocaleDateString('es-ES', {
+    day: 'numeric', month: 'long', year: 'numeric',
+  })
+
+  const benefits = [
+    { label: isPremium ? 'Protección Total' : 'Protección Básica', icon: ShieldCheck },
+    { label: isPremium ? 'Terceros $1M' : 'Terceros Básico', icon: Zap },
+    { label: '2do Conductor', icon: UserPlus },
+    { label: isPremium ? 'Km Ilimitado (USA)' : 'Km Ilimitado (FL)', icon: Gauge },
+    { label: 'Asistencia 24/7', icon: Phone },
+    { label: 'GPS Incluido', icon: Navigation },
+    { label: 'Combustible Lleno/Lleno', icon: Fuel },
+  ]
 
   return (
-    <div className="min-h-screen bg-slate-50 py-16 px-6 font-sans selection:bg-indigo-100 selection:selection:text-indigo-900 bg-dots">
-       
-       {/* Support Header (Floating) */}
-       <div className="max-w-4xl mx-auto mb-12 flex flex-col md:flex-row items-center justify-between gap-6 no-print">
-          <div className="flex items-center gap-4 group">
-             <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-xl shadow-indigo-600/10 border border-slate-100 transition-all group-hover:scale-105 group-hover:-rotate-3">
-                <Shield className="w-7 h-7" />
-             </div>
-             <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none flex items-center gap-2">
-                   Voucher de Reserva {isPremium && <span className="bg-indigo-600 text-white text-[10px] px-3 py-1 rounded-full uppercase tracking-widest font-black flex items-center gap-1 shadow-lg shadow-indigo-600/30 ring-4 ring-indigo-50">PREMIUM</span>}
-                </h1>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1 flex items-center gap-1.5 leading-none">
-                   <CheckCircle2 className="w-3 h-3" /> RESERVA CONFIRMADA & PAGADA
+    <div className="min-h-screen bg-slate-100 py-12 px-4 font-sans selection:bg-indigo-100">
+
+      {/* Controls (no-print) */}
+      <div className="max-w-3xl mx-auto mb-6 flex items-center justify-between no-print">
+        <div>
+          <h1 className="text-base font-black text-slate-900 flex items-center gap-2">
+            Voucher de Reserva
+            {isPremium && (
+              <span className="bg-indigo-600 text-white text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-widest font-bold">
+                PREMIUM
+              </span>
+            )}
+          </h1>
+          <p className="text-xs font-semibold text-emerald-600 flex items-center gap-1 mt-0.5">
+            <CheckCircle2 className="w-3 h-3" /> Reserva confirmada
+          </p>
+        </div>
+        <VoucherActions voucherNumber={voucher.confirmation_number} />
+      </div>
+
+      {/* Document */}
+      <main
+        id="voucher-document"
+        className="max-w-3xl mx-auto bg-white rounded-2xl overflow-hidden border border-slate-200 shadow-[0_4px_24px_rgba(15,23,42,0.08)]"
+      >
+
+        {/* Header — dark, compact */}
+        <div className={`${isPremium ? 'bg-indigo-950' : 'bg-slate-950'} px-10 py-7 flex items-center justify-between`}>
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                <span className="text-white font-black text-xs">G</span>
+              </div>
+              <span className="text-white font-black text-sm tracking-tight">Go Easy Florida</span>
+              {isPremium && (
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full">
+                  Premium
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-5 flex-wrap">
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-500">Confirmación</p>
+                <p className="text-lg font-black font-mono tracking-widest text-indigo-400 leading-tight">
+                  {voucher.confirmation_number}
                 </p>
-             </div>
+              </div>
+              <div className="w-px h-7 bg-white/10" />
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-500">Emitido</p>
+                <p className="text-xs font-bold text-slate-300">{issueDate}</p>
+              </div>
+              <div className="w-px h-7 bg-white/10" />
+              <div className="flex items-center gap-1.5 bg-emerald-500/15 border border-emerald-500/30 rounded-full px-3 py-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400">Confirmada</span>
+              </div>
+            </div>
           </div>
-          
-          <VoucherActions voucherNumber={voucher.confirmation_number} />
-       </div>
+        </div>
 
-       {/* The Voucher Document */}
-       <main id="voucher-document" className="max-w-4xl mx-auto bg-white border border-slate-200 shadow-[0_80px_160px_rgba(30,41,59,0.1)] rounded-[3rem] overflow-hidden relative group/voucher">
-          
-          {/* Header Section */}
-          <div className={`${isPremium ? 'bg-indigo-950' : 'bg-slate-950'} text-white p-12 lg:p-16 flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden`}>
-             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none" />
-             <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-indigo-500/20 blur-[140px] rounded-full -translate-y-1/2 translate-x-1/2" />
-             <div className="absolute bottom-0 left-0 w-[20rem] h-[20rem] bg-rose-500/10 blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2" />
-             
-             <div className="space-y-8 relative z-10">
-                <div className="space-y-4">
-                   <h2 className="text-5xl font-black tracking-tighter leading-none italic uppercase">
-                      Go Easy <span className="text-indigo-400 italic decoration-indigo-400 underline decoration-8 underline-offset-8">Florida</span>
-                   </h2>
-                   {isPremium && (
-                     <div className="inline-flex items-center gap-2 bg-indigo-500/10 backdrop-blur-xl border border-white/5 px-4 py-2 rounded-full">
-                        <Zap className="w-4 h-4 text-indigo-400 fill-indigo-400" />
-                        <span className="text-xs font-black uppercase tracking-widest text-indigo-300">Platinum Coverage Active</span>
-                     </div>
-                   )}
-                </div>
-                
-                <div className="flex items-center gap-8 border-t border-white/10 pt-8">
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Número de Reserva</p>
-                      <p className="text-3xl font-black tracking-widest font-mono text-indigo-400 drop-shadow-[0_0_15px_rgba(129,140,248,0.3)]">{voucher.confirmation_number}</p>
-                   </div>
-                   <div className="h-10 w-px bg-white/10" />
-                   <div className="space-y-1">
-                      <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Fecha Emisión</p>
-                      <p className="text-xs font-black uppercase text-indigo-200">{new Date(voucher.created_at).toLocaleDateString('es-ES', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                   </div>
-                </div>
-             </div>
-             
-             <div className="bg-white rounded-[2rem] p-6 shadow-2xl relative z-10 transition-transform group-hover/voucher:scale-105 group-hover/voucher:rotate-2">
-                <QrCode className="w-24 h-24 text-slate-900" />
-                <div className="absolute -top-3 -right-3 bg-indigo-600 p-2 rounded-full shadow-lg border-4 border-slate-950">
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                </div>
-                <p className="text-[9px] text-center font-black text-slate-400 uppercase tracking-widest mt-3">Escanear para Check-In</p>
-             </div>
-          </div>
+        <div className="divide-y divide-slate-100">
 
-          <div className="p-12 lg:p-16 space-y-20">
-             
-             {/* Driver & Car Summary Section */}
-             <div className="grid grid-cols-1 md:grid-cols-12 gap-16 items-start">
-                
-                {/* Driver Identity */}
-                <div className="md:col-span-12 lg:col-span-5 space-y-12">
-                   <div className="space-y-6">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
-                         <User className="w-5 h-5 text-indigo-500" /> Datos del Cliente
-                      </h3>
-                      <div className="space-y-4">
-                         <h4 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-[0.9]">{lead.first_name} <br/> {lead.last_name}</h4>
-                         <div className="flex flex-wrap items-center gap-4">
-                            <span className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 font-bold text-sm text-slate-600">
-                               <Phone className="w-4 h-4 text-indigo-500" /> {lead.phone}
-                            </span>
-                            <span className="flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 font-bold text-sm text-slate-600">
-                               <Hash className="w-4 h-4 text-indigo-500" /> {lead.id.slice(0, 8).toUpperCase()}
-                            </span>
-                         </div>
-                      </div>
+          {/* Sección 1: Cliente + Itinerario */}
+          <div className="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-slate-100">
 
-                      {/* Conductor Principal */}
-                      {(voucher.conductor_nombre || voucher.conductor_telefono) && (
-                        <div className="pt-4 border-t border-slate-100 space-y-2">
-                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
-                              <User className="w-3.5 h-3.5 text-indigo-400" /> Conductor Principal
-                           </p>
-                           <p className="text-xl font-black text-slate-900 tracking-tight uppercase">{voucher.conductor_nombre}</p>
-                           {voucher.conductor_telefono && (
-                              <span className="inline-flex items-center gap-2 bg-slate-50 border border-slate-100 rounded-xl px-4 py-2 font-bold text-sm text-slate-600">
-                                 <Phone className="w-4 h-4 text-indigo-500" /> {voucher.conductor_telefono}
-                              </span>
-                           )}
-                        </div>
-                      )}
-                   </div>
+            {/* Columna izquierda: Cliente, Conductor, Vehículo */}
+            <div className="md:col-span-2 p-8 space-y-7">
 
-                   <div className="space-y-6">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2 font-mono">
-                         <Car className="w-5 h-5 text-indigo-500" /> Vehículo Seleccionado
-                      </h3>
-                      <div className="group relative">
-                         <div className="absolute -inset-4 bg-indigo-600/5 rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity" />
-                         <div className="flex items-center gap-8 relative z-10 transition-transform group-hover:translate-x-2">
-                            <div className="w-32 h-32 bg-slate-100 rounded-[2.5rem] overflow-hidden flex items-center justify-center p-4 ring-1 ring-slate-200">
-                               <img src={category.image_url} className="w-full h-auto object-contain drop-shadow-2xl" />
-                            </div>
-                            <div>
-                               <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mb-1">Clase {category.name.split(' ')[0]}</p>
-                               <p className="text-3xl font-black text-slate-900 tracking-tighter uppercase leading-none mb-2">{category.name}</p>
-                               <div className="flex items-center gap-2">
-                                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Modelos 2024 - 2026</span>
-                               </div>
-                            </div>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                {/* Logistics Itinerary */}
-                <div className="md:col-span-12 lg:col-span-7 space-y-12">
-                   <div className="space-y-6">
-                       <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.4em] flex items-center gap-2">
-                          <MapPin className="w-5 h-5 text-indigo-500" /> Itinerario de Viaje
-                       </h3>
-                       
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative">
-                          {/* Connection line for visual flow */}
-                          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white border-4 border-slate-100 rounded-full z-10 hidden md:block" />
-                          <div className="absolute left-0 right-0 top-1/2 h-px bg-slate-100 -translate-y-1/2 hidden md:block" />
-
-                          {/* Pickup */}
-                          <div className="relative z-20 group">
-                             <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-[2.5rem] space-y-6 transition-all group-hover:bg-indigo-600 group-hover:border-indigo-600 group-hover:translate-y-[-4px] overflow-hidden">
-                                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-150 transition-transform">
-                                   <MapPin className="w-12 h-12 text-indigo-900 group-hover:text-white" />
-                                </div>
-                                <div className="space-y-4">
-                                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 group-hover:text-indigo-200">Entrega de Llaves</span>
-                                   <p className="text-indigo-900 font-extrabold text-2xl group-hover:text-white leading-tight underline decoration-2 decoration-indigo-400/30 underline-offset-4">{lead.pickup_location}</p>
-                                </div>
-                                <div className="space-y-2 pt-4 border-t border-indigo-200/50 group-hover:border-white/20">
-                                   <div className="flex items-center gap-2 text-indigo-600 font-bold text-sm group-hover:text-indigo-100">
-                                      <Calendar className="w-4 h-4" /> 
-                                      {new Date(lead.pickup_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })} • 
-                                      {new Date(lead.pickup_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                                   </div>
-                                </div>
-                             </div>
-                          </div>
-
-                          {/* Return */}
-                          <div className="relative z-20 group">
-                             <div className="p-8 bg-slate-50 border border-slate-200 rounded-[2.5rem] space-y-6 transition-all hover:bg-slate-900 hover:border-slate-900 hover:translate-y-[-4px] overflow-hidden group/return">
-                                <div className="absolute top-0 right-0 p-6 opacity-10 group-hover/return:scale-150 transition-transform">
-                                   <MapPin className="w-12 h-12 text-slate-900 group-hover/return:text-white" />
-                                </div>
-                                <div className="space-y-4">
-                                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 group-hover/return:text-slate-500">Devolución</span>
-                                   <p className="text-slate-900 font-extrabold text-2xl group-hover/return:text-white leading-tight underline decoration-2 decoration-slate-400/30 underline-offset-4">{lead.return_location}</p>
-                                </div>
-                                <div className="space-y-2 pt-4 border-t border-slate-200 group-hover/return:border-white/20">
-                                   <div className="flex items-center gap-2 text-slate-500 font-bold text-sm group-hover/return:text-slate-300">
-                                      <Calendar className="w-4 h-4" /> 
-                                      {new Date(lead.return_date).toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })} • 
-                                      {new Date(lead.return_date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                                   </div>
-                                </div>
-                             </div>
-                          </div>
-                       </div>
-                   </div>
-                </div>
-             </div>
-
-             {/* Provider Details Bar */}
-             <div className="flex flex-col md:flex-row gap-12 pt-20 border-t border-slate-100">
-                <div className="flex flex-col gap-6 flex-1">
-                   <div className="space-y-2">
-                       <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Compañía Operadora</h4>
-                       <div className="space-y-1">
-                          <p className="text-3xl font-black text-slate-900 tracking-tighter uppercase">{provider?.name || 'Local Partner Florida'}</p>
-                           <div className="flex flex-col gap-2">
-                              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest">
-                                 ID Sistema: #{voucher.confirmation_number}
-                              </div>
-                              {voucher.provider_confirmation ? (
-                                <div className="inline-flex flex-col gap-1 p-4 bg-indigo-600 rounded-[1.5rem] shadow-xl shadow-indigo-600/20 border border-white/10 group-hover:scale-105 transition-transform">
-                                   <span className="text-[8px] font-black text-indigo-200 uppercase tracking-widest leading-none flex items-center gap-1.5">
-                                      <Hash className="w-3 h-3" /> Confirmación {provider?.name || 'Rentadora'}
-                                   </span>
-                                   <p className="text-xl font-mono font-black text-white tracking-widest uppercase leading-none">
-                                      {voucher.provider_confirmation}
-                                   </p>
-                                </div>
-                              ) : (
-                                <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-amber-100/50">
-                                   <Info className="w-3 h-3" /> Confirmación en proceso
-                                </div>
-                              )}
-                           </div>
-                       </div>
-                   </div>
-
-                   {office && (
-                     <div className="inline-flex items-center gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                        <div className="w-10 h-10 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center text-indigo-600">
-                           <Phone className="w-5 h-5" />
-                        </div>
-                        <div>
-                           <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Contacto Local 24/7</p>
-                           <p className="text-sm font-black text-slate-700">{office.phone}</p>
-                        </div>
-                     </div>
-                   )}
-                </div>
-
-                <div className="flex-[1.5] bg-slate-950 p-10 rounded-[3rem] space-y-6 border border-white/5 relative overflow-hidden group">
-                   <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 blur-[80px] rounded-full translate-x-1/2 -translate-y-1/2" />
-                   <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 flex items-center gap-2 relative z-10">
-                      <Info className="w-4 h-4" /> Instrucciones de Recogida
-                   </h4>
-                   <p className="text-sm font-bold text-slate-400 leading-relaxed italic relative z-10">
-                      {office?.notes || office?.hours 
-                        ? `${office.hours ? `Horario: ${office.hours}. ` : ''}${office.notes || 'Nuestro representante le estará esperando en la zona de llegadas.'}`
-                        : "Al llegar al aeropuerto, proceda a la zona de Rental Car Center. Nuestro representante le estará esperando con un cartel de su nombre o el logo de Go Easy Florida. Por favor presente su licencia de conducir y este voucher."
-                      }
-                   </p>
-                </div>
-             </div>
-
-             {/* Protection & Benefits Row */}
-             <div className="pt-20 border-t border-slate-100">
-                <div className="flex flex-wrap items-center justify-center gap-y-10 gap-x-16">
-                     {/* Logic-driven Benefits Row */}
-                     {[
-                        { 
-                          show: true,
-                          label: isPremium ? 'Protección Total' : 'Protección Básica', 
-                          desc: isPremium ? 'Robo y Choque $0 Deducible' : 'Con Deducible / Básica',
-                          icon: Shield,
-                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
-                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: isPremium ? 'Terceros ($1M)' : 'Terceros Básico', 
-                          desc: isPremium ? 'Cobertura Ampliada' : 'Protección Obligatoria',
-                          icon: Zap,
-                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
-                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: '2do Conductor', 
-                          desc: 'Sin Costo Extra',
-                          icon: UserPlus,
-                          color: 'text-slate-600',
-                          bg: 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: 'Kilometraje', 
-                          desc: isPremium ? 'Ilimitado (USA)' : 'Ilimitado (Florida)',
-                          icon: Gauge,
-                          color: 'text-slate-600',
-                          bg: 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: 'Asistencia 24/7', 
-                          desc: 'Vía WhatsApp VIP',
-                          icon: Phone,
-                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
-                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: 'GPS Incluido', 
-                          desc: 'Sistema Satelital',
-                          icon: Navigation,
-                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
-                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
-                        },
-                        { 
-                          show: true,
-                          label: 'Combustible', 
-                          desc: 'Lleno / Lleno',
-                          icon: Fuel,
-                          color: isPremium ? 'text-indigo-600' : 'text-slate-600',
-                          bg: isPremium ? 'bg-indigo-50' : 'bg-slate-100'
-                        }
-                     ].filter(b => b.show).map((benefit, i) => (
-                        <div key={i} className="group flex items-center gap-4 font-black text-xs uppercase tracking-[0.2em] text-slate-900 transition-all hover:scale-105">
-                           <div className={`p-4 rounded-2xl ${benefit.bg} ${benefit.color} shadow-lg shadow-slate-200/5 transition-all group-hover:rotate-12`}>
-                              <benefit.icon className="w-5 h-5" />
-                           </div>
-                           <div className="space-y-1">
-                              <p className={`leading-none ${benefit.color}`}>{benefit.label}</p>
-                              <p className="text-[9px] font-bold text-slate-400">{benefit.desc}</p>
-                           </div>
-                        </div>
-                     ))}
-                </div>
-             </div>
-          </div>
-
-          <div className="bg-slate-50 p-8 text-center border-t border-slate-200 relative group overflow-hidden">
-             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-200 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-1000" />
-             <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.6em] relative z-10">
-                Reserva Procesada por Go Easy CRM · {new Date().getFullYear()} Florida VIP Services
-             </p>
-          </div>
-       </main>
-
-       {/* Support Section Decor (no-print) */}
-       <footer className="mt-20 max-w-4xl mx-auto border-t border-slate-200 pt-16 no-print">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 items-center text-center md:text-left">
-             <div className="space-y-4">
-                <h5 className="text-sm font-black text-slate-900 uppercase tracking-widest">Atención 24/7</h5>
-                <p className="text-xs text-slate-500 font-bold leading-relaxed px-10 md:px-0">
-                  Si tiene algún inconveniente al recoger su vehículo o necesita asistencia en el camino, 
-                  contáctenos inmediatamente vía WhatsApp.
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" /> Cliente
                 </p>
-             </div>
-             
-             <div className="flex flex-col items-center gap-4">
-                <button className="bg-emerald-500 text-white w-full max-w-[200px] h-14 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all">
-                   <Phone className="w-5 h-5" /> Soporte WhatsApp
-                </button>
-                <div className="flex items-center gap-2 text-slate-400 font-bold text-xs uppercase tracking-tighter">
-                   <Globe className="w-4 h-4" /> GoEasyFlorida.com
-                </div>
-             </div>
-
-             <div className="space-y-4 md:text-right">
-                <h5 className="text-sm font-black text-slate-900 uppercase tracking-widest">Oficina Principal</h5>
-                <p className="text-xs text-slate-500 font-bold">
-                   1234 Ocean Drive, Suite 201<br/>
-                   Miami Beach, FL 33139<br/>
-                   United States
+                <p className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                  {lead.first_name} {lead.last_name}
                 </p>
-             </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600">
+                    <Phone className="w-3 h-3 text-indigo-500" /> {lead.phone}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-mono font-semibold text-slate-500">
+                    <Hash className="w-3 h-3" /> {lead.id.slice(0, 8).toUpperCase()}
+                  </span>
+                </div>
+              </div>
+
+              {(voucher.conductor_nombre || voucher.conductor_telefono) && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5" /> Conductor Principal
+                  </p>
+                  <p className="text-base font-black text-slate-800">{voucher.conductor_nombre}</p>
+                  {voucher.conductor_telefono && (
+                    <span className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      <Phone className="w-3 h-3 text-indigo-500" /> {voucher.conductor_telefono}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 flex items-center gap-1.5">
+                  <Car className="w-3.5 h-3.5" /> Vehículo
+                </p>
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-16 bg-slate-50 border border-slate-100 rounded-xl overflow-hidden flex items-center justify-center p-2 shrink-0">
+                    <img
+                      src={category.image_url}
+                      alt={category.name}
+                      className="w-full h-auto object-contain"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-0.5">
+                      Clase {category.name.split(' ')[0]}
+                    </p>
+                    <p className="text-base font-black text-slate-900 leading-tight">{category.name}</p>
+                    <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Modelos 2024 – 2026</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Columna derecha: Itinerario */}
+            <div className="md:col-span-3 p-8 space-y-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" /> Itinerario de Viaje
+              </p>
+
+              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-500">
+                  Entrega de Llaves
+                </span>
+                <p className="text-base font-black text-indigo-900 leading-snug">{lead.pickup_location}</p>
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-indigo-600">
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span className="capitalize">{pickupFormatted}</span>
+                  <span className="text-indigo-300">·</span>
+                  <span>{pickupTime}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 px-1">
+                <div className="flex-1 h-px bg-slate-200" />
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+                  {diffDays} {diffDays === 1 ? 'día' : 'días'}
+                </span>
+                <div className="flex-1 h-px bg-slate-200" />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  Devolución
+                </span>
+                <p className="text-base font-black text-slate-800 leading-snug">{lead.return_location}</p>
+                <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-500">
+                  <Calendar className="w-3.5 h-3.5 shrink-0" />
+                  <span className="capitalize">{returnFormatted}</span>
+                  <span className="text-slate-300">·</span>
+                  <span>{returnTime}</span>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div className="mt-16 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest flex items-center justify-center gap-8">
-             <div className="flex items-center gap-2"><Shield className="w-3 h-3" /> Pago Seguro SSL</div>
-             <div className="flex items-center gap-2"><Mail className="w-3 h-3" /> tickets@goeasy.com</div>
-             <div className="flex items-center gap-2 cursor-pointer hover:text-indigo-600 transition-colors">Términos del Servicio</div>
+
+          {/* Sección 2: Pago en counter */}
+          {grandTotal > 0 && (
+            <div className="px-8 py-5 bg-amber-50 flex items-center justify-between gap-6">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-amber-700 flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5" /> A pagar en counter al recoger el vehículo
+                </p>
+                <p className="text-xs font-semibold text-amber-600/70 mt-0.5">
+                  Presenta este voucher y tu licencia de conducir.
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className="text-3xl font-black text-amber-700 tracking-tight font-mono">
+                  ${balanceAtCounter.toFixed(2)}
+                </p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mt-0.5">
+                  USD · Pay at Pickup
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Sección 3: Proveedor */}
+          <div className="grid grid-cols-1 md:grid-cols-5 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+            <div className="md:col-span-2 p-8 space-y-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+                Compañía Operadora
+              </p>
+              <div className="space-y-3">
+                <p className="text-xl font-black text-slate-900 tracking-tight">
+                  {provider?.name || 'Local Partner Florida'}
+                </p>
+                <div className="space-y-2">
+                  <span className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide">
+                    ID: {voucher.confirmation_number}
+                  </span>
+                  {voucher.provider_confirmation ? (
+                    <div className="flex flex-col gap-1 bg-indigo-600 rounded-xl px-4 py-3">
+                      <span className="text-[9px] font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                        <Hash className="w-3 h-3" /> Confirmación {provider?.name}
+                      </span>
+                      <p className="text-lg font-black font-mono text-white tracking-widest">
+                        {voucher.provider_confirmation}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-lg px-3 py-1.5 text-[11px] font-bold">
+                      <Info className="w-3 h-3" /> Confirmación en proceso
+                    </div>
+                  )}
+                </div>
+                {office && (
+                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 rounded-xl p-3">
+                    <div className="w-8 h-8 bg-white rounded-lg shadow-sm border border-slate-100 flex items-center justify-center text-indigo-500 shrink-0">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">
+                        Contacto Local 24/7
+                      </p>
+                      <p className="text-sm font-black text-slate-700 mt-0.5">{office.phone}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="md:col-span-3 p-8 bg-slate-950 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-indigo-400 flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5" /> Instrucciones de Recogida
+              </p>
+              <p className="text-sm font-medium text-slate-400 leading-relaxed">
+                {office?.notes || office?.hours
+                  ? `${office.hours ? `Horario: ${office.hours}. ` : ''}${office.notes || 'Nuestro representante le estará esperando en la zona de llegadas.'}`
+                  : 'Al llegar al aeropuerto, proceda a la zona de Rental Car Center. Nuestro representante le estará esperando con un cartel de su nombre o el logo de Go Easy Florida. Por favor presente su licencia de conducir y este voucher.'
+                }
+              </p>
+            </div>
           </div>
-       </footer>
+
+          {/* Sección 4: Beneficios — compactos */}
+          <div className="px-8 py-5">
+            <div className="flex flex-wrap gap-2">
+              {benefits.map((b, i) => (
+                <div
+                  key={i}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold border ${
+                    isPremium
+                      ? 'bg-indigo-50 text-indigo-700 border-indigo-100'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  <b.icon className="w-3 h-3" />
+                  {b.label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sección 5: Términos y condiciones (solo tarifa base) */}
+          {!isPremium && (
+            <div className="px-8 py-7 space-y-5 border-t border-slate-100">
+              <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">
+                Términos y Condiciones
+              </p>
+
+              {/* Resumen */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-1.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Resumen</p>
+                <p className="text-xs font-medium text-slate-600 leading-relaxed">
+                  Este precio incluye millas ilimitadas, reserva vehicular, 2 conductores (+25 años) y seguro exigido por el estado. No incluye SunPass, el cual deberá ser activado en el counter, ni el hold de seguridad de $300 a $500 USD. Recuerde que los pagos realizados por este medio no son reembolsables, sin embargo, de verse obligado a algún cambio, usted cuenta con 18 meses para reprogramar los días de reserva adquiridos.
+                </p>
+              </div>
+
+              {/* Detalle */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Condiciones Detalladas</p>
+                <div className="text-[11px] font-medium text-slate-500 leading-relaxed space-y-2">
+                  <p>Imprima esta confirmación y preséntala al agente de alquiler en el momento de recoger el vehículo. El pago deberá efectuarse directamente a la empresa de alquiler de coches en el momento de recoger el vehículo; es indispensable tener una tarjeta de crédito para el depósito de seguridad.</p>
+                  <p>Se cobrará una tasa adicional (15,99 $/día) a los conductores de entre 21 y 24 años. Los conductores de entre 21 y 24 años no podrán alquilar vehículos de las siguientes clases: coches de lujo, descapotables, vehículos deportivos o vehículos con capacidad para más de 5 pasajeros. Algunos países y categorías específicas de vehículos pueden tener normas de edad específicas.</p>
+                  <p>Combustible: El vehículo se entrega con el depósito lleno y deberá devolverse también lleno para evitar cargos por repostaje, a menos que el plan de alquiler seleccionado incluya un depósito de combustible gratuito.</p>
+                  <p>En el Estado de Florida todos los vehículos están equipados con el sistema TollPass; sin embargo, el costo de los peajes no está incluido en las tarifas publicadas.</p>
+                  <p>Las tarifas solo son válidas para viajeros internacionales, que no residan en el mismo país en el que se alquila el vehículo, con un permiso de conducir original válido de su país de residencia.</p>
+                  <p>Al recoger el vehículo, el agente de alquiler puede ofrecer servicios adicionales y cobertura de seguro, así como mejoras en la categoría del vehículo. Dichos servicios son opcionales y el cliente puede rechazarlos. La no aceptación de dichos servicios opcionales no impide al cliente alquilar el vehículo. Lea detenidamente el contrato de alquiler antes de firmarlo para asegurarse de que solo se han incluido los servicios solicitados, ya que una vez aceptados los servicios opcionales se modificará el importe total del alquiler y no se devolverá ninguna cantidad.</p>
+                  <p>Tenga en cuenta que las reservas dobles, o las reservas con fechas que se solapen, no están permitidas y pueden dar lugar a la cancelación de la reserva. Para más información, visite las páginas de preguntas frecuentes o de términos y condiciones de nuestro sitio web.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Footer del documento */}
+          <div className="px-8 py-4 bg-slate-50 flex items-center justify-between">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Go Easy CRM · {new Date().getFullYear()} Florida VIP Services
+            </p>
+            <p className="text-[10px] font-mono font-bold text-slate-400">
+              {voucher.confirmation_number}
+            </p>
+          </div>
+
+        </div>
+      </main>
+
+      {/* Support footer (no-print) */}
+      <footer className="mt-10 max-w-3xl mx-auto border-t border-slate-200 pt-10 no-print">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
+          <div className="space-y-2">
+            <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest">Atención 24/7</h5>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+              Si tiene algún inconveniente al recoger su vehículo o necesita asistencia, contáctenos vía WhatsApp.
+            </p>
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <button className="bg-emerald-500 text-white w-full max-w-[180px] h-11 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 hover:bg-emerald-600 transition-colors">
+              <Phone className="w-4 h-4" /> Soporte WhatsApp
+            </button>
+            <div className="flex items-center gap-1.5 text-slate-400 font-semibold text-xs">
+              <Globe className="w-3.5 h-3.5" /> GoEasyFlorida.com
+            </div>
+          </div>
+          <div className="space-y-2 md:text-right">
+            <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest">Oficina Principal</h5>
+            <p className="text-xs text-slate-500 font-medium">
+              1234 Ocean Drive, Suite 201<br />
+              Miami Beach, FL 33139<br />
+              United States
+            </p>
+          </div>
+        </div>
+        <div className="mt-8 text-center text-[10px] font-bold text-slate-300 uppercase tracking-widest flex items-center justify-center gap-6">
+          <div className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> Pago Seguro SSL</div>
+          <div className="flex items-center gap-1.5"><Mail className="w-3 h-3" /> tickets@goeasy.com</div>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -43,8 +43,21 @@ export function ZadarmaWidget({ sipExtension, pbxNumber }: ZadarmaWidgetProps) {
         })
       }
 
-      if (document.querySelector(`script[src*="loader-phone-lib"]`)) {
+      const libAlreadyLoaded = !!document.querySelector(`script[src*="loader-phone-lib"]`)
+      if (libAlreadyLoaded && window.zadarmaWidgetFn) {
         launch()
+        return
+      }
+
+      if (libAlreadyLoaded) {
+        // Scripts are in the DOM but widget function not ready yet — wait for it
+        const poll = setInterval(() => {
+          if (window.zadarmaWidgetFn) {
+            clearInterval(poll)
+            launch()
+          }
+        }, 100)
+        setTimeout(() => clearInterval(poll), 5000)
         return
       }
 

@@ -2,7 +2,6 @@
 
 import { Printer, Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
 interface VoucherActionsProps {
@@ -22,15 +21,25 @@ export function VoucherActions({ voucherNumber }: VoucherActionsProps) {
       const element = document.getElementById('voucher-document')
       if (!element) return
 
-      // Pre-capture layout adjustment
+      // Dynamically import to avoid SSR issues
+      const html2canvas = (await import('html2canvas')).default
+
       const canvas = await html2canvas(element, {
-        scale: 2, // High resolution
+        scale: 2,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        imageTimeout: 15000,
+        onclone: (clonedDoc) => {
+          // Ensure images in the cloned doc are loaded
+          const imgs = clonedDoc.querySelectorAll('img')
+          imgs.forEach((img: HTMLImageElement) => {
+            img.crossOrigin = 'anonymous'
+          })
+        },
       })
 
-      const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF({
         orientation: 'p',
         unit: 'px',
@@ -39,22 +48,26 @@ export function VoucherActions({ voucherNumber }: VoucherActionsProps) {
 
       const pdfWidth = pdf.internal.pageSize.getWidth()
       const pdfHeight = pdf.internal.pageSize.getHeight()
-      
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight)
-      
-      const targetWidth = imgWidth * ratio
-      const targetHeight = imgHeight * ratio
-      
-      const offsetX = (pdfWidth - targetWidth) / 2
-      const offsetY = (pdfHeight - targetHeight) / 2
 
-      pdf.addImage(imgData, 'PNG', offsetX, offsetY, targetWidth, targetHeight)
+      const ratio = pdfWidth / canvas.width
+      const scaledTotalHeight = canvas.height * ratio
+      const imgData = canvas.toDataURL('image/jpeg', 0.92)
+
+      let currentY = 0
+      let page = 0
+
+      while (currentY < scaledTotalHeight) {
+        if (page > 0) pdf.addPage()
+        pdf.addImage(imgData, 'JPEG', 0, -currentY, pdfWidth, scaledTotalHeight)
+        currentY += pdfHeight
+        page++
+      }
+
       pdf.save(`voucher-${voucherNumber}.pdf`)
     } catch (error) {
-      console.error('Error generating PDF:', error)
-      alert("Hubo un error al generar el PDF. Por favor intenta Imprimir y 'Guardar como PDF'.")
+      console.error('[VoucherPDF] Error:', error)
+      // Fallback: open print dialog so user can Save as PDF
+      window.print()
     } finally {
       setIsDownloading(false)
     }
@@ -62,24 +75,24 @@ export function VoucherActions({ voucherNumber }: VoucherActionsProps) {
 
   return (
     <div className="flex items-center gap-3 no-print">
-      <button 
+      <button
         onClick={handlePrint}
-        className="bg-white text-slate-700 font-black text-xs uppercase tracking-widest px-6 py-3 rounded-2xl border border-slate-200 hover:bg-slate-50 transition-all flex items-center gap-2 cursor-pointer group"
+        className="bg-white text-slate-700 font-semibold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors flex items-center gap-2 cursor-pointer"
       >
-        <Printer className="w-4 h-4 group-hover:scale-110 transition-transform" /> Imprimir
+        <Printer className="w-4 h-4" /> Imprimir
       </button>
-      <button 
+      <button
         onClick={handleDownload}
         disabled={isDownloading}
-        className="bg-slate-900 text-white font-black text-xs uppercase tracking-widest px-6 py-3 rounded-2xl shadow-xl shadow-slate-900/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 transition-all flex items-center gap-2 cursor-pointer group whitespace-nowrap"
+        className="bg-slate-900 text-white font-semibold text-xs uppercase tracking-widest px-5 py-2.5 rounded-xl hover:bg-slate-800 disabled:opacity-50 transition-colors flex items-center gap-2 cursor-pointer whitespace-nowrap"
       >
         {isDownloading ? (
           <>
-            <Loader2 className="w-4 h-4 animate-spin text-indigo-400" /> Generando...
+            <Loader2 className="w-4 h-4 animate-spin" /> Generando...
           </>
         ) : (
           <>
-            <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" /> Descargar PDF
+            <Download className="w-4 h-4" /> Descargar PDF
           </>
         )}
       </button>

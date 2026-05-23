@@ -65,6 +65,8 @@ export async function generateVoucherForLead(
   })
 
   revalidatePath(`/dashboard/leads/${leadId}`)
+  revalidatePath(`/voucher/${voucher.id}`)
+  revalidatePath(`/v/${voucher.id}`)
 
   return voucher
 }
