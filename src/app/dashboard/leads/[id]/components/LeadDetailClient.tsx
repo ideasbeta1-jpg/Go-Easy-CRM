@@ -16,6 +16,7 @@ import { updateLead, deleteLead } from '@/app/utils/actions/leads'
 import { addLeadNote, deleteLeadNote } from '@/app/utils/actions/lead-notes'
 import { generateQuoteForLead } from '@/app/utils/actions/quotes'
 import { generateVoucherForLead, updateProviderConfirmation, saveVoucherDraft } from '@/app/utils/actions/vouchers'
+import { simulatePayment } from '@/app/utils/actions/simulate-payment'
 import { sendManualWhatsApp, sendManualWhatsAppMedia } from '@/app/utils/actions/whatsapp'
 import { uploadChatMedia } from '@/app/utils/actions/storage'
 import { fetchMoreMessages } from '@/app/utils/actions/messages'
@@ -946,6 +947,36 @@ export default function LeadDetailClient({
               </div>
 
               <CallLogPanel leadId={lead.id} leadPhone={formData.phone || ''} agentId={currentUser?.id || ''} agentSip={currentUser?.zadarma_sip || null} />
+
+              {/* Simulación de pago — solo para pruebas */}
+              {(lead.status === 'en_cotizacion' || lead.status === 'lead_nuevo') && (
+                <div className="border border-dashed border-amber-300 bg-amber-50 rounded-2xl p-4 space-y-3">
+                  <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">⚡ Modo prueba</p>
+                  <p className="text-xs text-amber-700 font-medium leading-relaxed">
+                    Simula el pago del cliente. Si el tab Voucher tiene proveedor y n° de confirmación guardados, el voucher se generará y enviará automáticamente. Si no, pasará a Reserva Confirmada.
+                  </p>
+                  <button
+                    onClick={async () => {
+                      if (!confirm('¿Simular pago del cliente?')) return
+                      startTransition(async () => {
+                        try {
+                          const result = await simulatePayment(lead.id)
+                          router.refresh()
+                          alert(result.stage === 'voucher_enviado'
+                            ? '✅ Voucher generado y enviado automáticamente.'
+                            : '✅ Lead pasó a Reserva Confirmada.')
+                        } catch (e: any) {
+                          alert(`Error: ${e.message}`)
+                        }
+                      })
+                    }}
+                    disabled={isPending}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-amber-500 text-white rounded-xl font-bold text-sm hover:bg-amber-600 transition-all disabled:opacity-50"
+                  >
+                    {isPending ? 'Procesando...' : '💳 Simular cotización pagada'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
