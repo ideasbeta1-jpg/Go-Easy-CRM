@@ -64,11 +64,9 @@ export async function POST(req: Request) {
     await writeFile(inputPath, rawBuffer)
 
     const ffmpegPath = getFfmpegPath()
-    console.log(`[audio/send] Converting ${mimeType} → OGG Opus via ffmpeg`)
     try {
       await execAsync(`"${ffmpegPath}" -y -i "${inputPath}" -c:a libopus -b:a 64k "${outputPath}"`)
       finalBuffer = await readFile(outputPath)
-      console.log(`[audio/send] Converted successfully, size: ${finalBuffer.length} bytes`)
     } catch (convErr: any) {
       console.error('[audio/send] ffmpeg conversion failed:', convErr?.message)
       return NextResponse.json(
@@ -92,7 +90,6 @@ export async function POST(req: Request) {
     })
 
     const uploadData = await uploadRes.json()
-    console.log(`[audio/send] Meta media upload (${uploadRes.status}):`, JSON.stringify(uploadData))
 
     if (!uploadRes.ok) {
       const errMsg = uploadData?.error?.message || JSON.stringify(uploadData)
@@ -125,7 +122,6 @@ export async function POST(req: Request) {
     })
 
     const sendData = await sendRes.json()
-    console.log(`[audio/send] Meta send (${sendRes.status}):`, JSON.stringify(sendData))
 
     if (!sendRes.ok) {
       const errMsg = sendData?.error?.message || JSON.stringify(sendData)

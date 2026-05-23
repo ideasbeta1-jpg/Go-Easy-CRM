@@ -164,8 +164,6 @@ export async function sendWABATextMessage(recipient: string, message: string) {
   const token = process.env.WABA_ACCESS_TOKEN;
   const version = process.env.WABA_VERSION || 'v21.0';
 
-  console.log('[sendWABATextMessage] Attempting send to:', recipient);
-  
   if (!pId || !token) {
     console.error('[sendWABATextMessage] CRITICAL: WABA credentials missing (PHONE_NUMBER_ID or ACCESS_TOKEN)');
     return false;
@@ -207,7 +205,6 @@ export async function sendWABATextMessage(recipient: string, message: string) {
        return false;
     }
 
-    console.log('[sendWABATextMessage] SUCCESS:', data.messages?.[0]?.id);
     return true;
   } catch (error) {
     console.error('[sendWABATextMessage] FETCH EXCEPTION:', error);
@@ -254,7 +251,6 @@ export async function createTemplate(templateData: {
  * Downloads a media file from Meta using its ID and returns a Blob
  */
 export async function downloadWABAMedia(mediaId: string): Promise<{ blob: Blob, mimeType: string } | null> {
-  console.log('[downloadWABAMedia] Starting for mediaId:', mediaId);
   if (!ACCESS_TOKEN) {
     console.error('[downloadWABAMedia] WABA credentials missing');
     return null;
@@ -273,7 +269,6 @@ export async function downloadWABAMedia(mediaId: string): Promise<{ blob: Blob, 
     }
 
     const { url, mime_type } = await metaResponse.json();
-    console.log('[downloadWABAMedia] Downloading from:', url);
 
     // 2. Download the actual binary data
     const fileResponse = await fetch(url, {
@@ -323,8 +318,6 @@ export async function sendWABAMediaMessage(
     [wabaType]: { link: mediaUrl },
   }
 
-  console.log('[sendWABAMediaMessage] Payload:', JSON.stringify(payload))
-
   try {
     const url = `${BASE_URL}/${PHONE_NUMBER_ID}/messages`
     const response = await fetch(url, {
@@ -337,7 +330,6 @@ export async function sendWABAMediaMessage(
     })
 
     const data = await response.json()
-    console.log(`[sendWABAMediaMessage] Meta response (${response.status}):`, JSON.stringify(data))
 
     if (!response.ok) {
       const errMsg = data?.error?.message || data?.error?.error_data?.details || JSON.stringify(data)

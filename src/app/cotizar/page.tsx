@@ -46,6 +46,11 @@ export default async function PublicQuotePage({
           <div className="bg-white border border-slate-100 shadow-2xl rounded-[3rem] p-8 md:p-16 relative overflow-hidden">
              
              <form action={submitPublicLead}>
+                {/* Honeypot anti-spam: visually hidden, never filled by real users */}
+                <div aria-hidden="true" style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}>
+                  <label htmlFor="website">Website</label>
+                  <input type="text" id="website" name="website" tabIndex={-1} autoComplete="off" />
+                </div>
                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-16">
                    
                    {/* Inputs Area */}

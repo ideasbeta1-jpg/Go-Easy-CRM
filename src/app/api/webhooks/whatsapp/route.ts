@@ -3,10 +3,25 @@ import { NextResponse } from 'next/server'
 import { assignLeadToAgent } from '@/utils/assignment'
 import { executeStageAutomation } from '@/utils/automation-engine'
 import { broadcastNotification } from '@/app/utils/actions/notifications'
+import crypto from 'crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
+    const rawBody = await req.text()
+
+    // Verify Meta WABA signature (X-Hub-Signature-256)
+    const appSecret = process.env.WABA_APP_SECRET
+    if (appSecret) {
+      const signature = req.headers.get('x-hub-signature-256')
+      const expected = `sha256=${crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex')}`
+      if (!signature || signature !== expected) {
+        return NextResponse.json({ error: 'Invalid signature' }, { status: 403 })
+      }
+    }
+
+    const body = JSON.parse(rawBody)
+    const supabase = createAdminClient()
 
     // --- HANDLE EVOLUTION API ---
     if (body.event === 'messages.upsert' && body.data) {
@@ -25,8 +40,8 @@ export async function POST(req: Request) {
         const wamid = msgData.key?.id || null
 
         if (phoneNumber) {
-           const leadId = await getOrCreateLead(phoneNumber, pushName, content)
-           if (leadId) await storeMessage(leadId, content, null, null, wamid)
+           const leadId = await getOrCreateLead(supabase, phoneNumber, pushName, content)
+           if (leadId) await storeMessage(supabase, leadId, content, null, null, wamid)
         }
       }
     }
@@ -35,17 +50,15 @@ export async function POST(req: Request) {
     if (body.object === 'whatsapp_business_account' && body.entry) {
       for (const entry of body.entry) {
         for (const change of entry.changes) {
-          // Handle incoming messages
           if (change.value.messages) {
             for (const message of change.value.messages) {
                const contact = change.value.contacts?.[0]
-               await handleWabaMessage(message, contact)
+               await handleWabaMessage(supabase, message, contact)
             }
           }
-          // Handle delivery/read status updates
           if (change.value.statuses) {
             for (const statusUpdate of change.value.statuses) {
-              await handleWabaStatus(statusUpdate)
+              await handleWabaStatus(supabase, statusUpdate)
             }
           }
         }
@@ -59,13 +72,10 @@ export async function POST(req: Request) {
   }
 }
 
-async function handleWabaStatus(statusUpdate: any) {
-  // statusUpdate: { id: wamid, status: 'sent'|'delivered'|'read'|'failed', recipient_id, timestamp }
+async function handleWabaStatus(supabase: SupabaseClient, statusUpdate: any) {
   const { id: wamid, status } = statusUpdate
   if (!wamid || !status) return
 
-  const supabase = createAdminClient()
-  // Only upgrade status, never downgrade (sent → delivered → read)
   const statusOrder: Record<string, number> = { sent: 1, delivered: 2, read: 3, failed: 0 }
   const newRank = statusOrder[status] ?? -1
   if (newRank < 0) return
@@ -84,13 +94,12 @@ async function handleWabaStatus(statusUpdate: any) {
   }
 }
 
-async function handleWabaMedia(mediaId: string, leadId: string) {
+async function handleWabaMedia(supabase: SupabaseClient, mediaId: string, leadId: string) {
   try {
     const { downloadWABAMedia } = await import('@/utils/waba')
     const media = await downloadWABAMedia(mediaId)
     if (!media) return null
 
-    const supabase = createAdminClient()
     const extension = media.mimeType.split('/')[1]?.split(';')[0] || 'bin'
     const fileName = `inbound_${leadId}_${Date.now()}.${extension}`
 
@@ -108,14 +117,12 @@ async function handleWabaMedia(mediaId: string, leadId: string) {
   }
 }
 
-async function handleWabaMessage(message: any, contact: any) {
+async function handleWabaMessage(supabase: SupabaseClient, message: any, contact: any) {
   const phoneNumber = message.from
   const pushName = contact?.profile?.name || 'WABA Contact'
   const wamid = message.id || null
 
-  // Check for duplicate before processing
   if (wamid) {
-    const supabase = createAdminClient()
     const { data: existing } = await supabase
       .from('messages')
       .select('id')
@@ -135,37 +142,33 @@ async function handleWabaMessage(message: any, contact: any) {
   let mediaUrl = null
   let mediaType = null
 
-  // Handle Media (audio, image, video, document)
   const mediaObj = message.audio || message.image || message.video || message.document
   if (mediaObj?.id) {
-    const leadId = await getOrCreateLead(phoneNumber, pushName, content || '[Media]')
+    const leadId = await getOrCreateLead(supabase, phoneNumber, pushName, content || '[Media]')
     if (leadId) {
-      const mediaResult = await handleWabaMedia(mediaObj.id, leadId)
+      const mediaResult = await handleWabaMedia(supabase, mediaObj.id, leadId)
       if (mediaResult) {
         mediaUrl = mediaResult.url
         mediaType = mediaResult.type
       }
-      // Set descriptive content fallback based on type
       if (!content) {
-        if (message.image) content = mediaType ? `[Imagen]` : '[Imagen]'
+        if (message.image) content = '[Imagen]'
         else if (message.video) content = '[Video]'
         else if (message.audio) content = '[Audio]'
         else if (message.document) content = message.document.filename || '[Documento]'
         else content = '[Multimedia]'
       }
-      await storeMessage(leadId, content, mediaUrl, mediaType, wamid)
+      await storeMessage(supabase, leadId, content, mediaUrl, mediaType, wamid)
     }
     return
   }
 
-  // Handle Text / Interactive
   if (!content) content = '[Mensaje]'
-  const leadId = await getOrCreateLead(phoneNumber, pushName, content)
-  if (leadId) await storeMessage(leadId, content, null, null, wamid)
+  const leadId = await getOrCreateLead(supabase, phoneNumber, pushName, content)
+  if (leadId) await storeMessage(supabase, leadId, content, null, null, wamid)
 }
 
-async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: string) {
-  const supabase = createAdminClient()
+async function getOrCreateLead(supabase: SupabaseClient, phoneNumber: string, pushName: string, firstMsg: string) {
   const isBSUID = phoneNumber.includes(':') || /[a-z]/i.test(phoneNumber)
   const last10 = phoneNumber.slice(-10)
   const query = isBSUID ? `phone.eq.${phoneNumber}` : `phone.like.%${phoneNumber}%,phone.like.%${last10}%`
@@ -190,13 +193,13 @@ async function getOrCreateLead(phoneNumber: string, pushName: string, firstMsg: 
 }
 
 async function storeMessage(
+  supabase: SupabaseClient,
   leadId: string,
   content: string,
   mediaUrl?: string | null,
   mediaType?: string | null,
   wamid?: string | null
 ) {
-  const supabase = createAdminClient()
   const result = await supabase.from('messages').insert({
     lead_id: leadId,
     content,

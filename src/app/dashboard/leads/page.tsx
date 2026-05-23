@@ -38,7 +38,17 @@ export default async function LeadsPage() {
     leadsQuery = leadsQuery.eq('assigned_to', user.id)
   }
 
-  const { data: leads, error } = await leadsQuery
+  const [
+    { data: leads, error },
+    { data: categories },
+    { data: locations },
+    { data: unreadMessages },
+  ] = await Promise.all([
+    leadsQuery,
+    supabase.from('categories').select('*').order('name'),
+    supabase.from('locations').select('*').order('name'),
+    supabase.from('messages').select('lead_id').eq('direction', 'inbound').eq('is_read', false),
+  ])
 
   if (error) {
     return (
@@ -62,15 +72,6 @@ export default async function LeadsPage() {
     acc[p.id] = p
     return acc
   }, {} as Record<string, any>)
-
-  const { data: categories } = await supabase.from('categories').select('*').order('name')
-  const { data: locations } = await supabase.from('locations').select('*').order('name')
-
-  const { data: unreadMessages } = await supabase
-    .from('messages')
-    .select('lead_id')
-    .eq('direction', 'inbound')
-    .eq('is_read', false)
 
   const unreadByLead: Record<string, number> = {}
   ;(unreadMessages || []).forEach(m => {

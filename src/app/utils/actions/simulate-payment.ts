@@ -2,9 +2,14 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function simulatePayment(leadId: string): Promise<{ stage: 'voucher_enviado' | 'reserva_confirmada' }> {
+  const userClient = await createClient()
+  const { data: { user } } = await userClient.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
+
   const supabase = createAdminClient()
 
   const { data: lead, error: leadError } = await supabase

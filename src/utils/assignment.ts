@@ -20,39 +20,23 @@ export async function assignLeadToAgent(leadId: string) {
 
     if (agentsError) throw agentsError
 
-    if (!agents || agents.length === 0) {
-      console.log(`[Assignment] No hay asesores registrados para asignar el lead ${leadId}`)
-      return null
-    }
+    if (!agents || agents.length === 0) return null
 
     const agent = agents[0]
 
-    // 3. Asignación del lead
-    const { error: assignError } = await supabase
-      .from('leads')
-      .update({ 
-        assigned_to: agent.id,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', leadId)
+    const now = new Date().toISOString()
+
+    // 3 & 4. Assign lead + update agent Round Robin timestamp in parallel
+    const [{ error: assignError }, , { data: lead }] = await Promise.all([
+      supabase.from('leads').update({ assigned_to: agent.id, updated_at: now }).eq('id', leadId),
+      supabase.from('profiles').update({ last_assigned_at: now }).eq('id', agent.id),
+      supabase.from('leads').select('first_name, last_name').eq('id', leadId).single(),
+    ])
 
     if (assignError) throw assignError
 
-    // 4. Actualizar marca de tiempo del agente para Round Robin
-    await supabase
-      .from('profiles')
-      .update({ last_assigned_at: new Date().toISOString() })
-      .eq('id', agent.id)
-
-    console.log(`[Assignment] Lead ${leadId} asignado exitosamente a ${agent.full_name}`)
-
     // Create in-app notification for the assigned agent
     try {
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('first_name, last_name')
-        .eq('id', leadId)
-        .single()
 
       if (lead) {
         const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim()

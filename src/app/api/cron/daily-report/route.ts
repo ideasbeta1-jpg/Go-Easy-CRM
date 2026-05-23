@@ -6,11 +6,8 @@ export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get('authorization')?.replace('Bearer ', '');
-  
-  // Si CRON_SECRET no está configurado en env, permitiremos temporalmente
-  // en desarrollo para no bloquear pruebas, pero en prod requerirá validación.
   const expectedSecret = process.env.CRON_SECRET;
-  if (expectedSecret && secret !== expectedSecret) {
+  if (!expectedSecret || secret !== expectedSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

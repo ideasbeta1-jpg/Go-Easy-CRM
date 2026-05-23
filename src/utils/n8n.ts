@@ -26,10 +26,7 @@ export async function sendLeadToN8n(leadId: string, event: string, payload: any 
   const path = WEBHOOK_PATHS[event]
 
   // Skip events that have no mapped webhook (e.g. en_cotizacion, voucher_enviado)
-  if (!path) {
-    console.log(`[n8n] No webhook mapped for event: ${event} — skipping`)
-    return
-  }
+  if (!path) return
 
   const url = `${N8N_BASE}/${path}`
 
@@ -67,7 +64,6 @@ export async function sendLeadToN8n(leadId: string, event: string, payload: any 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    console.log(`[n8n] Webhook [${event}] → ${url} | status: ${res.status}`)
   } catch (err) {
     console.error(`[n8n] Webhook Error [${event}]:`, err)
   }

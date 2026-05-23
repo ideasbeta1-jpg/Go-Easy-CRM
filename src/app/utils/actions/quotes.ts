@@ -7,6 +7,8 @@ import { executeStageAutomation } from '@/utils/automation-engine'
 
 export async function generateQuoteForLead(leadId: string, totalAmount: number) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   // 1. Fetch Lead data
   const { data: lead } = await supabase

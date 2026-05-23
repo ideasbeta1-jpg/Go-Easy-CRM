@@ -15,7 +15,6 @@ export async function executeStageAutomation(
   extraData: any = {}
 ) {
   const supabase = createAdminClient();
-  console.log(`[AutomationEngine] Procesando etapa ${stage} para Lead ${leadId}`);
   
   // Registro inicial para saber que el motor arrancó
   await logAutomation(leadId, stage, 'system', 'engine_start', 'processing');
@@ -61,37 +60,22 @@ export async function executeStageAutomation(
           lead.assigned_agent = agent;
         }
       } catch (agentErr) {
-        console.warn('[AutomationEngine] Error al obtener agente (no crítico):', agentErr);
-      }
+        }
     }
 
-    // Obtener la cotización más reciente si estamos en etapa de cotización o si se requiere
-    const { data: quote } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // Fetch quote and voucher in parallel
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '');
+    const [{ data: quote }, { data: voucher }] = await Promise.all([
+      supabase.from('quotes').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+      supabase.from('vouchers').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
 
     if (quote) {
       lead.active_quote = quote;
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '');
       lead.quote_url = `${appUrl}/q/${quote.id}`;
     }
-
-    // Obtener el voucher más reciente si existe
-    const { data: voucher } = await supabase
-      .from('vouchers')
-      .select('*')
-      .eq('lead_id', leadId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
     if (voucher) {
       lead.active_voucher = voucher;
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '');
       lead.voucher_url = `${appUrl}/v/${voucher.id}`;
     }
 
@@ -114,10 +98,8 @@ export async function executeStageAutomation(
     const templateName = mapping?.template_name || defaultTemplates[stage];
     
     if (!isEnabled('whatsapp')) {
-      console.log(`[AutomationEngine] WhatsApp deshabilitado para etapa: ${stage}`);
       await logAutomation(leadId, stage, 'whatsapp', 'skipped_by_config', 'skipped');
     } else if (!templateName) {
-      console.log(`[AutomationEngine] No hay plantilla definida para la etapa: ${stage}`);
       await logAutomation(leadId, stage, 'system', 'no_template', 'skipped');
     } else if (lead.phone) {
       // 3. Resolver parámetros de WhatsApp
@@ -196,8 +178,8 @@ export async function executeStageAutomation(
                 }
               }
             }
-          } catch (e) {
-            console.warn('[AutomationEngine] Could not generate detailed template preview, using fallback.');
+          } catch {
+            // non-critical: fallback text already set
           }
 
           await supabase.from('messages').insert({
@@ -401,19 +383,17 @@ function formatValue(val: any, type: 'date' | 'time'): string {
 }
 
 
-/**
- * Registra el resultado en la tabla automation_logs
- */
 async function logAutomation(
-  lead_id: string, 
-  stage: string, 
-  channel: string, 
-  template_name: string, 
-  status: string, 
-  error_message?: string
+  lead_id: string,
+  stage: string,
+  channel: string,
+  template_name: string,
+  status: string,
+  error_message?: string,
+  supabaseClient?: ReturnType<typeof createAdminClient>
 ) {
   try {
-    const supabase = createAdminClient();
+    const supabase = supabaseClient ?? createAdminClient();
     await supabase.from('automation_logs').insert({
       lead_id,
       stage,

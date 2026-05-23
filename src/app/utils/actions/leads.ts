@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function updateLead(id: string, updates: any) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const { data, error } = await supabase
     .from('leads')
@@ -24,6 +26,8 @@ export async function updateLead(id: string, updates: any) {
 
 export async function updateLeadStatus(id: string, status: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const { error } = await supabase
     .from('leads')
@@ -38,6 +42,8 @@ export async function updateLeadStatus(id: string, status: string) {
 
 export async function deleteLead(id: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const { error } = await supabase
     .from('leads')

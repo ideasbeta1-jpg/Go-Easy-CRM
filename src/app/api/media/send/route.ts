@@ -75,7 +75,6 @@ export async function POST(req: Request) {
     })
 
     const uploadData = await uploadRes.json()
-    console.log(`[media/send] Meta upload (${uploadRes.status}):`, JSON.stringify(uploadData))
 
     if (!uploadRes.ok) {
       return NextResponse.json(
@@ -110,7 +109,6 @@ export async function POST(req: Request) {
     })
 
     const sendData = await sendRes.json()
-    console.log(`[media/send] Meta send (${sendRes.status}):`, JSON.stringify(sendData))
 
     if (!sendRes.ok) {
       return NextResponse.json(

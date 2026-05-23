@@ -12,6 +12,8 @@ export async function generateVoucherForLead(
   conductorTelefono: string
 ) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   // 1. Update Lead Provider and status
   const { error: leadUpdateError } = await supabase
@@ -79,6 +81,8 @@ export async function saveVoucherDraft(
   conductorTelefono: string
 ) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const { error } = await supabase
     .from('leads')
@@ -103,6 +107,8 @@ export async function updateProviderConfirmation(
   leadId: string
 ) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Unauthorized')
 
   const { error } = await supabase
     .from('vouchers')

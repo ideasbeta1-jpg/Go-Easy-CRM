@@ -37,27 +37,20 @@ export async function GET() {
       const sign = buildZadarmaSignature(method, params)
       const qs = new URLSearchParams(params).toString()
       const url = `${BASE_URL}${method}?${qs}`
-      console.log('[webrtc-key] Llamando:', url)
       const response = await fetch(url, {
         headers: { Authorization: `${USER_KEY}:${sign}` },
       })
 
-      const text = await response.text()
-      console.log('[webrtc-key] Zadarma status:', response.status, 'body:', text)
-
-      const result = JSON.parse(text)
+      const result = JSON.parse(await response.text())
       if (result.status === 'success' && result.key) {
         return NextResponse.json({ key: result.key, sip })
       }
-      console.warn('[webrtc-key] Zadarma dynamic key failed:', result.message)
-    } catch (err) {
-      console.warn('[webrtc-key] Zadarma request error:', err)
+    } catch {
+      // fall through to SIP password fallback
     }
   }
 
-  // Fallback: usar contraseña SIP del perfil del usuario
   if (profileForSip?.zadarma_sip_password) {
-    console.log('[webrtc-key] Usando contraseña SIP del perfil como fallback')
     return NextResponse.json({ key: profileForSip.zadarma_sip_password, sip })
   }
 

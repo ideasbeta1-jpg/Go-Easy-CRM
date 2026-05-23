@@ -57,7 +57,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
         {process.env.NEXT_PUBLIC_FB_PIXEL_ID && (
-          <Script id="fb-pixel" strategy="afterInteractive">
+          <Script id="fb-pixel" strategy="lazyOnload">
             {`
               !function(f,b,e,v,n,t,s)
               {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
