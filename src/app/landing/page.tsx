@@ -37,11 +37,19 @@ function LandingPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const _d = new Date()
-  const _pad = (n: number) => String(n).padStart(2, '0')
-  const _toDateStr = (date: Date) => `${date.getFullYear()}-${_pad(date.getMonth() + 1)}-${_pad(date.getDate())}`
-  const today = _toDateStr(_d)
-  const nextWeek = _toDateStr(new Date(_d.getFullYear(), _d.getMonth(), _d.getDate() + 7))
+  const [today, setToday] = useState('')
+  const [nextWeek, setNextWeek] = useState('')
+
+  useEffect(() => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const toDateStr = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    const d = new Date()
+    const t = toDateStr(d)
+    const nw = toDateStr(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 7))
+    setToday(t)
+    setNextWeek(nw)
+    setForm(f => ({ ...f, pickup_date: t, return_date: nw }))
+  }, [])
 
   const [form, setForm] = useState({
     category_id: '',
@@ -49,9 +57,9 @@ function LandingPageContent() {
     pickup_location_id: '',
     return_location: '',
     return_location_id: '',
-    pickup_date: today,
+    pickup_date: '',
     pickup_time: '10:00 AM',
-    return_date: nextWeek,
+    return_date: '',
     return_time: '10:00 AM',
     country_code: '+1',
     phone: '',

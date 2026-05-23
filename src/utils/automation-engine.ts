@@ -266,11 +266,20 @@ export async function executeStageAutomation(
       });
     }
 
-    // 6. Notificación al Vendedor (Si es reserva confirmada)
-    if (stage === 'reserva_confirmada' && lead.assigned_agent?.phone && isEnabled('agent_whatsapp')) {
+    // 6. Notificación al Vendedor
+    if (lead.assigned_agent?.phone && isEnabled('agent_whatsapp')) {
       const depositAmount = typeof extraData.amount === 'number' ? extraData.amount.toFixed(2) : (extraData.amount || '—');
-      const agentMsg = `🎉 *¡Felicidades!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* ha pagado el depósito de *$${depositAmount}*. Ahora ayúdanos gestionando el voucher.`;
-      await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
+      let agentMsg: string | null = null;
+
+      if (stage === 'reserva_confirmada') {
+        agentMsg = `🎉 *¡Felicidades!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* ha pagado el depósito de *$${depositAmount}*. Ahora ayúdanos gestionando el voucher.`;
+      } else if (stage === 'voucher_enviado' && extraData.auto_generated) {
+        agentMsg = `🎉 *¡Felicidades por tu venta!* Tu cliente *${lead.first_name} ${lead.last_name || ''}* acaba de pagar el depósito de *$${depositAmount}*. Como ya tenías el proveedor registrado, *el voucher fue enviado automáticamente al cliente* ✅`;
+      }
+
+      if (agentMsg) {
+        await sendWABATextMessage(lead.assigned_agent.phone, agentMsg);
+      }
     }
 
     // 7. In-App Notifications

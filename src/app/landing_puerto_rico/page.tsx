@@ -38,11 +38,13 @@ function LandingContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const _d = new Date()
-  const _pad = (n: number) => String(n).padStart(2, '0')
-  const _toDateStr = (date: Date) => `${date.getFullYear()}-${_pad(date.getMonth() + 1)}-${_pad(date.getDate())}`
-  const today = _toDateStr(_d)
-  const nextWeek = _toDateStr(new Date(_d.getFullYear(), _d.getMonth(), _d.getDate() + 7))
+  const [today, setToday] = useState('')
+
+  useEffect(() => {
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const d = new Date()
+    setToday(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`)
+  }, [])
 
   const [form, setForm] = useState({
     category_id: '',
