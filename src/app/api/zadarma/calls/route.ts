@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createAdminClient } from '@/utils/supabase/admin'
 
 /**
  * GET /api/zadarma/calls?leadId=xxx&limit=20
@@ -18,6 +13,9 @@ export async function GET(req: NextRequest) {
   if (!leadId) {
     return NextResponse.json({ error: 'leadId requerido' }, { status: 400 })
   }
+
+  // Cliente admin creado por petición (no a nivel de módulo) para no romper el build.
+  const supabase = createAdminClient()
 
   const { data, error } = await supabase
     .from('call_logs')

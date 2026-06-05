@@ -2,7 +2,6 @@
 
 import { Printer, Download, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import jsPDF from 'jspdf'
 
 interface VoucherActionsProps {
   voucherNumber: string
@@ -21,8 +20,12 @@ export function VoucherActions({ voucherNumber }: VoucherActionsProps) {
       const element = document.getElementById('voucher-document')
       if (!element) return
 
-      // Dynamically import to avoid SSR issues
-      const html2canvas = (await import('html2canvas')).default
+      // Carga diferida: jspdf + html2canvas (muy pesados) solo se descargan
+      // cuando el usuario realmente genera el PDF, no en el bundle inicial.
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ])
 
       const canvas = await html2canvas(element, {
         scale: 2,

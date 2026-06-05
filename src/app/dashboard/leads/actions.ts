@@ -93,6 +93,65 @@ export async function updateLeadStatus(id: string, status: string, lostReason?: 
   revalidatePath('/dashboard/leads')
 }
 
+// En un módulo 'use server' solo se pueden exportar funciones async, por eso
+// esta constante es local (no exportada).
+const TERMINAL_PAGE_SIZE = 30
+
+/**
+ * Carga incremental de leads de una etapa (pensado para las columnas cerradas,
+ * que crecen sin límite). Devuelve los leads ya enriquecidos con su agente,
+ * con el mismo shape que usa el Kanban.
+ */
+export async function loadMoreLeads(status: string, offset: number) {
+  const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { leads: [] as any[] }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  const isAdmin = !profile || profile.role === 'admin'
+
+  let query = supabase
+    .from('leads')
+    .select(`*, category:categories(name, image_url, daily_price)`)
+    .is('deleted_at', null)
+    .eq('status', status)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + TERMINAL_PAGE_SIZE - 1)
+
+  if (!isAdmin) query = query.eq('assigned_to', user.id)
+
+  const { data: leads, error } = await query
+  if (error) throw new Error(error.message)
+
+  const assignedToIds = Array.from(new Set((leads || []).map(l => l.assigned_to).filter(Boolean)))
+  let profiles: any[] = []
+  if (assignedToIds.length > 0) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, first_name, last_name, avatar_url')
+      .in('id', assignedToIds as string[])
+    profiles = data || []
+  }
+  const profileMap = Object.fromEntries(profiles.map(p => [p.id, p]))
+
+  const processed = (leads || []).map(l => {
+    const p = profileMap[l.assigned_to]
+    return {
+      ...l,
+      assigned_to_profile: p
+        ? { ...p, full_name: p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Agente' }
+        : null,
+    }
+  })
+
+  return { leads: processed }
+}
+
 export async function searchCustomerByContact(query: string) {
   if (!query || query.length < 3) return null
 

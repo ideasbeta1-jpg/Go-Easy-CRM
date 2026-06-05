@@ -1,7 +1,12 @@
 import { createClient } from '@/utils/supabase/server'
+import { getCachedUser } from '@/utils/supabase/auth'
+import { getCachedCategories, getCachedLocations } from '@/app/utils/actions/cached-data'
 
 import { KanbanBoard } from './components/KanbanBoard'
 import { NewLeadButton } from './components/NewLeadButton'
+
+// Debe coincidir con TERMINAL_PAGE_SIZE en ./actions (carga inicial de cerrados).
+const TERMINAL_PAGE_SIZE = 30
 import { KanbanFilterProvider } from './components/KanbanFilterContext'
 import { KanbanSearchControls, KanbanFilterChips } from './components/KanbanSearchControls'
 
@@ -17,7 +22,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export default async function LeadsPage() {
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
   if (!user) return null
 
   const { data: profile } = await supabase
@@ -28,25 +33,50 @@ export default async function LeadsPage() {
 
   const isAdmin = !profile || profile?.role === 'admin'
 
-  let leadsQuery = supabase
-    .from('leads')
-    .select(`*, category:categories(name, image_url, daily_price)`)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
+  const ACTIVE_STATUSES = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado']
+  const withScope = (q: any) => (isAdmin ? q : q.eq('assigned_to', user.id))
 
-  if (!isAdmin) {
-    leadsQuery = leadsQuery.eq('assigned_to', user.id)
-  }
-
+  // Pipeline activo: se carga completo (acotado por naturaleza, necesario para
+  // drag-drop/búsqueda/orden). Columnas cerradas (crecen sin límite): solo los
+  // más recientes + "Cargar más". KPIs de cerrados vía agregados ligeros para
+  // que el cap no distorsione las métricas.
   const [
-    { data: leads, error },
-    { data: categories },
-    { data: locations },
+    { data: activeLeadsRaw, error },
+    { data: wonRecent },
+    { data: lostRecent },
+    { data: wonAmounts },
+    { count: lostTotal },
+    categories,
+    locations,
     { data: unreadMessages },
   ] = await Promise.all([
-    leadsQuery,
-    supabase.from('categories').select('*').order('name'),
-    supabase.from('locations').select('*').order('name'),
+    withScope(supabase.from('leads')
+      .select(`*, category:categories(name, image_url, daily_price)`)
+      .is('deleted_at', null)
+      .in('status', ACTIVE_STATUSES)
+      .order('created_at', { ascending: false })),
+    withScope(supabase.from('leads')
+      .select(`*, category:categories(name, image_url, daily_price)`)
+      .is('deleted_at', null)
+      .eq('status', 'cerrado_ganado')
+      .order('created_at', { ascending: false })
+      .range(0, TERMINAL_PAGE_SIZE - 1)),
+    withScope(supabase.from('leads')
+      .select(`*, category:categories(name, image_url, daily_price)`)
+      .is('deleted_at', null)
+      .eq('status', 'cerrado_perdido')
+      .order('created_at', { ascending: false })
+      .range(0, TERMINAL_PAGE_SIZE - 1)),
+    withScope(supabase.from('leads')
+      .select('total_amount')
+      .is('deleted_at', null)
+      .eq('status', 'cerrado_ganado')),
+    withScope(supabase.from('leads')
+      .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
+      .eq('status', 'cerrado_perdido')),
+    getCachedCategories(),
+    getCachedLocations(),
     supabase.from('messages').select('lead_id').eq('direction', 'inbound').eq('is_read', false),
   ])
 
@@ -58,7 +88,9 @@ export default async function LeadsPage() {
     )
   }
 
-  const assignedToIds = Array.from(new Set(leads?.map(l => l.assigned_to).filter(Boolean)))
+  const leads = [...(activeLeadsRaw || []), ...(wonRecent || []), ...(lostRecent || [])]
+
+  const assignedToIds = Array.from(new Set(leads.map(l => l.assigned_to).filter(Boolean)))
   let profiles: any[] = []
   if (assignedToIds.length > 0) {
     const { data: profilesData } = await supabase
@@ -78,15 +110,21 @@ export default async function LeadsPage() {
     if (m.lead_id) unreadByLead[m.lead_id] = (unreadByLead[m.lead_id] || 0) + 1
   })
 
-  const TERMINAL_STATUSES = ['cerrado_ganado', 'cerrado_perdido']
-  const activeLeads = (leads || []).filter(l => !TERMINAL_STATUSES.includes(l.status))
-  const wonLeads = (leads || []).filter(l => l.status === 'cerrado_ganado')
-  const lostLeads = (leads || []).filter(l => l.status === 'cerrado_perdido')
-  const activePipelineValue = activeLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
-  const wonValue = wonLeads.reduce((sum, l) => sum + parseFloat(l.total_amount || 0), 0)
-  const closedTotal = wonLeads.length + lostLeads.length
-  const winRate = closedTotal > 0 ? ((wonLeads.length / closedTotal) * 100).toFixed(1) : null
-  const unassignedCount = activeLeads.filter(l => !l.assigned_to).length
+  const activeLeads: any[] = activeLeadsRaw || []
+  const activePipelineValue = activeLeads.reduce((sum: number, l: any) => sum + parseFloat(l.total_amount || 0), 0)
+  const wonCount = (wonAmounts || []).length
+  const wonValue = (wonAmounts || []).reduce((sum: number, l: any) => sum + parseFloat(l.total_amount || 0), 0)
+  const lostCount = lostTotal || 0
+  const closedTotal = wonCount + lostCount
+  const winRate = closedTotal > 0 ? ((wonCount / closedTotal) * 100).toFixed(1) : null
+  const unassignedCount = activeLeads.filter((l: any) => !l.assigned_to).length
+  const totalLeads = activeLeads.length + closedTotal
+
+  // Totales reales por etapa terminal (para el contador de columna y "Cargar más").
+  const statusTotals: Record<string, number> = {
+    cerrado_ganado: wonCount,
+    cerrado_perdido: lostCount,
+  }
 
   const statuses = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado', 'cerrado_ganado', 'cerrado_perdido']
   const processedLeads = (leads || []).map(l => {
@@ -116,7 +154,7 @@ export default async function LeadsPage() {
               Pipeline de Ventas
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              {leads?.length || 0} leads · actualizado hace 2 min <span className="text-amber-400">⚡</span>
+              {totalLeads} leads · actualizado hace 2 min <span className="text-amber-400">⚡</span>
             </p>
           </div>
 
@@ -171,6 +209,7 @@ export default async function LeadsPage() {
           statusConfig={statusConfig}
           unreadByLead={unreadByLead}
           addLeadProps={addLeadProps}
+          statusTotals={statusTotals}
         />
       </div>
     </KanbanFilterProvider>

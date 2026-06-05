@@ -17,7 +17,17 @@
       "mcp__claude_ai_Context7__resolve-library-id",
       "mcp__claude_ai_Context7__query-docs",
       "Bash(Get-ChildItem -Path src -Recurse -File -Filter \"*.tsx\" -o Name)",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3007/landing_puerto_rico_v2)",
+      "Bash(cat /tmp/nextjs-3007.log)",
+      "Read(//private/tmp/**)",
+      "Bash(git add *)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx next build 2>&1)",
+      "Bash(cat src/proxy.ts)",
+      "Bash(cat proxy.ts)",
+      "PowerShell($env:STRIPE_SECRET_KEY='sk_test_dummy_for_build'; $env:SUPABASE_SERVICE_ROLE_KEY='dummy_service_role_for_build'; $env:STRIPE_WEBHOOK_SECRET='whsec_dummy'; npx next build 2>&1 | Select-Object -Last 45)"
     ]
   }
 }

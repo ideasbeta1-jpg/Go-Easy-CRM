@@ -1,15 +1,17 @@
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
 export async function proxy(request: NextRequest) {
   const { nextUrl } = request
-  
-  // Lista de rutas públicas que no deben ser redirigidas o protegidas globalmente
-  const publicRoutes = ['/voucher', '/cotizacion', '/landing', '/login', '/auth', '/api/public']
+
+  // Rutas públicas que no requieren sesión de Supabase
+  const publicRoutes = ['/voucher', '/cotizacion', '/landing', '/login', '/auth', '/api/public', '/landing_puerto_rico', '/typ']
   const isPublicRoute = publicRoutes.some(route => nextUrl.pathname.startsWith(route)) || nextUrl.pathname === '/'
 
-  // Actualmente la protección se maneja en los Layouts (como dashboard/layout.tsx),
-  // pero definimos este whitelist para seguir el plan y facilitar futuras protecciones globales.
+  if (isPublicRoute) {
+    return NextResponse.next({ request })
+  }
+
   return await updateSession(request)
 }
 

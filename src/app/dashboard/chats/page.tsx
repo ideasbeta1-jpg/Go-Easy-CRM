@@ -18,10 +18,13 @@ export default async function ChatsPage() {
 
   const isAdmin = profile?.role === 'admin'
 
+  // Solo los leads más recientes para la barra lateral (alineado con el límite de
+  // mensajes de abajo). Antes traía TODOS los leads sin límite en cada carga.
   const { data: leads } = await adminSupabase
     .from('leads')
     .select('*')
     .order('created_at', { ascending: false })
+    .limit(500)
 
   // Only load the last 50 messages per lead for sidebar preview — NOT all messages
   // Full conversation is loaded on-demand when a lead is selected

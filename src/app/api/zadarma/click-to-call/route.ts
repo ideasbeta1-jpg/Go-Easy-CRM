@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient as createServiceClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { zadarmaRequest } from '@/lib/zadarma'
-
-const supabase = createServiceClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 /**
  * POST /api/zadarma/click-to-call
@@ -16,6 +11,8 @@ const supabase = createServiceClient(
  * y cuando contesta, conecta automáticamente al cliente (teléfono del lead).
  */
 export async function POST(req: NextRequest) {
+  // Cliente admin creado por petición (no a nivel de módulo) para no romper el build.
+  const supabase = createAdminClient()
   // Verificar sesión del usuario autenticado
   const supabaseAuth = await createClient()
   const { data: { user } } = await supabaseAuth.auth.getUser()

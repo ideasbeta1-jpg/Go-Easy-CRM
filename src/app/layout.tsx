@@ -4,7 +4,7 @@ import type { Metadata, Viewport } from 'next'
 import { Radio_Canada_Big } from 'next/font/google'
 import React from 'react'
 import "./globals.css";
-import { createClient } from '@/utils/supabase/server'
+import { getCachedSystemSettings } from '@/app/utils/actions/cached-data'
 
 const radioCanada = Radio_Canada_Big({
   subsets: ['latin'],
@@ -18,29 +18,35 @@ export const viewport: Viewport = {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const supabase = await createClient()
-  const { data: settings } = await supabase
-    .from('system_settings')
-    .select('*')
-    .eq('id', 1)
-    .single()
-
-  const v = settings?.updated_at ? `?v=${new Date(settings.updated_at).getTime()}` : ''
-
-  return {
-    title: settings?.seo_title || "Go Easy Florida CRM",
-    description: settings?.seo_description || "Premium Car Rental CRM",
-    keywords: settings?.seo_keywords,
+  const defaultMetadata: Metadata = {
+    title: "Go Easy Florida CRM",
+    description: "Premium Car Rental CRM",
     manifest: "/manifest.json",
-    icons: {
-      icon: settings?.favicon_url ? `${settings.favicon_url}${v}` : "/favicon.ico",
-      apple: "/icon-192x192.png",
-    },
-    appleWebApp: {
-      capable: true,
-      title: "GE CRM",
-      statusBarStyle: "black-translucent",
-    },
+    icons: { icon: "/favicon.ico", apple: "/icon-192x192.png" },
+    appleWebApp: { capable: true, title: "GE CRM", statusBarStyle: "black-translucent" },
+  }
+
+  try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return defaultMetadata
+    }
+    const settings = await getCachedSystemSettings()
+
+    const v = settings?.updated_at ? `?v=${new Date(settings.updated_at).getTime()}` : ''
+
+    return {
+      title: settings?.seo_title || defaultMetadata.title,
+      description: settings?.seo_description || defaultMetadata.description,
+      keywords: settings?.seo_keywords,
+      manifest: "/manifest.json",
+      icons: {
+        icon: settings?.favicon_url ? `${settings.favicon_url}${v}` : "/favicon.ico",
+        apple: "/icon-192x192.png",
+      },
+      appleWebApp: { capable: true, title: "GE CRM", statusBarStyle: "black-translucent" },
+    }
+  } catch {
+    return defaultMetadata
   }
 }
 
@@ -55,7 +61,20 @@ export default function RootLayout({
       className={`${radioCanada.variable} h-full antialiased`}
     >
       <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
+        {/* Material Symbols sin bloquear el render: se inyecta la hoja de estilos
+            de forma asíncrona tras empezar a parsear el HTML. Antes era un
+            <link rel="stylesheet"> render-blocking en el <head>. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){var l=document.createElement('link');l.rel='stylesheet';l.href='https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap';document.head.appendChild(l);})();",
+          }}
+        />
+        <noscript>
+          <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" />
+        </noscript>
         {process.env.NEXT_PUBLIC_FB_PIXEL_ID && (
           <Script id="fb-pixel" strategy="lazyOnload">
             {`

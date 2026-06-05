@@ -1,15 +1,18 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/utils/supabase/auth'
+import { revalidatePath, updateTag } from 'next/cache'
+import { CACHE_TAGS } from './cached-data'
 
-export async function updateCategory(id: string, updates: { 
-  name?: string; 
+export async function updateCategory(id: string, updates: {
+  name?: string;
   daily_price?: number;
   base_daily_cost?: number;
-  description?: string; 
+  description?: string;
   image_url?: string;
 }) {
+  await requireAdmin()
   const supabase = await createClient()
 
   const { data, error } = await supabase
@@ -23,6 +26,7 @@ export async function updateCategory(id: string, updates: {
     throw new Error(error.message)
   }
 
+  updateTag(CACHE_TAGS.categories)
   revalidatePath('/dashboard/catalog')
   return data
 }
@@ -34,6 +38,7 @@ export async function createCategory(data: {
   description?: string;
   image_url?: string;
 }) {
+  await requireAdmin()
   const supabase = await createClient()
 
   const { data: newCat, error } = await supabase
@@ -46,6 +51,7 @@ export async function createCategory(data: {
     throw new Error(error.message)
   }
 
+  updateTag(CACHE_TAGS.categories)
   revalidatePath('/dashboard/catalog')
   return newCat
 }

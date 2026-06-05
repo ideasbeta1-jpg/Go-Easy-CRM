@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { verifyZadarmaWebhook } from '@/lib/zadarma'
 import { sendLeadToN8n } from '@/utils/n8n'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Cliente admin perezoso: se crea en la primera petición, no al evaluar el
+// módulo. Así el build no falla si SUPABASE_SERVICE_ROLE_KEY no está disponible
+// en tiempo de compilación.
+let _db: ReturnType<typeof createAdminClient> | null = null
+const db = () => (_db ??= createAdminClient())
 
 const DISPOSITION_MAP: Record<string, string> = {
   answered: 'answered',
@@ -76,7 +77,7 @@ async function handleCallStart(p: Record<string, string>) {
   const internalNumber = p.internal_number || p.pbx_extension || ''
 
   // Buscar agente por extensión PBX
-  const { data: agent } = await supabase
+  const { data: agent } = await db()
     .from('profiles')
     .select('id')
     .eq('zadarma_sip', internalNumber)
@@ -85,7 +86,7 @@ async function handleCallStart(p: Record<string, string>) {
   // Vincular con lead por número de teléfono — suffix matching para cubrir variantes de código de país
   const normalized10 = normalizePhone(callerNumber)        // últimos 10 dígitos
   const normalizedFull = callerNumber.replace(/^\+/, '')   // sin prefijo +
-  const { data: lead } = await supabase
+  const { data: lead } = await db()
     .from('leads')
     .select('id')
     .or(`phone.ilike.%${normalized10},phone.eq.${normalizedFull},phone.eq.${callerNumber}`)
@@ -93,7 +94,7 @@ async function handleCallStart(p: Record<string, string>) {
 
   const direction = p.direction === 'outgoing' ? 'outbound' : 'inbound'
 
-  const { error } = await supabase.from('call_logs').upsert(
+  const { error } = await db().from('call_logs').upsert(
     {
       zadarma_call_id: callId,
       caller_number: callerNumber,
@@ -113,7 +114,7 @@ async function handleCallStart(p: Record<string, string>) {
 
 async function handleCallAnswer(p: Record<string, string>) {
   const callId = p.call_id || p.pbx_call_id
-  const { error } = await supabase.from('call_logs').upsert(
+  const { error } = await db().from('call_logs').upsert(
     {
       zadarma_call_id: callId,
       status: 'answered',
@@ -135,7 +136,7 @@ async function handleCallEnd(p: Record<string, string>) {
 
   const status = DISPOSITION_MAP[disposition] || 'ended'
 
-  const { error } = await supabase.from('call_logs').upsert(
+  const { error } = await db().from('call_logs').upsert(
     {
       zadarma_call_id: callId,
       status,
@@ -156,7 +157,7 @@ async function handleCallEnd(p: Record<string, string>) {
   // Si la llamada fue perdida, disparamos la automatización de WhatsApp a n8n
   if (status === 'missed') {
     // Buscar la información completa para n8n
-    const { data: callLog } = await supabase
+    const { data: callLog } = await db()
       .from('call_logs')
       .select(`
         caller_number,
@@ -197,7 +198,7 @@ async function handleRecordingReady(p: Record<string, string>) {
   const callId = p.pbx_call_id || p.call_id_with_rec || p.call_id
   const recordingUrl = p.link || p.record_url || ''
 
-  const { error } = await supabase
+  const { error } = await db()
     .from('call_logs')
     .update({ recording_url: recordingUrl })
     .eq('zadarma_call_id', callId)

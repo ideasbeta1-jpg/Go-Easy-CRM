@@ -12,31 +12,35 @@ export default async function DashboardPage() {
   const startOf30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
 
+  // Antes: 7 consultas `count: 'exact'` separadas (un escaneo de tabla por cada
+  // status). Ahora: una sola lectura ligera de `status, assigned_to` y los conteos
+  // se derivan en memoria. Pasa de 11 a 5 round-trips a la base de datos.
   const [
-    { count: newLeads },
-    { count: inQuote },
-    { count: confirmed },
-    { count: voucher },
-    { count: won },
-    { count: lost },
+    { data: statusRows },
     { data: recentLeads },
     { data: monthLeads },
     { data: profiles },
     { data: categoryLeads },
-    { count: unassignedNew },
   ] = await Promise.all([
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'lead_nuevo').is('deleted_at', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'en_cotizacion').is('deleted_at', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'reserva_confirmada').is('deleted_at', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'voucher_enviado').is('deleted_at', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'cerrado_ganado').is('deleted_at', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'cerrado_perdido').is('deleted_at', null),
+    supabase.from('leads').select('status, assigned_to').is('deleted_at', null),
     supabase.from('leads').select('created_at').is('deleted_at', null).gte('created_at', startOf30d.toISOString()),
     supabase.from('leads').select('assigned_to, status, total_amount').is('deleted_at', null).gte('created_at', startOf30d.toISOString()),
     supabase.from('profiles').select('id, first_name, last_name, full_name'),
     supabase.from('leads').select('category_id, categories(name)').is('deleted_at', null).not('category_id', 'is', null),
-    supabase.from('leads').select('*', { count: 'exact', head: true }).eq('status', 'lead_nuevo').is('assigned_to', null).is('deleted_at', null),
   ])
+
+  const statusCounts: Record<string, number> = {}
+  let unassignedNew = 0
+  for (const r of statusRows || []) {
+    statusCounts[r.status] = (statusCounts[r.status] || 0) + 1
+    if (r.status === 'lead_nuevo' && !r.assigned_to) unassignedNew++
+  }
+  const newLeads = statusCounts['lead_nuevo'] || 0
+  const inQuote = statusCounts['en_cotizacion'] || 0
+  const confirmed = statusCounts['reserva_confirmada'] || 0
+  const voucher = statusCounts['voucher_enviado'] || 0
+  const won = statusCounts['cerrado_ganado'] || 0
+  const lost = statusCounts['cerrado_perdido'] || 0
 
   // Build chart datasets from raw leads
   const DAY_NAMES = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']

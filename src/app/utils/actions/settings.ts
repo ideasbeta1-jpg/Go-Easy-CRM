@@ -1,41 +1,18 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/utils/supabase/auth'
+import { updateTag } from 'next/cache'
+import { getCachedSystemSettings, CACHE_TAGS } from './cached-data'
 
 export async function getSystemSettings() {
-  const supabase = await createClient()
-  
-  const { data, error } = await supabase
-    .from('system_settings')
-    .select('*')
-    .eq('id', 1)
-    .single()
-
-  if (error) {
-    console.error('Error fetching system settings:', error)
-    return null
-  }
-  
-  return data
+  // Servido desde la caché de datos de Next; se revalida al guardar ajustes.
+  return getCachedSystemSettings()
 }
 
 export async function updateSystemSettings(data: any) {
+  await requireAdmin()
   const supabase = await createClient()
-  
-  // Verify admin role
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('No authenticated user')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') {
-    throw new Error('Only admins can update system settings')
-  }
 
   const { error } = await supabase
     .from('system_settings')
@@ -46,8 +23,9 @@ export async function updateSystemSettings(data: any) {
     .eq('id', 1)
 
   if (error) throw new Error(error.message)
-  
-  revalidatePath('/dashboard', 'layout')
-  revalidatePath('/dashboard/settings/system')
+
+  // updateTag ya expira y refresca la lectura cacheada (read-your-own-writes);
+  // no hace falta revalidar el layout completo del dashboard.
+  updateTag(CACHE_TAGS.systemSettings)
   return { success: true }
 }

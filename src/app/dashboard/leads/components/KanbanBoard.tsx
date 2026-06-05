@@ -6,7 +6,7 @@ import { Calendar, X, AlertTriangle, Zap, XCircle, ChevronDown, ChevronRight } f
 import { useRouter } from 'next/navigation'
 import { useKanbanFilter } from './KanbanFilterContext'
 import { isToday, isThisWeek, isThisMonth, differenceInHours, differenceInDays } from 'date-fns'
-import { updateLeadStatus } from '../actions'
+import { updateLeadStatus, loadMoreLeads } from '../actions'
 import { VALID_TRANSITIONS, STAGE_AUTOMATION_NOTE, CONFIRM_STAGES, LOST_STAGE, LOST_REASONS } from '@/lib/leads/transitions'
 import { calcRentalDays, calcReservationAmount } from '@/lib/leads/calculations'
 import { NewLeadButton } from './NewLeadButton'
@@ -23,6 +23,8 @@ interface KanbanBoardProps {
   statusConfig: Record<string, { label: string; color: string }>
   unreadByLead?: Record<string, number>
   addLeadProps?: AddLeadProps
+  /** Total real de leads por etapa (para etapas cerradas que se cargan paginadas). */
+  statusTotals?: Record<string, number>
 }
 
 interface PendingMove {
@@ -59,8 +61,9 @@ function shortId(uuid: string): string {
   return 'GE-' + uuid.slice(-4).toUpperCase()
 }
 
-export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, addLeadProps }: KanbanBoardProps) {
+export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, addLeadProps, statusTotals = {} }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
+  const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({})
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragSourceStatus, setDragSourceStatus] = useState<string | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -142,6 +145,28 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     }
     router.refresh()
     setIsUpdating(false)
+  }
+
+  // Nº de leads de una etapa ya cargados en memoria (sin filtros de búsqueda).
+  const loadedCount = (status: string) => leads.filter(l => l.status === status).length
+
+  const handleLoadMore = async (status: string) => {
+    if (loadingMore[status]) return
+    setLoadingMore(prev => ({ ...prev, [status]: true }))
+    try {
+      const { leads: more } = await loadMoreLeads(status, loadedCount(status))
+      if (more && more.length > 0) {
+        setLeads(prev => {
+          const existing = new Set(prev.map(l => l.id))
+          const fresh = more.filter((l: any) => !existing.has(l.id))
+          return [...prev, ...fresh]
+        })
+      }
+    } catch (e: any) {
+      alert('Error al cargar más leads: ' + e.message)
+    } finally {
+      setLoadingMore(prev => ({ ...prev, [status]: false }))
+    }
   }
 
   const getGroupedLeads = (status: string) => {
@@ -232,6 +257,10 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
             const isTerminal = TERMINAL.has(status)
             const isCollapsed = !!collapsedStages[status]
             const dropClass = getColumnDropClass(status)
+            // En etapas cerradas el total real viene del servidor (carga paginada).
+            const stageTotal = isTerminal ? (statusTotals[status] ?? stageLeads.length) : stageLeads.length
+            const hasMore = isTerminal && loadedCount(status) < (statusTotals[status] ?? 0)
+            const noActiveFilters = !searchTerm && !agentFilter && dateFilter === 'all'
 
             return (
               <div
@@ -249,7 +278,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                       {statusConfig[status]?.label || status}
                     </span>
                     <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[11px] font-black">
-                      {stageLeads.length}
+                      {isTerminal && noActiveFilters ? stageTotal : stageLeads.length}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -275,7 +304,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                     }`}
                   >
                     <ChevronRight className="w-4 h-4" />
-                    Ver {stageLeads.length} leads {status === 'cerrado_ganado' ? 'ganados' : 'perdidos'}
+                    Ver {stageTotal} leads {status === 'cerrado_ganado' ? 'ganados' : 'perdidos'}
                   </button>
                 ) : (
                   <div
@@ -422,6 +451,24 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                       <div className="h-32 flex flex-col items-center justify-center text-slate-200 gap-2 select-none">
                         <span className="text-[10px] font-bold uppercase tracking-[0.3em]">Sin registros</span>
                       </div>
+                    )}
+
+                    {/* Carga incremental para etapas cerradas (crecen sin límite) */}
+                    {hasMore && noActiveFilters && (
+                      <button
+                        onClick={() => handleLoadMore(status)}
+                        disabled={!!loadingMore[status]}
+                        className="mt-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-dashed border-slate-200 text-[11px] font-bold text-slate-400 hover:text-slate-600 hover:border-slate-300 transition-colors disabled:opacity-50"
+                      >
+                        {loadingMore[status] ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                            Cargando...
+                          </>
+                        ) : (
+                          <>Cargar más ({loadedCount(status)}/{stageTotal})</>
+                        )}
+                      </button>
                     )}
                   </div>
                 )}

@@ -1,12 +1,13 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { getCachedUser } from '@/utils/supabase/auth'
 import { revalidatePath } from 'next/cache'
 
 export async function updateProfileStatus(isActive: boolean) {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+
+  const user = await getCachedUser()
   if (!user) return { error: 'No authenticated user' }
 
   const { error } = await supabase
@@ -25,8 +26,8 @@ export async function updateProfileStatus(isActive: boolean) {
 
 export async function updateLastActive() {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+
+  const user = await getCachedUser()
   if (!user) return { error: 'No authenticated user' }
 
   await supabase
@@ -39,8 +40,8 @@ export async function updateLastActive() {
 
 export async function getProfileStatus() {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+
+  const user = await getCachedUser()
   if (!user) return { isActive: false }
 
   const { data, error } = await supabase
@@ -55,8 +56,8 @@ export async function getProfileStatus() {
 
 export async function getUserProfile() {
   const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
+
+  const user = await getCachedUser()
   if (!user) return null
 
   const { data, error } = await supabase

@@ -16,6 +16,16 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   turbopack: {},
   serverExternalPackages: ['@ffmpeg-installer/ffmpeg'],
+  images: {
+    // Optimización automática (AVIF/WebP, redimensionado) para imágenes remotas.
+    formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.supabase.co' },   // Supabase Storage (catálogo, logos, avatares)
+      { protocol: 'https', hostname: 'ui-avatars.com' },    // avatares generados
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+    ],
+  },
 };
 
 export default withPWA(nextConfig);

@@ -1,7 +1,9 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
-import { revalidatePath } from 'next/cache'
+import { requireAdmin } from '@/utils/supabase/auth'
+import { revalidatePath, updateTag } from 'next/cache'
+import { CACHE_TAGS } from './cached-data'
 
 export interface Location {
   id: string
@@ -61,6 +63,7 @@ export async function createLocation(data: {
   code?: string
   type?: string
 }) {
+  await requireAdmin()
   const supabase = await createClient()
 
   const { data: newLocation, error } = await supabase
@@ -71,6 +74,7 @@ export async function createLocation(data: {
 
   if (error) throw new Error(error.message)
 
+  updateTag(CACHE_TAGS.locations)
   revalidatePath('/dashboard/settings/locations')
   return newLocation
 }
@@ -80,6 +84,7 @@ export async function updateLocation(id: string, updates: {
   code?: string
   type?: string
 }) {
+  await requireAdmin()
   const supabase = await createClient()
 
   const { data: updatedLocation, error } = await supabase
@@ -91,11 +96,13 @@ export async function updateLocation(id: string, updates: {
 
   if (error) throw new Error(error.message)
 
+  updateTag(CACHE_TAGS.locations)
   revalidatePath('/dashboard/settings/locations')
   return updatedLocation
 }
 
 export async function deleteLocation(id: string) {
+  await requireAdmin()
   const supabase = await createClient()
 
   // Check if it's being used by provider_offices or leads first
@@ -126,6 +133,7 @@ export async function deleteLocation(id: string) {
 
   if (error) throw new Error(error.message)
 
+  updateTag(CACHE_TAGS.locations)
   revalidatePath('/dashboard/settings/locations')
   return true
 }

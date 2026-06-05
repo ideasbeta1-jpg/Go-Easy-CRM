@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { getCachedUser } from '@/utils/supabase/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { SidebarNav } from './components/SidebarNav'
@@ -17,15 +17,18 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedUser()
 
   if (!user) {
     redirect('/login')
   }
 
-  const userProfile = await getUserProfile()
-  const settings = await getSystemSettings()
+  // Perfil y ajustes en paralelo (antes era una cascada secuencial).
+  // getUserProfile reutiliza getCachedUser, así que no repite el round-trip de auth.
+  const [userProfile, settings] = await Promise.all([
+    getUserProfile(),
+    getSystemSettings(),
+  ])
 
   const menuItems = [
     { name: 'Inicio', href: '/dashboard' },

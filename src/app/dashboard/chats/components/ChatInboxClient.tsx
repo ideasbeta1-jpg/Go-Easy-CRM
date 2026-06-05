@@ -321,9 +321,12 @@ export default function ChatInboxClient({
   // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const supabase = createClient()
+    // Los agentes solo escuchan cambios de SUS leads; antes cada cliente recibía
+    // todos los cambios de leads de toda la empresa.
+    const leadsFilter = isAdmin ? {} : { filter: `assigned_to=eq.${currentUserId}` }
     const leadsChannel = supabase
-      .channel('leads-all')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+      .channel('leads-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads', ...leadsFilter }, (payload) => {
         if (payload.eventType === 'INSERT') setLeads(prev => [payload.new as Lead, ...prev])
         else if (payload.eventType === 'UPDATE') setLeads(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l))
       })
@@ -354,7 +357,7 @@ export default function ChatInboxClient({
       supabase.removeChannel(leadsChannel)
       supabase.removeChannel(messagesChannel)
     }
-  }, [])
+  }, [currentUserId, isAdmin])
 
   useEffect(() => {
     const leadId = searchParams.get('leadId')

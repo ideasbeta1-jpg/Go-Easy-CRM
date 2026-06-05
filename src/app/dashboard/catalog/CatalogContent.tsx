@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Plus, Search, Edit2, Archive, Filter, ChevronRight, Car } from 'lucide-react'
 import CategoryDrawer from './CategoryDrawer'
 
@@ -127,10 +128,12 @@ export default function CatalogContent({ initialCategories, vehiclesCount }: Cat
               </span>
               
               {cat.image_url ? (
-                <img 
-                  src={cat.image_url} 
-                  alt={cat.name} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                <Image
+                  src={cat.image_url}
+                  alt={cat.name}
+                  fill
+                  sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                  className="object-cover group-hover:scale-110 transition-transform duration-700"
                 />
               ) : (
                 <div className="w-full h-full bg-slate-50 flex items-center justify-center text-slate-200">
