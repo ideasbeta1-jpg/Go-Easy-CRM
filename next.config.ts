@@ -16,6 +16,11 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   turbopack: {},
   serverExternalPackages: ['@ffmpeg-installer/ffmpeg'],
+  // Tree-shaking dirigido para librerías con muchos exports: solo se incluye en
+  // el bundle lo que realmente se importa (iconos/funciones usados), no el paquete entero.
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns'],
+  },
   images: {
     // Optimización automática (AVIF/WebP, redimensionado) para imágenes remotas.
     formats: ['image/avif', 'image/webp'],

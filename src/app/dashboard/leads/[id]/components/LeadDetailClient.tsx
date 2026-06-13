@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, MessageSquare, Send, Users, User, Car, Clock, DollarSign,
   CheckCircle2, AlertCircle, Zap, X, Trash2, Calculator, Mic, Volume2,
@@ -94,9 +94,13 @@ export default function LeadDetailClient({
   currentUser?: any
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // ─── UI State ──────────────────────────────────────────────────────────────
-  const [activeTab, setActiveTab] = useState<TabId>('info')
+  const initialTab = (searchParams.get('tab') as TabId) || 'info'
+  const [activeTab, setActiveTab] = useState<TabId>(
+    ['info', 'cotizacion', 'voucher', 'historial', 'tareas', 'chat'].includes(initialTab) ? initialTab : 'info'
+  )
   const [showNegotiationCalc, setShowNegotiationCalc] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [isAddingNote, setIsAddingNote] = useState(false)

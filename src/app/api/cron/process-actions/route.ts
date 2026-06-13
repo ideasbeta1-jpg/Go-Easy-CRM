@@ -64,18 +64,25 @@ export async function GET(req: NextRequest) {
       .is('deleted_at', null)
       .limit(20)
 
-    for (const lead of staleLeads || []) {
-      // Evitar re-ejecutar si ya fue procesado en las últimas 24h
-      const { data: recent } = await supabase
+    // Des-duplicación en bloque: en lugar de una query por lead dentro del loop
+    // (N+1), traemos de una sola vez los leads ya procesados por esta regla en las
+    // últimas 24h y los guardamos en un Set para filtrar en memoria.
+    const staleLeadIds = (staleLeads || []).map((l: any) => l.id)
+    let recentlyProcessed = new Set<string>()
+    if (staleLeadIds.length > 0) {
+      const { data: recentActions } = await supabase
         .from('pending_actions')
-        .select('id')
+        .select('lead_id')
         .eq('rule_id', rule.id)
-        .eq('lead_id', lead.id)
         .eq('status', 'done')
         .gte('executed_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString())
-        .maybeSingle()
+        .in('lead_id', staleLeadIds)
+      recentlyProcessed = new Set((recentActions || []).map((a: any) => a.lead_id))
+    }
 
-      if (recent) continue
+    for (const lead of staleLeads || []) {
+      // Evitar re-ejecutar si ya fue procesado en las últimas 24h
+      if (recentlyProcessed.has(lead.id)) continue
 
       const fakeAction = {
         id: `inactivity_${rule.id}_${lead.id}`,

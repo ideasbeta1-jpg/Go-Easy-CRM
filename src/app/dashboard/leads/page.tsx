@@ -9,6 +9,7 @@ import { NewLeadButton } from './components/NewLeadButton'
 const TERMINAL_PAGE_SIZE = 30
 import { KanbanFilterProvider } from './components/KanbanFilterContext'
 import { KanbanSearchControls, KanbanFilterChips } from './components/KanbanSearchControls'
+import { TaskBanner, type BannerTask } from './components/TaskBanner'
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   lead_nuevo:          { label: 'Lead Nuevo',         color: 'bg-blue-500' },
@@ -89,6 +90,48 @@ export default async function LeadsPage() {
   }
 
   const leads = [...(activeLeadsRaw || []), ...(wonRecent || []), ...(lostRecent || [])]
+
+  // Tareas pendientes por lead (para badges en tarjetas del kanban)
+  const allLeadIds = leads.map(l => l.id).filter(Boolean)
+  let tasksByLead: Record<string, { count: number; overdue: number }> = {}
+  if (allLeadIds.length > 0) {
+    const now = new Date().toISOString()
+    const { data: pendingTasks } = await supabase
+      .from('tasks')
+      .select('lead_id, due_date')
+      .in('lead_id', allLeadIds)
+      .in('status', ['pending', 'in_progress'])
+    ;(pendingTasks || []).forEach((t: any) => {
+      if (!tasksByLead[t.lead_id]) tasksByLead[t.lead_id] = { count: 0, overdue: 0 }
+      tasksByLead[t.lead_id].count++
+      if (t.due_date && t.due_date < now) tasksByLead[t.lead_id].overdue++
+    })
+  }
+
+  // Tareas para el banner: vencidas o que vencen hoy (scope por RLS del usuario)
+  const endOfToday = new Date()
+  endOfToday.setHours(23, 59, 59, 999)
+  const nowISO = new Date().toISOString()
+  const { data: bannerTasksRaw } = await supabase
+    .from('tasks')
+    .select('id, title, task_type, due_date, lead_id, lead:leads(first_name, last_name)')
+    .in('status', ['pending', 'in_progress'])
+    .not('due_date', 'is', null)
+    .lte('due_date', endOfToday.toISOString())
+    .order('due_date', { ascending: true })
+    .limit(50)
+
+  const bannerTasks: BannerTask[] = (bannerTasksRaw || []).map((t: any) => ({
+    id: t.id,
+    title: t.title,
+    task_type: t.task_type,
+    due_date: t.due_date,
+    lead_id: t.lead_id,
+    lead_name: t.lead
+      ? `${t.lead.first_name || ''} ${t.lead.last_name || ''}`.trim() || 'Lead'
+      : 'Lead',
+    overdue: !!t.due_date && t.due_date < nowISO,
+  }))
 
   const assignedToIds = Array.from(new Set(leads.map(l => l.assigned_to).filter(Boolean)))
   let profiles: any[] = []
@@ -200,6 +243,9 @@ export default async function LeadsPage() {
           </div>
         </div>
 
+        {/* Banner de tareas pendientes para hoy */}
+        <TaskBanner tasks={bannerTasks} />
+
         {/* Active filter chips */}
         <KanbanFilterChips agents={profiles} />
 
@@ -208,6 +254,7 @@ export default async function LeadsPage() {
           statuses={statuses}
           statusConfig={statusConfig}
           unreadByLead={unreadByLead}
+          tasksByLead={tasksByLead}
           addLeadProps={addLeadProps}
           statusTotals={statusTotals}
         />

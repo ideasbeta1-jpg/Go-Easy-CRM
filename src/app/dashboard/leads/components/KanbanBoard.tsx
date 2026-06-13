@@ -22,6 +22,7 @@ interface KanbanBoardProps {
   statuses: string[]
   statusConfig: Record<string, { label: string; color: string }>
   unreadByLead?: Record<string, number>
+  tasksByLead?: Record<string, { count: number; overdue: number }>
   addLeadProps?: AddLeadProps
   /** Total real de leads por etapa (para etapas cerradas que se cargan paginadas). */
   statusTotals?: Record<string, number>
@@ -61,7 +62,7 @@ function shortId(uuid: string): string {
   return 'GE-' + uuid.slice(-4).toUpperCase()
 }
 
-export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, addLeadProps, statusTotals = {} }: KanbanBoardProps) {
+export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, tasksByLead = {}, addLeadProps, statusTotals = {} }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({})
   const [draggingId, setDraggingId] = useState<string | null>(null)
@@ -77,7 +78,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
   })
   const [mobileMoveLead, setMobileMoveLead] = useState<{ id: string; status: string } | null>(null)
   const router = useRouter()
-  const { searchTerm, sortBy, agentFilter, dateFilter } = useKanbanFilter()
+  const { searchTerm, sortBy, agentFilter, dateFilter, tasksOnly } = useKanbanFilter()
 
   const handleDragStart = (e: React.DragEvent, leadId: string, currentStatus: string) => {
     e.dataTransfer.setData('leadId', leadId)
@@ -181,6 +182,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
     }
 
     if (agentFilter) filtered = filtered.filter(l => l.assigned_to === agentFilter)
+
+    if (tasksOnly) filtered = filtered.filter(l => (tasksByLead[l.id]?.count || 0) > 0)
 
     if (dateFilter !== 'all') {
       filtered = filtered.filter(l => {
@@ -319,6 +322,8 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                       const stageAge = getStageAge(lead)
                       const reserveAmt = getReservationAmount(lead)
 
+                      const taskInfo = tasksByLead[lead.id]
+
                       return (
                         <Link
                           key={lead.id}
@@ -329,7 +334,9 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                             draggable
                             onDragStart={(e) => handleDragStart(e, lead.id, lead.status)}
                             onDragEnd={handleDragEnd}
-                            className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing"
+                            className={`bg-white rounded-2xl border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-grab active:cursor-grabbing ${
+                              taskInfo?.overdue ? 'border-red-200' : 'border-slate-100'
+                            }`}
                           >
                             <div className="p-4">
                               {/* Row 1: ID + badges + unread + mobile move */}
@@ -345,6 +352,17 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                                 {urgency && (
                                   <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 ${urgency.cls}`}>
                                     🔥 {urgency.label}
+                                  </span>
+                                )}
+                                {taskInfo && taskInfo.count > 0 && (
+                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 shrink-0 ${
+                                    taskInfo.overdue > 0
+                                      ? 'bg-red-50 text-red-600 border-red-200'
+                                      : 'bg-amber-50 text-amber-600 border-amber-200'
+                                  }`}>
+                                    📋 {taskInfo.overdue > 0
+                                      ? `${taskInfo.overdue} vencida${taskInfo.overdue > 1 ? 's' : ''}`
+                                      : `${taskInfo.count} tarea${taskInfo.count > 1 ? 's' : ''}`}
                                   </span>
                                 )}
                                 <div className="ml-auto flex items-center gap-1 shrink-0">

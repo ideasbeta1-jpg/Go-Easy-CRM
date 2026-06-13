@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import LeadDetailClient from './components/LeadDetailClient'
 import { ZadarmaWidget } from '@/components/ZadarmaWidget'
 import { getTasksForLead } from '@/app/utils/actions/tasks'
+import { getCachedCategories, getCachedLocations } from '@/app/utils/actions/cached-data'
 
 export default async function LeadDetailPage({
   params: paramsPromise
@@ -29,17 +30,19 @@ export default async function LeadDetailPage({
      return notFound()
   }
 
-  // 2. Fetch related and auxiliary data in parallel
+  // 2. Fetch related and auxiliary data in parallel.
+  // categories y locations son datos casi-estáticos: se sirven desde caché
+  // (getCachedCategories/getCachedLocations) en lugar de consultarse en cada apertura.
   const [
-    categoryRes, 
-    providerRes, 
+    categoryRes,
+    providerRes,
     profileRes,
-    categoriesRes,
+    categoriesData,
     allProvidersRes,
     allAgentsRes,
     quotesRes,
     vouchersRes,
-    locationsRes,
+    locationsData,
     providerOfficesRes,
     messagesRes,
     notesRes,
@@ -48,12 +51,12 @@ export default async function LeadDetailPage({
     leadRaw.category_id ? supabase.from('categories').select('*').eq('id', leadRaw.category_id).single() : Promise.resolve({ data: null, error: null }),
     leadRaw.provider_id ? supabase.from('providers').select('*').eq('id', leadRaw.provider_id).single() : Promise.resolve({ data: null, error: null }),
     leadRaw.assigned_to ? supabase.from('profiles').select('*').eq('id', leadRaw.assigned_to).single() : Promise.resolve({ data: null, error: null }),
-    supabase.from('categories').select('*').order('name'),
+    getCachedCategories(),
     supabase.from('providers').select('*').order('name'),
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('quotes').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('vouchers').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
-    supabase.from('locations').select('*').order('name'),
+    getCachedLocations(),
     supabase.from('provider_offices').select('*'),
     supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false }),
@@ -78,10 +81,10 @@ export default async function LeadDetailPage({
         activeQuote={activeQuote}
         allQuotes={quotesRes.data || []}
         activeVoucher={vouchersRes.data?.[0]}
-        categories={categoriesRes.data || []}
+        categories={categoriesData || []}
         providers={allProvidersRes.data || []}
         agents={allAgentsRes.data || []}
-        locations={locationsRes.data || []}
+        locations={locationsData || []}
         providerOffices={providerOfficesRes.data || []}
         messages={(messagesRes.data || []).reverse()}
         totalMessages={messagesRes.count ?? 0}

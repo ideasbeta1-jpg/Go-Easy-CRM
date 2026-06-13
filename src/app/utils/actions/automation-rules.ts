@@ -90,17 +90,25 @@ export async function getPendingActions(limit = 30): Promise<{ actions: PendingA
 
   if (error) return { actions: [], error: error.message }
 
-  // Enriquecer con datos del lead manualmente (lead_id no tiene FK explícita)
-  const actions = await Promise.all(
-    (data || []).map(async (action: any) => {
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('first_name, last_name, phone')
-        .eq('id', action.lead_id)
-        .maybeSingle()
-      return { ...action, leads: lead || null }
-    })
+  // Enriquecer con datos del lead en UNA sola consulta (antes era N+1: una query
+  // por acción). Se recogen los lead_id únicos y se traen todos de golpe con .in().
+  const leadIds = Array.from(
+    new Set((data || []).map((a: any) => a.lead_id).filter(Boolean))
   )
+
+  let leadsById: Record<string, any> = {}
+  if (leadIds.length > 0) {
+    const { data: leadsData } = await supabase
+      .from('leads')
+      .select('id, first_name, last_name, phone')
+      .in('id', leadIds as string[])
+    leadsById = Object.fromEntries((leadsData || []).map((l: any) => [l.id, l]))
+  }
+
+  const actions = (data || []).map((action: any) => ({
+    ...action,
+    leads: leadsById[action.lead_id] || null,
+  }))
 
   return { actions: actions as PendingAction[] }
 }

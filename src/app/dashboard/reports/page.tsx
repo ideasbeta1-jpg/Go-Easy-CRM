@@ -9,6 +9,13 @@ export const metadata = {
 export default async function ReportsPage() {
   const supabase = await createClient()
 
+  // Ventana de datos acotada: los filtros de la UI llegan como máximo a "este año",
+  // así que 24 meses cubre todos los presets. Evita que la página escale con TODO el
+  // histórico de leads/mensajes a medida que crece la base de datos.
+  const windowStart = new Date()
+  windowStart.setMonth(windowStart.getMonth() - 24)
+  const windowStartIso = windowStart.toISOString()
+
   // Fetch all required data in parallel
   const [
     leadsRes,
@@ -41,10 +48,12 @@ export default async function ReportsPage() {
         assigned_to
       `)
       .is('deleted_at', null)
+      .gte('created_at', windowStartIso)
       .order('created_at', { ascending: true }),
     supabase
       .from('messages')
       .select('id, lead_id, direction, created_at')
+      .gte('created_at', windowStartIso)
       .order('created_at', { ascending: true }),
     supabase
       .from('profiles')

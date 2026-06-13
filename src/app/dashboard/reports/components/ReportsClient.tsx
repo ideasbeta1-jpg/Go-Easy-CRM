@@ -1,10 +1,7 @@
 'use client'
 
 import React, { useMemo, useState, useEffect } from 'react'
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area
-} from 'recharts'
+import dynamic from 'next/dynamic'
 import {
   TrendingUp,
   Users,
@@ -41,6 +38,18 @@ import {
   addWeeks
 } from 'date-fns'
 import { es } from 'date-fns/locale'
+
+// Los gráficos (recharts) se cargan de forma diferida para sacar la librería del
+// bundle inicial de Reportes. Placeholder ligero mientras se descargan.
+const ChartFallback = () => (
+  <div className="flex items-center justify-center w-full h-full">
+    <div className="w-8 h-8 border-2 border-slate-100 border-t-indigo-500 rounded-full animate-spin" />
+  </div>
+)
+const LeadsAreaChart = dynamic(() => import('./ReportsCharts').then(m => m.LeadsAreaChart), { ssr: false, loading: ChartFallback })
+const StatusPieChart = dynamic(() => import('./ReportsCharts').then(m => m.StatusPieChart), { ssr: false, loading: ChartFallback })
+const CategoryBarChart = dynamic(() => import('./ReportsCharts').then(m => m.CategoryBarChart), { ssr: false, loading: ChartFallback })
+const ChatActivityBarChart = dynamic(() => import('./ReportsCharts').then(m => m.ChatActivityBarChart), { ssr: false, loading: ChartFallback })
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#64748b']
 
@@ -914,32 +923,7 @@ export default function ReportsClient({
           </div>
 
           <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timeChartData}>
-                <defs>
-                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }} 
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', padding: '12px', fontSize: '12px' }}
-                />
-                <Area type="monotone" name="Leads" dataKey="leads" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorLeads)" />
-              </AreaChart>
-            </ResponsiveContainer>
+            <LeadsAreaChart data={timeChartData} />
           </div>
         </section>
 
@@ -952,23 +936,7 @@ export default function ReportsClient({
 
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6 flex-1">
             <div className="h-[180px] w-[180px] relative flex-shrink-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={statusDist}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={80}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {statusDist.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              <StatusPieChart data={statusDist} />
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  <span className="text-2xl font-extrabold text-slate-800">{totalLeadsCount}</span>
                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider leading-none mt-0.5">Leads</span>
@@ -1005,26 +973,7 @@ export default function ReportsClient({
           </div>
 
           <div className="h-[280px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={categoryDist} margin={{ bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 700 }}
-                />
-                <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 700 }}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.05)', padding: '12px' }}
-                />
-                <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} barSize={28} />
-              </BarChart>
-            </ResponsiveContainer>
+            <CategoryBarChart data={categoryDist} />
           </div>
         </section>
 
@@ -1222,13 +1171,7 @@ export default function ReportsClient({
                   ))}
                 </div>
                 <div className="h-[150px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chatActivityData}>
-                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} />
-                      <Bar dataKey="inbound" stackId="a" fill="#3b82f6" radius={[0, 0, 0, 0]} barSize={12} />
-                      <Bar dataKey="outbound" stackId="a" fill="#10b981" radius={[4, 4, 0, 0]} barSize={12} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <ChatActivityBarChart data={chatActivityData} />
                 </div>
               </div>
 

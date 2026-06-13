@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, Filter, X, ChevronDown, Check } from 'lucide-react'
+import { Search, Filter, X, ChevronDown, Check, ClipboardList } from 'lucide-react'
 import { useKanbanFilter, SortOption, DateFilterOption } from './KanbanFilterContext'
 import { useState, useRef, useEffect } from 'react'
 
@@ -11,9 +11,13 @@ interface Agent {
 }
 
 export function KanbanFilterChips({ agents = [] }: { agents?: Agent[] }) {
-  const { sortBy, setSortBy, agentFilter, setAgentFilter, dateFilter, setDateFilter } = useKanbanFilter()
+  const { sortBy, setSortBy, agentFilter, setAgentFilter, dateFilter, setDateFilter, tasksOnly, setTasksOnly } = useKanbanFilter()
 
   const chips: { label: string; onRemove: () => void }[] = []
+
+  if (tasksOnly) {
+    chips.push({ label: 'Con tareas pendientes', onRemove: () => setTasksOnly(false) })
+  }
 
   if (sortBy !== 'newest') {
     const labels: Record<string, string> = { oldest: 'Más Antiguos', highest_value: 'Mayor Valor', lowest_value: 'Menor Valor' }
@@ -50,11 +54,12 @@ export function KanbanFilterChips({ agents = [] }: { agents?: Agent[] }) {
 }
 
 export function KanbanSearchControls({ agents = [] }: { agents?: Agent[] }) {
-  const { 
-    searchTerm, setSearchTerm, 
-    sortBy, setSortBy, 
+  const {
+    searchTerm, setSearchTerm,
+    sortBy, setSortBy,
     agentFilter, setAgentFilter,
-    dateFilter, setDateFilter
+    dateFilter, setDateFilter,
+    tasksOnly, setTasksOnly
   } = useKanbanFilter()
   
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -93,12 +98,26 @@ export function KanbanSearchControls({ agents = [] }: { agents?: Agent[] }) {
         )}
       </div>
 
+      {/* Toggle rápido: solo leads con tareas pendientes */}
+      <button
+        onClick={() => setTasksOnly(!tasksOnly)}
+        title="Mostrar solo leads con tareas pendientes"
+        className={`flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 transition-all font-bold text-sm rounded-full border shrink-0 ${
+          tasksOnly
+            ? 'bg-amber-50 text-amber-600 border-amber-200 shadow-sm'
+            : 'text-slate-500 hover:text-amber-600 hover:bg-amber-50/50 border-transparent hover:border-amber-200/60'
+        }`}
+      >
+        <ClipboardList className="w-3.5 h-3.5 md:w-4 md:h-4" />
+        <span className="hidden sm:inline">Con tareas</span>
+      </button>
+
       <div className="relative" ref={dropdownRef}>
-        <button 
+        <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
           className={`flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 transition-all font-bold text-sm rounded-full border ${
-            activeFiltersCount > 0 
-              ? 'bg-blue-50/80 text-primary border-primary/20 shadow-sm' 
+            activeFiltersCount > 0
+              ? 'bg-blue-50/80 text-primary border-primary/20 shadow-sm'
               : 'text-slate-500 hover:text-primary hover:bg-slate-50/80 border-transparent hover:border-slate-200/60'
           }`}
         >
@@ -202,6 +221,7 @@ export function KanbanSearchControls({ agents = [] }: { agents?: Agent[] }) {
                   setSortBy('newest')
                   setAgentFilter(null)
                   setDateFilter('all')
+                  setTasksOnly(false)
                   setIsDropdownOpen(false)
                 }}
                 className="w-full text-center px-3 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-xl transition-colors"

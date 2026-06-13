@@ -14,6 +14,8 @@ interface KanbanFilterContextType {
   setAgentFilter: (agentId: string | null) => void;
   dateFilter: DateFilterOption;
   setDateFilter: (date: DateFilterOption) => void;
+  tasksOnly: boolean;
+  setTasksOnly: (v: boolean) => void;
 }
 
 const KanbanFilterContext = createContext<KanbanFilterContextType | undefined>(undefined)
@@ -23,13 +25,15 @@ export function KanbanFilterProvider({ children }: { children: ReactNode }) {
   const [sortBy, setSortBy] = useState<SortOption>('newest')
   const [agentFilter, setAgentFilter] = useState<string | null>(null)
   const [dateFilter, setDateFilter] = useState<DateFilterOption>('all')
-  
+  const [tasksOnly, setTasksOnly] = useState(false)
+
   return (
-    <KanbanFilterContext.Provider value={{ 
-      searchTerm, setSearchTerm, 
+    <KanbanFilterContext.Provider value={{
+      searchTerm, setSearchTerm,
       sortBy, setSortBy,
       agentFilter, setAgentFilter,
-      dateFilter, setDateFilter
+      dateFilter, setDateFilter,
+      tasksOnly, setTasksOnly
     }}>
       {children}
     </KanbanFilterContext.Provider>
