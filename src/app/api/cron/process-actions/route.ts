@@ -181,6 +181,60 @@ async function executeAction(action: any, supabase: any) {
       return { type: 'notify_agent' }
     }
 
+    case 'create_task': {
+      const taskPayload = payload.task_payload || {}
+
+      // Interpolar título y descripción con datos del lead
+      const title = interpolateMessage(taskPayload.title || 'Tarea de seguimiento', lead)
+      const description = taskPayload.description
+        ? interpolateMessage(taskPayload.description, lead)
+        : null
+
+      // due_date: ahora + due_hours (definido en el task_payload de la regla)
+      const dueHours = taskPayload.due_hours || 0
+      const dueDate = dueHours > 0
+        ? new Date(Date.now() + dueHours * 3600 * 1000).toISOString()
+        : null
+
+      const assignedTo = taskPayload.assigned_to || lead.assigned_to || null
+
+      const { data: newTask, error: taskError } = await supabase
+        .from('tasks')
+        .insert({
+          lead_id: action.lead_id,
+          task_type: taskPayload.task_type || 'call',
+          title,
+          description,
+          due_date: dueDate,
+          assigned_to: assignedTo,
+          status: 'pending',
+          priority: taskPayload.priority || 'medium',
+          follow_up_rules: taskPayload.follow_up_rules || {},
+          parent_task_id: taskPayload.parent_task_id || null,
+          automation_rule_id: action.rule_id || null,
+          source: 'automation',
+        })
+        .select('*')
+        .single()
+
+      if (taskError) throw new Error(`Error creando tarea: ${taskError.message}`)
+
+      if (newTask?.assigned_to) {
+        await broadcastNotification(
+          {
+            type: 'new_lead',
+            title: '📋 Nueva Tarea',
+            body: title,
+            link: `/dashboard/leads/${action.lead_id}`,
+            lead_id: action.lead_id,
+          },
+          newTask.assigned_to
+        )
+      }
+
+      return { type: 'create_task', task_id: newTask?.id }
+    }
+
     default:
       throw new Error(`Tipo de acción desconocido: ${action.action_type}`)
   }

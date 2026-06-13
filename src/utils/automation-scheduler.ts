@@ -35,6 +35,7 @@ export async function scheduleRulesForStage(leadId: string, stage: string) {
       action_template: rule.action_template,
       action_message: rule.action_message,
       action_stage: rule.action_stage,
+      task_payload: rule.task_payload || null,
     },
   }))
 

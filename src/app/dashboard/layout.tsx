@@ -38,6 +38,7 @@ export default async function DashboardLayout({
     { name: 'Proveedores', href: '/dashboard/providers' },
     { name: 'Reportes', href: '/dashboard/reports' },
     { name: 'Mensajes', href: '/dashboard/messages' },
+    { name: 'Tareas', href: '/dashboard/tasks' },
     { name: 'Automatizaciones', href: '/dashboard/automations' },
   ]
 

@@ -22,10 +22,12 @@ import { uploadChatMedia } from '@/app/utils/actions/storage'
 import { fetchMoreMessages } from '@/app/utils/actions/messages'
 import CallLogPanel from './CallLogPanel'
 import { ActivityTimeline } from './sections/ActivityTimeline'
+import TasksPanel from './sections/TasksPanel'
+import type { Task } from '@/app/utils/actions/tasks'
 
 // ─── Types & Constants ────────────────────────────────────────────────────────
 
-type TabId = 'info' | 'cotizacion' | 'voucher' | 'historial' | 'chat'
+type TabId = 'info' | 'cotizacion' | 'voucher' | 'historial' | 'tareas' | 'chat'
 
 const STATUS_MAP: Record<string, string> = {
   lead_nuevo: 'Lead Nuevo',
@@ -71,6 +73,7 @@ export default function LeadDetailClient({
   messages: initialMessages,
   totalMessages,
   leadNotes,
+  tasks: initialTasks,
   notesError,
   currentUser
 }: {
@@ -86,6 +89,7 @@ export default function LeadDetailClient({
   messages: any[]
   totalMessages: number
   leadNotes: any[]
+  tasks: Task[]
   notesError?: any
   currentUser?: any
 }) {
@@ -579,6 +583,7 @@ export default function LeadDetailClient({
             { id: 'cotizacion', label: 'Cotización' },
             { id: 'voucher', label: 'Voucher' },
             { id: 'historial', label: 'Historial' },
+            { id: 'tareas', label: 'Tareas' },
           ] as { id: TabId; label: string }[]).map(tab => (
             <button
               key={tab.id}
@@ -1151,6 +1156,16 @@ export default function LeadDetailClient({
               />
             </div>
           )}
+
+          {/* TAREAS */}
+          {activeTab === 'tareas' && (
+            <TasksPanel
+              leadId={lead.id}
+              initialTasks={initialTasks}
+              agents={agents}
+              currentUserId={currentUser?.id}
+            />
+          )}
         </div>
 
         {/* ── Right sidebar: WhatsApp + Notes — shown on mobile via chat tab ── */}
@@ -1346,7 +1361,7 @@ export default function LeadDetailClient({
           { id: 'info', label: 'Info', icon: User },
           { id: 'cotizacion', label: 'Cotiza', icon: Zap },
           { id: 'voucher', label: 'Voucher', icon: FileText },
-          { id: 'historial', label: 'Historial', icon: Clock },
+          { id: 'tareas', label: 'Tareas', icon: CheckCircle2 },
           { id: 'chat', label: 'Chat', icon: MessageSquare },
         ] as { id: TabId; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => {
           const isActive = activeTab === id

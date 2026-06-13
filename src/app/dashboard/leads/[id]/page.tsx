@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import LeadDetailClient from './components/LeadDetailClient'
 import { ZadarmaWidget } from '@/components/ZadarmaWidget'
+import { getTasksForLead } from '@/app/utils/actions/tasks'
 
 export default async function LeadDetailPage({
   params: paramsPromise
@@ -41,7 +42,8 @@ export default async function LeadDetailPage({
     locationsRes,
     providerOfficesRes,
     messagesRes,
-    notesRes
+    notesRes,
+    tasksRes
   ] = await Promise.all([
     leadRaw.category_id ? supabase.from('categories').select('*').eq('id', leadRaw.category_id).single() : Promise.resolve({ data: null, error: null }),
     leadRaw.provider_id ? supabase.from('providers').select('*').eq('id', leadRaw.provider_id).single() : Promise.resolve({ data: null, error: null }),
@@ -54,7 +56,8 @@ export default async function LeadDetailPage({
     supabase.from('locations').select('*').order('name'),
     supabase.from('provider_offices').select('*'),
     supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
-    supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false })
+    supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false }),
+    getTasksForLead(id)
   ])
 
   const lead = {
@@ -83,6 +86,7 @@ export default async function LeadDetailPage({
         messages={(messagesRes.data || []).reverse()}
         totalMessages={messagesRes.count ?? 0}
         leadNotes={notesRes.data || []}
+        tasks={tasksRes.tasks || []}
         currentUser={currentUserProfile}
       />
       {currentUserProfile?.zadarma_sip && (

@@ -22,6 +22,7 @@ export function SidebarNav({ menuItems }: { menuItems: MenuItem[] }) {
     'Proveedores': 'inventory_2',
     'Reportes': 'monitoring',
     'Mensajes': 'forum',
+    'Tareas': 'task_alt',
     'Automatizaciones': 'bolt'
   };
 

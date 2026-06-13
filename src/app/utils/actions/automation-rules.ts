@@ -12,10 +12,11 @@ export type AutomationRule = {
   trigger_delay_hours: number | null
   trigger_date_field: string | null
   trigger_date_offset_hours: number | null
-  action_type: 'whatsapp_template' | 'whatsapp_text' | 'change_stage' | 'notify_agent'
+  action_type: 'whatsapp_template' | 'whatsapp_text' | 'change_stage' | 'notify_agent' | 'create_task'
   action_template: string | null
   action_message: string | null
   action_stage: string | null
+  task_payload: any | null
   created_at: string
 }
 
