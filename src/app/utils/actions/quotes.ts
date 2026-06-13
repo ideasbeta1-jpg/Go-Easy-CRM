@@ -115,6 +115,7 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     .update({
       status: 'en_cotizacion',
       total_amount: totalAmount,
+      status_changed_at: new Date().toISOString(),
     })
     .eq('id', leadId)
 

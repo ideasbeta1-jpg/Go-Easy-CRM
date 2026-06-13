@@ -1,8 +1,14 @@
 import { createAdminClient } from './supabase/admin'
+import { broadcastNotification } from '@/app/utils/actions/notifications'
 
 /**
- * Programa pending_actions para reglas de tipo stage_delay al cambiar de etapa.
- * Cancela primero las acciones pendientes anteriores del lead.
+ * Programa las acciones de reglas stage_delay al cambiar de etapa.
+ *
+ * - Las reglas de tipo `create_task` se ejecutan DE INMEDIATO (la tarea aparece
+ *   en cuanto cambia la etapa; su due_date se calcula con due_hours). No dependen
+ *   del cron, que puede correr con baja frecuencia.
+ * - El resto de acciones (WhatsApp, cambio de etapa, notificación) se encolan en
+ *   pending_actions para ejecución diferida por el cron.
  */
 export async function scheduleRulesForStage(leadId: string, stage: string) {
   const supabase = createAdminClient()
@@ -25,21 +31,92 @@ export async function scheduleRulesForStage(leadId: string, stage: string) {
   if (!rules || rules.length === 0) return
 
   const now = new Date()
-  const actions = rules.map((rule: any) => ({
-    rule_id: rule.id,
-    lead_id: leadId,
-    execute_at: new Date(now.getTime() + (rule.trigger_delay_hours || 1) * 3600 * 1000).toISOString(),
-    status: 'pending',
-    action_type: rule.action_type,
-    action_payload: {
-      action_template: rule.action_template,
-      action_message: rule.action_message,
-      action_stage: rule.action_stage,
-      task_payload: rule.task_payload || null,
-    },
-  }))
+  const taskRules = rules.filter((r: any) => r.action_type === 'create_task')
+  const otherRules = rules.filter((r: any) => r.action_type !== 'create_task')
 
-  await supabase.from('pending_actions').insert(actions)
+  // ── Crear tareas de inmediato (independiente del cron) ──────────────────────
+  if (taskRules.length > 0) {
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('first_name, last_name, pickup_date, return_date, pickup_location, total_amount, assigned_to')
+      .eq('id', leadId)
+      .single()
+
+    if (lead) {
+      for (const rule of taskRules) {
+        const tp = rule.task_payload || {}
+
+        // Evitar duplicados: si ya hay una tarea pendiente de esta regla, saltar
+        const { data: existing } = await supabase
+          .from('tasks')
+          .select('id')
+          .eq('automation_rule_id', rule.id)
+          .eq('lead_id', leadId)
+          .in('status', ['pending', 'in_progress'])
+          .maybeSingle()
+        if (existing) continue
+
+        const dueHours = tp.due_hours || 0
+        const dueDate = dueHours > 0
+          ? new Date(now.getTime() + dueHours * 3600 * 1000).toISOString()
+          : null
+        const assignedTo = tp.assigned_to || lead.assigned_to || null
+
+        const { data: newTask } = await supabase
+          .from('tasks')
+          .insert({
+            lead_id: leadId,
+            task_type: tp.task_type || 'call',
+            title: interpolateMessage(tp.title || 'Tarea de seguimiento', lead),
+            description: tp.description ? interpolateMessage(tp.description, lead) : null,
+            due_date: dueDate,
+            assigned_to: assignedTo,
+            status: 'pending',
+            priority: tp.priority || 'medium',
+            follow_up_rules: tp.follow_up_rules || {},
+            automation_rule_id: rule.id,
+            source: 'automation',
+          })
+          .select('id, title')
+          .single()
+
+        if (newTask && assignedTo) {
+          try {
+            await broadcastNotification(
+              {
+                type: 'new_lead',
+                title: '📋 Nueva Tarea',
+                body: newTask.title,
+                link: `/dashboard/leads/${leadId}?tab=tareas`,
+                lead_id: leadId,
+              },
+              assignedTo
+            )
+          } catch {
+            // notificación no crítica
+          }
+        }
+      }
+    }
+  }
+
+  // ── Encolar el resto en pending_actions (ejecución diferida por el cron) ─────
+  if (otherRules.length > 0) {
+    const actions = otherRules.map((rule: any) => ({
+      rule_id: rule.id,
+      lead_id: leadId,
+      execute_at: new Date(now.getTime() + (rule.trigger_delay_hours || 1) * 3600 * 1000).toISOString(),
+      status: 'pending',
+      action_type: rule.action_type,
+      action_payload: {
+        action_template: rule.action_template,
+        action_message: rule.action_message,
+        action_stage: rule.action_stage,
+      },
+    }))
+
+    await supabase.from('pending_actions').insert(actions)
+  }
 }
 
 /**
