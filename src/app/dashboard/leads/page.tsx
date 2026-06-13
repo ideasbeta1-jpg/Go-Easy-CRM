@@ -37,6 +37,12 @@ export default async function LeadsPage() {
   const ACTIVE_STATUSES = ['lead_nuevo', 'en_cotizacion', 'reserva_confirmada', 'voucher_enviado']
   const withScope = (q: any) => (isAdmin ? q : q.eq('assigned_to', user.id))
 
+  const endOfToday = new Date()
+  endOfToday.setHours(23, 59, 59, 999)
+  const nowISO = new Date().toISOString()
+
+  // Ola 1: todo lo que NO depende de la lista de leads ya cargada. Incluye el
+  // banner de tareas de hoy (antes era una consulta secuencial aparte).
   // Pipeline activo: se carga completo (acotado por naturaleza, necesario para
   // drag-drop/búsqueda/orden). Columnas cerradas (crecen sin límite): solo los
   // más recientes + "Cargar más". KPIs de cerrados vía agregados ligeros para
@@ -50,6 +56,7 @@ export default async function LeadsPage() {
     categories,
     locations,
     { data: unreadMessages },
+    { data: bannerTasksRaw },
   ] = await Promise.all([
     withScope(supabase.from('leads')
       .select(`*, category:categories(name, image_url, daily_price)`)
@@ -79,6 +86,13 @@ export default async function LeadsPage() {
     getCachedCategories(),
     getCachedLocations(),
     supabase.from('messages').select('lead_id').eq('direction', 'inbound').eq('is_read', false),
+    supabase.from('tasks')
+      .select('id, title, task_type, due_date, lead_id, lead:leads(first_name, last_name)')
+      .in('status', ['pending', 'in_progress'])
+      .not('due_date', 'is', null)
+      .lte('due_date', endOfToday.toISOString())
+      .order('due_date', { ascending: true })
+      .limit(50),
   ])
 
   if (error) {
@@ -91,35 +105,27 @@ export default async function LeadsPage() {
 
   const leads = [...(activeLeadsRaw || []), ...(wonRecent || []), ...(lostRecent || [])]
 
-  // Tareas pendientes por lead (para badges en tarjetas del kanban)
+  // Ola 2: lo que depende de la lista de leads. tasksByLead y profiles son
+  // independientes entre sí, así que se resuelven en paralelo (antes eran dos
+  // consultas secuenciales). Reduce las olas del servidor de 4 a 2.
   const allLeadIds = leads.map(l => l.id).filter(Boolean)
-  let tasksByLead: Record<string, { count: number; overdue: number }> = {}
-  if (allLeadIds.length > 0) {
-    const now = new Date().toISOString()
-    const { data: pendingTasks } = await supabase
-      .from('tasks')
-      .select('lead_id, due_date')
-      .in('lead_id', allLeadIds)
-      .in('status', ['pending', 'in_progress'])
-    ;(pendingTasks || []).forEach((t: any) => {
-      if (!tasksByLead[t.lead_id]) tasksByLead[t.lead_id] = { count: 0, overdue: 0 }
-      tasksByLead[t.lead_id].count++
-      if (t.due_date && t.due_date < now) tasksByLead[t.lead_id].overdue++
-    })
-  }
+  const assignedToIds = Array.from(new Set(leads.map(l => l.assigned_to).filter(Boolean)))
+  const [{ data: pendingTasks }, { data: profilesData }] = await Promise.all([
+    allLeadIds.length > 0
+      ? supabase.from('tasks').select('lead_id, due_date').in('lead_id', allLeadIds).in('status', ['pending', 'in_progress'])
+      : Promise.resolve({ data: [] as any[] }),
+    assignedToIds.length > 0
+      ? supabase.from('profiles').select('id, full_name, first_name, last_name, avatar_url').in('id', assignedToIds as string[])
+      : Promise.resolve({ data: [] as any[] }),
+  ])
 
-  // Tareas para el banner: vencidas o que vencen hoy (scope por RLS del usuario)
-  const endOfToday = new Date()
-  endOfToday.setHours(23, 59, 59, 999)
-  const nowISO = new Date().toISOString()
-  const { data: bannerTasksRaw } = await supabase
-    .from('tasks')
-    .select('id, title, task_type, due_date, lead_id, lead:leads(first_name, last_name)')
-    .in('status', ['pending', 'in_progress'])
-    .not('due_date', 'is', null)
-    .lte('due_date', endOfToday.toISOString())
-    .order('due_date', { ascending: true })
-    .limit(50)
+  // Tareas pendientes por lead (para badges en tarjetas del kanban)
+  const tasksByLead: Record<string, { count: number; overdue: number }> = {}
+  ;(pendingTasks || []).forEach((t: any) => {
+    if (!tasksByLead[t.lead_id]) tasksByLead[t.lead_id] = { count: 0, overdue: 0 }
+    tasksByLead[t.lead_id].count++
+    if (t.due_date && t.due_date < nowISO) tasksByLead[t.lead_id].overdue++
+  })
 
   const bannerTasks: BannerTask[] = (bannerTasksRaw || []).map((t: any) => ({
     id: t.id,
@@ -133,16 +139,7 @@ export default async function LeadsPage() {
     overdue: !!t.due_date && t.due_date < nowISO,
   }))
 
-  const assignedToIds = Array.from(new Set(leads.map(l => l.assigned_to).filter(Boolean)))
-  let profiles: any[] = []
-  if (assignedToIds.length > 0) {
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('id, full_name, first_name, last_name, avatar_url')
-      .in('id', (assignedToIds as string[]))
-    profiles = profilesData || []
-  }
-
+  const profiles: any[] = profilesData || []
   const profileMap = profiles.reduce((acc, p) => {
     acc[p.id] = p
     return acc

@@ -432,9 +432,15 @@ export default function LeadDetailClient({
   const currentTotalDaily = formData.total_amount > 0 ? (formData.total_amount / daysForCalc) : (categoryBaseCost + categoryDefaultMargin)
   const currentVehicleCost = currentTotalDaily - currentMargin
 
+  // Desglose de cobro mostrado al cliente (mismo cálculo que la cotización pública):
+  // el depósito online = margen diario × días; el saldo en counter = total − depósito.
+  const depositTotal = currentMargin * daysForCalc
+  const balanceAtCounter = Math.max(0, formData.total_amount - depositTotal)
+
   const shortId = `GE-${lead.id.slice(-4).toUpperCase()}`
   const currentStatusIdx = STATUS_FLOW.indexOf(formData.status)
   const nextStatus = currentStatusIdx >= 0 && currentStatusIdx < STATUS_FLOW.length - 1 ? STATUS_FLOW[currentStatusIdx + 1] : null
+  const prevStatus = currentStatusIdx > 0 ? STATUS_FLOW[currentStatusIdx - 1] : null
   const hoursOld = (Date.now() - new Date(lead.created_at).getTime()) / (1000 * 60 * 60)
   const isUrgent = ['lead_nuevo', 'en_cotizacion'].includes(formData.status) && hoursOld > 48
 
@@ -538,6 +544,15 @@ export default function LeadDetailClient({
             >
               <Mail className="w-4 h-4" />
             </a>
+          )}
+          {prevStatus && (
+            <button
+              onClick={() => handleStatusChange(prevStatus)}
+              className="flex items-center gap-2 px-3 sm:px-4 py-2.5 border border-slate-200 text-slate-500 rounded-xl text-sm font-bold hover:text-primary hover:border-primary/20 transition-all"
+              title={`Regresar a ${STATUS_MAP[prevStatus] || prevStatus}`}
+            >
+              ←<span className="hidden sm:inline"> Regresar etapa</span>
+            </button>
           )}
           {nextStatus && (
             <button
@@ -705,6 +720,22 @@ export default function LeadDetailClient({
                     <option value="">Sin agente</option>
                     {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
                   </select>
+                </div>
+              </div>
+
+              {/* Resumen de cobro */}
+              <div className="mt-6 grid grid-cols-3 gap-3">
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3.5">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Renta</p>
+                  <p className="text-lg font-black text-slate-900 mt-0.5">${Number(formData.total_amount).toFixed(2)}</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3.5">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Depósito a cobrar</p>
+                  <p className="text-lg font-black text-indigo-700 mt-0.5">${depositTotal.toFixed(2)}</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Pago en counter</p>
+                  <p className="text-lg font-black text-emerald-700 mt-0.5">${balanceAtCounter.toFixed(2)}</p>
                 </div>
               </div>
 
@@ -953,6 +984,20 @@ export default function LeadDetailClient({
                     Ver Propuesta Activa →
                   </Link>
                 )}
+              </div>
+
+              {/* Desglose de cobro: depósito online + saldo en counter */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-5">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Depósito total a cobrar</p>
+                  <p className="text-2xl font-black text-indigo-700 mt-1">${depositTotal.toFixed(2)}</p>
+                  <p className="text-[11px] text-indigo-400 font-medium mt-0.5">Pago online del cliente para confirmar la reserva</p>
+                </div>
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
+                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Pago en counter</p>
+                  <p className="text-2xl font-black text-emerald-700 mt-1">${balanceAtCounter.toFixed(2)}</p>
+                  <p className="text-[11px] text-emerald-500 font-medium mt-0.5">Lo paga el cliente al recibir el vehículo en el destino</p>
+                </div>
               </div>
 
               <CallLogPanel leadId={lead.id} leadPhone={formData.phone || ''} agentId={currentUser?.id || ''} agentSip={currentUser?.zadarma_sip || null} />

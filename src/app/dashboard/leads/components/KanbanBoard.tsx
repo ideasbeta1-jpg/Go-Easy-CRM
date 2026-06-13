@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Calendar, X, AlertTriangle, Zap, XCircle, ChevronDown, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -62,6 +62,19 @@ function shortId(uuid: string): string {
   return 'GE-' + uuid.slice(-4).toUpperCase()
 }
 
+// Avatar de agente con iniciales en CSS. Evita un request HTTP por tarjeta a
+// ui-avatars.com (con 150 tarjetas eran ~150 peticiones externas que el navegador
+// serializa de a 6, bloqueando la carga del tablero).
+const AVATAR_PALETTE = ['bg-blue-500', 'bg-indigo-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-purple-500', 'bg-cyan-500']
+function avatarColor(seed: string): string {
+  const code = (seed || '').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return AVATAR_PALETTE[code % AVATAR_PALETTE.length]
+}
+function initialsOf(name: string | null): string {
+  if (!name) return 'SA'
+  return name.trim().split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase()
+}
+
 export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead = {}, tasksByLead = {}, addLeadProps, statusTotals = {} }: KanbanBoardProps) {
   const [leads, setLeads] = useState(initialLeads)
   const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({})
@@ -79,6 +92,36 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
   const [mobileMoveLead, setMobileMoveLead] = useState<{ id: string; status: string } | null>(null)
   const router = useRouter()
   const { searchTerm, sortBy, agentFilter, dateFilter, tasksOnly } = useKanbanFilter()
+
+  // Render progresivo de columnas ACTIVAS: se muestran COLUMN_PAGE tarjetas por
+  // columna y se renderizan más al hacer scroll. Evita montar todas las tarjetas
+  // de golpe (el costo real al entrar). No afecta a búsqueda/filtros (operan sobre
+  // la lista completa en memoria) ni a las columnas cerradas (paginación de servidor).
+  const COLUMN_PAGE = 15
+  const [visibleCount, setVisibleCount] = useState<Record<string, number>>({})
+  const sentinelRefs = useRef<Map<string, HTMLElement>>(new Map())
+
+  // Al cambiar filtros/búsqueda/orden, volver a la primera página de render.
+  useEffect(() => {
+    setVisibleCount({})
+  }, [searchTerm, agentFilter, dateFilter, sortBy, tasksOnly])
+
+  // Observa los centinelas de cada columna; al entrar en viewport, muestra más.
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const status = (entry.target as HTMLElement).dataset.status
+            if (status) setVisibleCount(prev => ({ ...prev, [status]: (prev[status] ?? COLUMN_PAGE) + COLUMN_PAGE }))
+          }
+        }
+      },
+      { rootMargin: '300px' }
+    )
+    sentinelRefs.current.forEach(el => obs.observe(el))
+    return () => obs.disconnect()
+  }, [leads, searchTerm, agentFilter, dateFilter, sortBy, tasksOnly, visibleCount])
 
   const handleDragStart = (e: React.DragEvent, leadId: string, currentStatus: string) => {
     e.dataTransfer.setData('leadId', leadId)
@@ -264,6 +307,11 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
             const stageTotal = isTerminal ? (statusTotals[status] ?? stageLeads.length) : stageLeads.length
             const hasMore = isTerminal && loadedCount(status) < (statusTotals[status] ?? 0)
             const noActiveFilters = !searchTerm && !agentFilter && dateFilter === 'all'
+            // Columnas activas: render progresivo. Las cerradas se muestran completas
+            // (su volumen ya lo limita la paginación de servidor).
+            const colVisible = visibleCount[status] ?? COLUMN_PAGE
+            const renderLeads = isTerminal ? stageLeads : stageLeads.slice(0, colVisible)
+            const hasMoreClient = !isTerminal && stageLeads.length > renderLeads.length
 
             return (
               <div
@@ -314,7 +362,7 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                     data-drop-surface
                     className="flex flex-col gap-2.5 overflow-y-auto pb-4 scrollbar-hide transition-colors duration-200 max-h-[calc(100vh-20rem)]"
                   >
-                    {stageLeads.map((lead) => {
+                    {renderLeads.map((lead) => {
                       const unread = unreadByLead[lead.id] || 0
                       const urgency = getUrgency(lead.pickup_date)
                       const showNew = isNewLead(lead.created_at)
@@ -432,11 +480,18 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                               {/* Row 5: Agent + reservation amount */}
                               <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <img
-                                    src={lead.assigned_to_profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(agentName || 'SA')}&background=f1f5f9&color=94a3b8&size=32&bold=true`}
-                                    className="w-6 h-6 rounded-full object-cover border border-slate-100 shrink-0"
-                                    alt={agentName || 'Sin asignar'}
-                                  />
+                                  {lead.assigned_to_profile?.avatar_url ? (
+                                    <img
+                                      src={lead.assigned_to_profile.avatar_url}
+                                      className="w-6 h-6 rounded-full object-cover border border-slate-100 shrink-0"
+                                      alt={agentName || 'Sin asignar'}
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-black shrink-0 ${agentName ? avatarColor(agentName) : 'bg-slate-300'}`}>
+                                      {initialsOf(agentName)}
+                                    </div>
+                                  )}
                                   <span className={`text-[10px] font-bold truncate ${agentName ? 'text-slate-600' : 'text-orange-400'}`}>
                                     {agentName || 'Sin asignar'}
                                   </span>
@@ -452,6 +507,20 @@ export function KanbanBoard({ initialLeads, statuses, statusConfig, unreadByLead
                         </Link>
                       )
                     })}
+
+                    {/* Centinela de render progresivo (columnas activas) */}
+                    {hasMoreClient && (
+                      <div
+                        ref={(el) => {
+                          if (el) sentinelRefs.current.set(status, el)
+                          else sentinelRefs.current.delete(status)
+                        }}
+                        data-status={status}
+                        className="flex items-center justify-center py-2"
+                      >
+                        <span className="w-4 h-4 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
+                      </div>
+                    )}
 
                     {/* Add lead button at bottom of non-terminal columns */}
                     {!isTerminal && addLeadProps && (

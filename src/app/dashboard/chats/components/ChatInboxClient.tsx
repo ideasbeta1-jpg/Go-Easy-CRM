@@ -237,11 +237,13 @@ function TemplatePicker({
 export default function ChatInboxClient({
   initialLeads,
   initialMessages,
+  initialUnreadByLead = {},
   currentUserId,
   isAdmin = false
 }: {
   initialLeads: Lead[]
   initialMessages: Message[]
+  initialUnreadByLead?: Record<string, number>
   currentUserId: string
   isAdmin?: boolean
 }) {
@@ -263,6 +265,17 @@ export default function ChatInboxClient({
 
   const [leads, setLeads] = useState<Lead[]>(initialLeads)
   const [previewMessages, setPreviewMessages] = useState<Message[]>(initialMessages)
+  // Conteo real de no-leídos por conversación (sembrado desde el servidor). Se
+  // incrementa con realtime y se limpia al abrir el chat.
+  const [unreadByLead, setUnreadByLead] = useState<Record<string, number>>(initialUnreadByLead)
+  const selectedLeadIdRef = useRef<string | null>(null)
+
+  // Render progresivo de la barra lateral: se muestran SIDEBAR_PAGE conversaciones
+  // y se renderizan más al hacer scroll (no se montan cientos de filas de golpe).
+  const SIDEBAR_PAGE = 20
+  const [visibleCount, setVisibleCount] = useState(SIDEBAR_PAGE)
+  const listRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
 
   const [convMessages, setConvMessages] = useState<Record<string, Message[]>>({})
   const [convPage, setConvPage] = useState<Record<string, number>>({})
@@ -342,6 +355,10 @@ export default function ChatInboxClient({
           if (!existing || existing.some(m => m.id === msg.id)) return prev
           return { ...prev, [msg.lead_id]: [...existing, msg] }
         })
+        // Incrementar no-leídos si el mensaje entrante no es del chat abierto.
+        if (msg.direction === 'inbound' && !msg.is_read && msg.lead_id !== selectedLeadIdRef.current) {
+          setUnreadByLead(prev => ({ ...prev, [msg.lead_id]: (prev[msg.lead_id] || 0) + 1 }))
+        }
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
         const msg = payload.new as Message
@@ -365,7 +382,10 @@ export default function ChatInboxClient({
   }, [searchParams, leads, handleSelectLead])
 
   useEffect(() => {
+    selectedLeadIdRef.current = selectedLeadId
     if (!selectedLeadId) return
+    // Limpiar el badge de no-leídos de la conversación abierta de inmediato.
+    setUnreadByLead(prev => (prev[selectedLeadId] ? { ...prev, [selectedLeadId]: 0 } : prev))
     const markAsRead = async () => {
       const supabase = createClient()
       const { error } = await supabase.from('messages').update({ is_read: true })
@@ -536,7 +556,7 @@ export default function ChatInboxClient({
         .filter(m => m.lead_id === lead.id)
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       const lastMessage = leadMsgs[0]
-      const isPending = !!lastMessage && lastMessage.direction === 'inbound' && !lastMessage.is_read
+      const isPending = (unreadByLead[lead.id] || 0) > 0
       return { ...lead, lastMessage, isPending }
     })
     .filter(lead => {
@@ -566,7 +586,7 @@ export default function ChatInboxClient({
       const db = b.lastMessage?.created_at || b.created_at
       return new Date(db).getTime() - new Date(da).getTime()
     })
-  }, [leads, previewMessages, searchTerm, filterType, statusFilter, currentUserId, isAdmin])
+  }, [leads, previewMessages, unreadByLead, searchTerm, filterType, statusFilter, currentUserId, isAdmin])
 
   const totalUnread = useMemo(() => processedLeads.filter(l => l.isPending).length, [processedLeads])
 
@@ -575,6 +595,24 @@ export default function ChatInboxClient({
     if (tabFilter === 'archived') return []
     return processedLeads
   }, [processedLeads, tabFilter])
+
+  // Solo se renderizan las primeras visibleCount conversaciones.
+  const visibleLeads = useMemo(() => displayedLeads.slice(0, visibleCount), [displayedLeads, visibleCount])
+
+  // Al cambiar de filtro/búsqueda/pestaña, volver a la primera página de render.
+  useEffect(() => { setVisibleCount(SIDEBAR_PAGE) }, [searchTerm, filterType, statusFilter, tabFilter])
+
+  // Cargar más filas cuando el centinela entra en viewport (scroll infinito cliente).
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const obs = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) setVisibleCount(c => c + SIDEBAR_PAGE) },
+      { root: listRef.current, rootMargin: '300px' }
+    )
+    obs.observe(sentinel)
+    return () => obs.disconnect()
+  }, [displayedLeads.length, visibleCount])
 
   const selectedLead = leads.find(l => l.id === selectedLeadId)
 
@@ -744,7 +782,7 @@ export default function ChatInboxClient({
         </div>
 
         {/* Conversation list */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div ref={listRef} className="flex-1 overflow-y-auto scrollbar-hide">
           {displayedLeads.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-8 opacity-40">
               <MessageSquare size={36} className="mb-3 text-slate-300" />
@@ -753,10 +791,8 @@ export default function ChatInboxClient({
               </p>
             </div>
           ) : (
-            displayedLeads.map(lead => {
-              const msgUnread = previewMessages.filter(m =>
-                m.lead_id === lead.id && m.direction === 'inbound' && !m.is_read
-              ).length
+            visibleLeads.map(lead => {
+              const msgUnread = unreadByLead[lead.id] || 0
               const avatarColor = getAvatarColor(`${lead.first_name}${lead.last_name}`)
               const lastMsgDate = lead.lastMessage ? new Date(lead.lastMessage.created_at) : null
               const timeStr = lastMsgDate
@@ -801,6 +837,11 @@ export default function ChatInboxClient({
                 </button>
               )
             })
+          )}
+          {displayedLeads.length > visibleLeads.length && (
+            <div ref={sentinelRef} className="flex items-center justify-center py-4">
+              <div className="w-5 h-5 border-2 border-slate-200 border-t-primary rounded-full animate-spin" />
+            </div>
           )}
         </div>
       </div>

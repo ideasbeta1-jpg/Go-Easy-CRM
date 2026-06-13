@@ -26,13 +26,24 @@ export default async function ChatsPage() {
     .order('created_at', { ascending: false })
     .limit(500)
 
-  // Only load the last 50 messages per lead for sidebar preview — NOT all messages
-  // Full conversation is loaded on-demand when a lead is selected
-  const { data: recentMessages } = await adminSupabase
-    .from('messages')
-    .select('id, lead_id, content, direction, media_url, media_type, is_read, status, created_at')
-    .order('created_at', { ascending: false })
-    .limit(500)
+  // Preview de cada conversación: UN mensaje por lead (el último) vía RPC. Antes
+  // se traían los 500 mensajes más recientes y se derivaba el preview en memoria,
+  // lo que es ineficiente y se rompe a escala (los 500 más recientes pueden ser
+  // todos de unos pocos chats activos, dejando el resto sin preview).
+  // La conversación completa se sigue cargando on-demand al seleccionar un lead.
+  const leadIds = (leads || []).map(l => l.id)
+  const [{ data: recentMessages }, { data: unreadRows }] = await Promise.all([
+    leadIds.length > 0
+      ? adminSupabase.rpc('get_conversation_previews', { p_lead_ids: leadIds })
+      : Promise.resolve({ data: [] as any[] }),
+    // Conteo real de no-leídos por conversación (solo filas no leídas → barato).
+    adminSupabase.from('messages').select('lead_id').eq('direction', 'inbound').eq('is_read', false),
+  ])
+
+  const initialUnreadByLead: Record<string, number> = {}
+  ;(unreadRows || []).forEach((m: any) => {
+    if (m.lead_id) initialUnreadByLead[m.lead_id] = (initialUnreadByLead[m.lead_id] || 0) + 1
+  })
 
   return (
     <Suspense fallback={
@@ -43,6 +54,7 @@ export default async function ChatsPage() {
       <ChatInboxClient
         initialLeads={leads || []}
         initialMessages={recentMessages || []}
+        initialUnreadByLead={initialUnreadByLead}
         currentUserId={user?.id || ''}
         isAdmin={isAdmin}
       />
