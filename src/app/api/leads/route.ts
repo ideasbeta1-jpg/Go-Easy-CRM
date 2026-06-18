@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendLeadToN8n } from '@/utils/n8n'
-import { assignLeadToAgent } from '@/utils/assignment'
+import { assignLeadWithContact } from '@/utils/assignment'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { findOrCreateContact } from '@/lib/contacts/findOrCreate'
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,26 +36,30 @@ export async function POST(req: NextRequest) {
 
     const supabase = createAdminClient()
 
-    // Dedup by phone — if a non-deleted lead with this phone exists return it
-    const cleanPhone = phone.replace(/\D/g, '')
-    const { data: existingLead } = await supabase
-      .from('leads')
-      .select('id, status')
-      .or(`phone.eq.${phone},phone.eq.${cleanPhone},phone.like.%${cleanPhone}`)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    // Contacto (persona) único por teléfono. Una nueva solicitud SIEMPRE genera una
+    // nueva reserva (lead), aunque el contacto ya exista (clientes recurrentes).
+    const contact = await findOrCreateContact(supabase, {
+      first_name,
+      last_name,
+      phone,
+      email,
+      source,
+      utm_source,
+      utm_medium,
+      utm_campaign,
+      utm_term,
+      utm_content,
+    })
 
-    if (existingLead) {
-      console.log('[/api/leads] Duplicate phone detected, returning existing lead:', existingLead.id)
-      return NextResponse.json({ success: true, id: existingLead.id, duplicate: true }, { status: 200 })
+    if (!contact) {
+      return NextResponse.json({ error: 'No se pudo registrar el contacto.' }, { status: 500 })
     }
 
     const { data, error } = await supabase
       .from('leads')
       .insert([
         {
+          contact_id: contact.id,
           first_name,
           last_name,
           phone,
@@ -84,8 +89,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (data?.id) {
-      // Asignar agente primero y pasar sus datos al motor para que el WhatsApp use el nombre real
-      const assignedAgent = await assignLeadToAgent(data.id)
+      // Hereda el agente del contacto (recurrente) o hace Round Robin (contacto nuevo).
+      const assignedAgent = await assignLeadWithContact(data.id, contact)
       await executeStageAutomation(data.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
     }
 

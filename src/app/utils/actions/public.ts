@@ -4,8 +4,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { assignLeadToAgent } from '@/utils/assignment'
+import { assignLeadWithContact } from '@/utils/assignment'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { findOrCreateContact } from '@/lib/contacts/findOrCreate'
 
 export async function submitPublicLead(formData: FormData) {
   // Honeypot: bots fill hidden fields, humans don't
@@ -30,11 +31,22 @@ export async function submitPublicLead(formData: FormData) {
 
   const supabase = await createClient()
 
+  const first_name = formData.get('first_name') as string
+  const last_name = formData.get('last_name') as string
+  const email = formData.get('email') as string
+
+  // Contacto (persona) único por teléfono — usa cliente admin porque el visitante puede ser anónimo.
+  const contact = await findOrCreateContact(adminSupabase, { first_name, last_name, phone, email })
+  if (!contact) {
+    throw new Error('No se pudo registrar el contacto.')
+  }
+
   const data = {
-    first_name: formData.get('first_name') as string,
-    last_name: formData.get('last_name') as string,
+    contact_id: contact.id,
+    first_name,
+    last_name,
     phone,
-    email: formData.get('email') as string,
+    email,
     pickup_date: formData.get('pickup_date') as string,
     return_date: formData.get('return_date') as string,
     pickup_location: formData.get('pickup_location') as string,
@@ -55,7 +67,7 @@ export async function submitPublicLead(formData: FormData) {
 
   // Trigger assignment and stage automation
   if (lead?.id) {
-    const assignedAgent = await assignLeadToAgent(lead.id)
+    const assignedAgent = await assignLeadWithContact(lead.id, contact)
     await executeStageAutomation(lead.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
   }
 

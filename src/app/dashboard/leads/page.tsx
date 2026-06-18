@@ -9,6 +9,7 @@ import { NewLeadButton } from './components/NewLeadButton'
 const TERMINAL_PAGE_SIZE = 30
 import { KanbanFilterProvider } from './components/KanbanFilterContext'
 import { KanbanSearchControls, KanbanFilterChips } from './components/KanbanSearchControls'
+import { ExportLeadsButton } from './components/ExportLeadsButton'
 import { TaskBanner, type BannerTask } from './components/TaskBanner'
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -194,12 +195,13 @@ export default async function LeadsPage() {
               Pipeline de Ventas
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              {totalLeads} leads · actualizado hace 2 min <span className="text-amber-400">⚡</span>
+              {totalLeads} reservas · actualizado hace 2 min <span className="text-amber-400">⚡</span>
             </p>
           </div>
 
           <div className="flex items-center gap-2.5 flex-1 justify-end max-w-xl">
             <KanbanSearchControls agents={profiles} />
+            <ExportLeadsButton />
             <NewLeadButton
               categories={categories || []}
               locations={locations || []}

@@ -122,13 +122,13 @@ export function NewLeadModal({ isOpen, onClose, categories, locations, currentUs
     
     try {
       await createLead(formData)
-      toast.success('¡Lead creado con éxito!', {
-        description: 'El nuevo lead ha sido registrado en el pipeline.',
+      toast.success('¡Reserva creada con éxito!', {
+        description: 'La nueva reserva ha sido registrada en el pipeline.',
         icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
       })
       onClose()
     } catch (error: any) {
-      toast.error('Error al crear el lead', {
+      toast.error('Error al crear la reserva', {
         description: error.message || 'Ocurrió un error inesperado.'
       })
     } finally {
@@ -165,7 +165,7 @@ export function NewLeadModal({ isOpen, onClose, categories, locations, currentUs
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl font-sans font-black text-slate-900 uppercase tracking-tighter leading-tight">
-                    Registrar <span className="text-primary">Nuevo Lead</span>
+                    Registrar <span className="text-primary">Nueva Reserva</span>
                   </h2>
                   {foundCustomer?.isRecurring && (
                     <div className="bg-amber-100 text-amber-700 text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider animate-bounce-subtle">

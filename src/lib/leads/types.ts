@@ -1,3 +1,15 @@
+export interface Contact {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  email: string | null
+  phone: string | null
+  phone_normalized: string | null
+  assigned_to: string | null
+  source: string | null
+  created_at: string
+}
+
 export interface LeadFormData {
   first_name: string
   last_name: string

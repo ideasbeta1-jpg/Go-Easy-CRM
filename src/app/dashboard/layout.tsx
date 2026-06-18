@@ -33,6 +33,7 @@ export default async function DashboardLayout({
   const menuItems = [
     { name: 'Inicio', href: '/dashboard' },
     { name: 'Leads Kanban', href: '/dashboard/leads' },
+    { name: 'Contactos', href: '/dashboard/contactos' },
     { name: 'Chats WhatsApp', href: '/dashboard/chats' },
     { name: 'Catálogo Flota', href: '/dashboard/catalog' },
     { name: 'Proveedores', href: '/dashboard/providers' },

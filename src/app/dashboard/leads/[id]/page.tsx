@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { notFound } from 'next/navigation'
 import LeadDetailClient from './components/LeadDetailClient'
+import ContactReservationsBanner from './components/ContactReservationsBanner'
 import { ZadarmaWidget } from '@/components/ZadarmaWidget'
 import { getTasksForLead } from '@/app/utils/actions/tasks'
 import { getCachedCategories, getCachedLocations } from '@/app/utils/actions/cached-data'
@@ -58,7 +59,10 @@ export default async function LeadDetailPage({
     supabase.from('vouchers').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     getCachedLocations(),
     supabase.from('provider_offices').select('*'),
-    supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
+    // Chat unificado por contacto: hilo completo de la persona a través de sus reservas.
+    leadRaw.contact_id
+      ? supabase.from('messages').select('*', { count: 'exact' }).eq('contact_id', leadRaw.contact_id).order('created_at', { ascending: false }).limit(50)
+      : supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false }),
     getTasksForLead(id)
   ])
@@ -70,11 +74,26 @@ export default async function LeadDetailPage({
     assigned_to_profile: profileRes.data
   }
 
+  // Contacto (persona) y sus otras reservas → historial unificado del cliente
+  const [contactRes, siblingsRes] = leadRaw.contact_id
+    ? await Promise.all([
+        supabase.from('contacts').select('id, first_name, last_name').eq('id', leadRaw.contact_id).single(),
+        supabase
+          .from('leads')
+          .select('id, status, pickup_date, total_amount, created_at')
+          .eq('contact_id', leadRaw.contact_id)
+          .is('deleted_at', null)
+          .neq('id', id)
+          .order('created_at', { ascending: false }),
+      ])
+    : [{ data: null }, { data: [] }]
+
   // The active quote is the one with is_active=true, falling back to the most recent
   const activeQuote = quotesRes.data?.find((q: any) => q.is_active) ?? quotesRes.data?.[0] ?? null
 
   return (
     <>
+      <ContactReservationsBanner contact={contactRes.data} siblings={siblingsRes.data || []} />
       <LeadDetailClient
         lead={lead}
         notesError={notesRes.error}

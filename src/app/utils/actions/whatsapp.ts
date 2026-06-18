@@ -59,13 +59,18 @@ export async function sendManualWhatsAppMedia(
   return result
 }
 
-/** Loads paginated messages for a specific conversation */
+/** Loads paginated messages for a conversation (por contacto: hilo completo de la persona). */
 export async function getLeadMessages(leadId: string, page = 0, pageSize = 50) {
   const adminSupabase = createAdminClient()
+
+  const { data: lead } = await adminSupabase.from('leads').select('contact_id').eq('id', leadId).single()
+  const col = lead?.contact_id ? 'contact_id' : 'lead_id'
+  const val = lead?.contact_id ?? leadId
+
   const { data, error } = await adminSupabase
     .from('messages')
-    .select('id, lead_id, content, direction, media_url, media_type, is_read, status, wamid, created_at')
-    .eq('lead_id', leadId)
+    .select('id, lead_id, contact_id, content, direction, media_url, media_type, is_read, status, wamid, created_at')
+    .eq(col, val)
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1)
 

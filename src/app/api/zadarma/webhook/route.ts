@@ -86,11 +86,14 @@ async function handleCallStart(p: Record<string, string>) {
   // Vincular con lead por número de teléfono — suffix matching para cubrir variantes de código de país
   const normalized10 = normalizePhone(callerNumber)        // últimos 10 dígitos
   const normalizedFull = callerNumber.replace(/^\+/, '')   // sin prefijo +
-  const { data: lead } = await db()
+  // Un contacto puede tener varias reservas: tomamos la más reciente.
+  const { data: leadMatches } = await db()
     .from('leads')
     .select('id')
     .or(`phone.ilike.%${normalized10},phone.eq.${normalizedFull},phone.eq.${callerNumber}`)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(1)
+  const lead = leadMatches?.[0] || null
 
   const direction = p.direction === 'outgoing' ? 'outbound' : 'inbound'
 

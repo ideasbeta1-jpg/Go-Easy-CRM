@@ -1,8 +1,9 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { NextResponse } from 'next/server'
-import { assignLeadToAgent } from '@/utils/assignment'
+import { assignLeadWithContact } from '@/utils/assignment'
 import { executeStageAutomation } from '@/utils/automation-engine'
 import { broadcastNotification } from '@/app/utils/actions/notifications'
+import { findOrCreateContact } from '@/lib/contacts/findOrCreate'
 import crypto from 'crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -169,14 +170,29 @@ async function handleWabaMessage(supabase: SupabaseClient, message: any, contact
 }
 
 async function getOrCreateLead(supabase: SupabaseClient, phoneNumber: string, pushName: string, firstMsg: string) {
-  const isBSUID = phoneNumber.includes(':') || /[a-z]/i.test(phoneNumber)
-  const last10 = phoneNumber.slice(-10)
-  const query = isBSUID ? `phone.eq.${phoneNumber}` : `phone.like.%${phoneNumber}%,phone.like.%${last10}%`
+  // La conversación es con la PERSONA (contacto). Buscamos/creamos el contacto por teléfono…
+  const contact = await findOrCreateContact(supabase, {
+    first_name: pushName,
+    last_name: '(WhatsApp)',
+    phone: phoneNumber,
+  })
+  if (!contact) return null
 
-  const { data: leads } = await supabase.from('leads').select('id').or(query).limit(1)
-  if (leads?.[0]?.id) return leads[0].id
+  // …y adjuntamos el mensaje a su reserva más reciente (no borrada). Evita inundar el Kanban
+  // con una reserva nueva por cada mensaje de un cliente existente.
+  const { data: existingLeads } = await supabase
+    .from('leads')
+    .select('id')
+    .eq('contact_id', contact.id)
+    .is('deleted_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
 
+  if (existingLeads?.[0]?.id) return existingLeads[0].id
+
+  // Sin reservas previas → crear la primera para este contacto.
   const { data: newLead } = await supabase.from('leads').insert({
+    contact_id: contact.id,
     first_name: pushName,
     last_name: '(WhatsApp)',
     phone: phoneNumber,
@@ -185,8 +201,8 @@ async function getOrCreateLead(supabase: SupabaseClient, phoneNumber: string, pu
   }).select('id').single()
 
   if (newLead?.id) {
-    await assignLeadToAgent(newLead.id)
-    await executeStageAutomation(newLead.id, 'lead_nuevo')
+    const assignedAgent = await assignLeadWithContact(newLead.id, contact)
+    await executeStageAutomation(newLead.id, 'lead_nuevo', assignedAgent ? { assigned_agent: assignedAgent } : {})
   }
 
   return newLead?.id || null
