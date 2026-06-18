@@ -9,10 +9,12 @@ import { getAutomationRules, getPendingActions } from '@/app/utils/actions/autom
 export default async function AutomationsPage() {
   const supabase = await createClient()
 
+  // Las columnas reales son template_name/error_message; las exponemos como action/error
+  // para el panel. Incluimos status 'error' (excepciones) además de 'failed'.
   const { data: failedLogs } = await supabase
     .from('automation_logs')
-    .select('id, lead_id, stage, channel, action, status, error, created_at, leads(first_name, last_name, phone)')
-    .eq('status', 'failed')
+    .select('id, lead_id, stage, channel, action:template_name, status, error:error_message, created_at, leads(first_name, last_name, phone)')
+    .in('status', ['failed', 'error'])
     .order('created_at', { ascending: false })
     .limit(30)
 

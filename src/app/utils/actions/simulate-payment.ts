@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { logLeadEvent, LEAD_EVENT } from '@/lib/leads/events'
 
 export async function simulatePayment(leadId: string): Promise<{ stage: 'voucher_enviado' | 'reserva_confirmada' }> {
   const userClient = await createClient()
@@ -14,13 +15,22 @@ export async function simulatePayment(leadId: string): Promise<{ stage: 'voucher
 
   const { data: lead, error: leadError } = await supabase
     .from('leads')
-    .select('provider_id, draft_provider_confirmation, draft_conductor_nombre, draft_conductor_telefono')
+    .select('status, provider_id, draft_provider_confirmation, draft_conductor_nombre, draft_conductor_telefono')
     .eq('id', leadId)
     .single()
 
   if (leadError || !lead) throw new Error('Lead no encontrado')
 
+  const prevStatus = lead.status ?? null
   const canAutoVoucher = !!(lead.provider_id && lead.draft_provider_confirmation)
+
+  // Pago simulado del cliente
+  await logLeadEvent(supabase, {
+    leadId,
+    type: LEAD_EVENT.PAYMENT_CONFIRMED,
+    actorId: user.id,
+    metadata: { simulated: true },
+  })
 
   if (canAutoVoucher) {
     const voucherNumber = `GF-${Math.floor(100000 + Math.random() * 900000)}`
@@ -48,13 +58,25 @@ export async function simulatePayment(leadId: string): Promise<{ stage: 'voucher
       updated_at: new Date().toISOString()
     }).eq('id', leadId)
 
-    await supabase.from('lead_notes').insert({
-      lead_id: leadId,
-      agent_id: null,
-      content: `[VOUCHER_GENERATED] Voucher ${voucherNumber} generado automáticamente al confirmarse el pago (simulación).`
-    })
-
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '')
+
+    await logLeadEvent(supabase, {
+      leadId,
+      type: LEAD_EVENT.VOUCHER_GENERATED,
+      actorId: user.id,
+      metadata: {
+        voucher_id: voucher.id,
+        voucher_number: voucherNumber,
+        voucher_url: `${appUrl}/v/${voucher.id}`,
+        provider_confirmation: lead.draft_provider_confirmation,
+        auto_generated: true,
+        simulated: true,
+      },
+    })
+    await logLeadEvent(supabase, {
+      leadId, type: LEAD_EVENT.STAGE_CHANGE, actorId: user.id,
+      fromStatus: prevStatus, toStatus: 'voucher_enviado',
+    })
 
     await executeStageAutomation(leadId, 'voucher_enviado', {
       voucher_number: voucherNumber,
@@ -72,6 +94,11 @@ export async function simulatePayment(leadId: string): Promise<{ stage: 'voucher
       deposit_paid: true,
       updated_at: new Date().toISOString()
     }).eq('id', leadId)
+
+    await logLeadEvent(supabase, {
+      leadId, type: LEAD_EVENT.STAGE_CHANGE, actorId: user.id,
+      fromStatus: prevStatus, toStatus: 'reserva_confirmada',
+    })
 
     await executeStageAutomation(leadId, 'reserva_confirmada', { amount: 0 })
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { logLeadEvent, LEAD_EVENT } from '@/lib/leads/events'
 
 export async function generateVoucherForLead(
   leadId: string,
@@ -47,22 +48,26 @@ export async function generateVoucherForLead(
 
   if (voucherError) throw new Error(voucherError.message)
 
-  // 4. Add Timeline Note
-  const { data: userData } = await supabase.auth.getUser()
-  const agentId = userData.user?.id
+  // 4. Registrar el evento en la línea de tiempo (con enlace al voucher)
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com').replace(/\/$/, '')
+  const voucherUrl = `${appUrl}/v/${voucher.id}`
 
-  await supabase
-    .from('lead_notes')
-    .insert({
-      lead_id: leadId,
-      agent_id: agentId,
-      content: `[VOUCHER_GENERATED] Se ha generado y enviado el voucher oficial ${voucherNumber}.`
-    })
+  await logLeadEvent(supabase, {
+    leadId,
+    type: LEAD_EVENT.VOUCHER_GENERATED,
+    actorId: user.id,
+    metadata: {
+      voucher_id: voucher.id,
+      voucher_number: voucherNumber,
+      voucher_url: voucherUrl,
+      provider_confirmation: providerConfirmation,
+    },
+  })
 
   // 5. Trigger Automation (Includes n8n fallback)
   await executeStageAutomation(leadId, 'voucher_enviado', {
      voucher_number: voucherNumber,
-     voucher_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/v/${voucher.id}`,
+     voucher_url: voucherUrl,
      provider_confirmation: providerConfirmation
   })
 

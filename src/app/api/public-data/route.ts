@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { logSystemEvent } from '@/utils/system-log'
 
 export async function GET() {
   try {
@@ -40,8 +41,13 @@ export async function GET() {
       locations: uniqueLocations,
       settings: settingsRes.data || null,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching public data:', err)
+    await logSystemEvent({
+      category: 'form', source: 'public_data', severity: 'error', status: 'failed',
+      message: 'No se pudieron cargar los datos del formulario público (categorías/ubicaciones)',
+      error: err?.message || String(err),
+    })
     return NextResponse.json({ error: 'Error cargando datos.' }, { status: 500 })
   }
 }

@@ -41,6 +41,7 @@ export default async function DashboardLayout({
     { name: 'Mensajes', href: '/dashboard/messages' },
     { name: 'Tareas', href: '/dashboard/tasks' },
     { name: 'Automatizaciones', href: '/dashboard/automations' },
+    { name: 'Registro Sistema', href: '/dashboard/logs' },
   ]
 
   return (

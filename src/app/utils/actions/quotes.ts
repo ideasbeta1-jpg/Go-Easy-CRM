@@ -4,11 +4,20 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { stripe } from '@/utils/stripe'
 import { executeStageAutomation } from '@/utils/automation-engine'
+import { logLeadEvent, LEAD_EVENT } from '@/lib/leads/events'
 
 export async function generateQuoteForLead(leadId: string, totalAmount: number) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Unauthorized')
+
+  // ¿Existe ya una cotización activa? → este enlace es una regeneración.
+  const { count: activeQuotes } = await supabase
+    .from('quotes')
+    .select('id', { count: 'exact', head: true })
+    .eq('lead_id', leadId)
+    .eq('is_active', true)
+  const wasRegenerated = (activeQuotes ?? 0) > 0
 
   // 1. Fetch Lead data
   const { data: lead } = await supabase
@@ -128,6 +137,19 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     .eq('id', quote.id)
 
   if (updateQuoteError) throw new Error(updateQuoteError.message)
+
+  // 7.1 Registrar el evento en la línea de tiempo (con enlace de pago)
+  await logLeadEvent(supabase, {
+    leadId,
+    type: LEAD_EVENT.QUOTE_GENERATED,
+    actorId: user.id,
+    metadata: {
+      quote_id: quote.id,
+      total_amount: totalAmount,
+      stripe_link: session.url,
+      regenerated: wasRegenerated,
+    },
+  })
 
   // 8. Trigger Automation Engine
   await executeStageAutomation(leadId, 'en_cotizacion', {

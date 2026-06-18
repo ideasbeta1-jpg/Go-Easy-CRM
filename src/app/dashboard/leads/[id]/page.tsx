@@ -47,6 +47,7 @@ export default async function LeadDetailPage({
     providerOfficesRes,
     messagesRes,
     notesRes,
+    eventsRes,
     tasksRes
   ] = await Promise.all([
     leadRaw.category_id ? supabase.from('categories').select('*').eq('id', leadRaw.category_id).single() : Promise.resolve({ data: null, error: null }),
@@ -64,6 +65,7 @@ export default async function LeadDetailPage({
       ? supabase.from('messages').select('*', { count: 'exact' }).eq('contact_id', leadRaw.contact_id).order('created_at', { ascending: false }).limit(50)
       : supabase.from('messages').select('*', { count: 'exact' }).eq('lead_id', id).order('created_at', { ascending: false }).limit(50),
     supabase.from('lead_notes').select('*, profiles(full_name)').eq('lead_id', id).order('created_at', { ascending: false }),
+    supabase.from('lead_events').select('*, actor:profiles(full_name, avatar_url)').eq('lead_id', id).order('created_at', { ascending: false }),
     getTasksForLead(id)
   ])
 
@@ -108,6 +110,8 @@ export default async function LeadDetailPage({
         messages={(messagesRes.data || []).reverse()}
         totalMessages={messagesRes.count ?? 0}
         leadNotes={notesRes.data || []}
+        leadEvents={eventsRes.data || []}
+        allVouchers={vouchersRes.data || []}
         tasks={tasksRes.tasks || []}
         currentUser={currentUserProfile}
       />

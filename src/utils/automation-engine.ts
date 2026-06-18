@@ -4,6 +4,7 @@ import { sendEmail, getStageEmailTemplate } from './email';
 import { sendLeadToN8n } from './n8n';
 import { broadcastNotification } from '@/app/utils/actions/notifications';
 import { scheduleRulesForStage } from './automation-scheduler';
+import { logSystemEvent, type LogCategory } from './system-log';
 
 /**
  * Motor central de automatización de Go Easy CRM
@@ -404,5 +405,24 @@ async function logAutomation(
     });
   } catch (err) {
     console.error('CRITICAL: Error logging automation result:', err);
+  }
+
+  // Espejo en la bitácora central: solo los fallos reales (no 'skipped'/'sent'/'success'),
+  // para que cada canal que falla aparezca en /dashboard/logs y en el semáforo de salud.
+  if (status === 'failed' || status === 'error') {
+    const KNOWN: LogCategory[] = ['whatsapp', 'email', 'n8n', 'meta_capi', 'system'];
+    const category: LogCategory = (KNOWN as string[]).includes(channel)
+      ? (channel as LogCategory)
+      : 'system';
+    await logSystemEvent({
+      category,
+      source: 'automation_engine',
+      severity: 'error',
+      status: 'failed',
+      message: `Automatización fallida en etapa "${stage}" (${template_name})`,
+      error: error_message,
+      leadId: lead_id,
+      context: { stage, channel, action: template_name },
+    });
   }
 }

@@ -26,6 +26,13 @@ interface SystemSettings {
   updated_at?: string
 }
 
+// Todas las horas del día (formato 12h AM/PM)
+const TIME_OPTIONS = Array.from({ length: 24 }, (_, h) => {
+  const period = h < 12 ? 'AM' : 'PM'
+  const hour12 = h % 12 === 0 ? 12 : h % 12
+  return `${hour12}:00 ${period}`
+})
+
 function LandingPageContent() {
   const [categories, setCategories] = useState<Category[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -348,9 +355,10 @@ function LandingPageContent() {
                         <label className="block text-sm font-bold text-gray-800">Fecha de llegada</label>
                         <input 
                           required
-                          type="date" 
+                          type="date"
                           value={form.pickup_date}
                           min={today}
+                          onClick={(e) => e.currentTarget.showPicker?.()}
                           onChange={(e) => {
                             const newPickup = e.target.value;
                             const d = new Date(newPickup + 'T12:00:00');
@@ -369,9 +377,10 @@ function LandingPageContent() {
                         <label className="block text-sm font-bold text-gray-800">Fecha de devolución</label>
                         <input 
                           required
-                          type="date" 
+                          type="date"
                           value={form.return_date}
                           min={form.pickup_date || today}
+                          onClick={(e) => e.currentTarget.showPicker?.()}
                           onChange={(e) => set('return_date', e.target.value)}
                           className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700" 
                         />
@@ -387,7 +396,7 @@ function LandingPageContent() {
                           onChange={(e) => set('pickup_time', e.target.value)}
                           className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
                         >
-                          {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
+                          {TIME_OPTIONS.map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
                         </select>
@@ -400,7 +409,7 @@ function LandingPageContent() {
                           onChange={(e) => set('return_time', e.target.value)}
                           className="block w-full border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-primary-blue focus:border-primary-blue text-base py-3 px-4 text-gray-700"
                         >
-                          {['8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM', '6:00 PM', '7:00 PM', '8:00 PM'].map(t => (
+                          {TIME_OPTIONS.map(t => (
                             <option key={t} value={t}>{t}</option>
                           ))}
                         </select>

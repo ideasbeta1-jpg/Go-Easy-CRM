@@ -7,6 +7,8 @@ import { assignLeadWithContact } from '@/utils/assignment'
 import { VALID_TRANSITIONS } from '@/lib/leads/transitions'
 import { scheduleDateRulesForLead } from '@/utils/automation-scheduler'
 import { findOrCreateContact } from '@/lib/contacts/findOrCreate'
+import { logLeadEvent, LEAD_EVENT } from '@/lib/leads/events'
+import { logSystemEvent } from '@/utils/system-log'
 
 export async function createLead(formData: FormData) {
   const supabase = await createClient()
@@ -24,6 +26,11 @@ export async function createLead(formData: FormData) {
   // Contacto (persona) único por teléfono; la reserva siempre se crea (puede haber varias por contacto).
   const contact = await findOrCreateContact(supabase, { first_name, last_name, phone, email })
   if (!contact) {
+    await logSystemEvent({
+      category: 'form', source: 'lead_form', severity: 'error', status: 'failed',
+      message: 'Registro de formulario fallido: no se pudo crear/encontrar el contacto',
+      context: { first_name, last_name, phone, email },
+    })
     throw new Error('No se pudo registrar el contacto.')
   }
 
@@ -45,6 +52,12 @@ export async function createLead(formData: FormData) {
   const { data: newLead, error } = await supabase.from('leads').insert(data).select('id').single()
 
   if (error) {
+    await logSystemEvent({
+      category: 'form', source: 'lead_form', severity: 'error', status: 'failed',
+      message: 'Registro de formulario fallido: no se pudo insertar el lead',
+      error: error.message,
+      context: { contact_id: contact.id, first_name, last_name, phone, email },
+    })
     throw new Error(error.message)
   }
 
@@ -64,6 +77,7 @@ export async function createLead(formData: FormData) {
 
 export async function updateLeadStatus(id: string, status: string, lostReason?: string) {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   // Fetch current status to check if transition is valid
   const { data: current, error: fetchError } = await supabase
@@ -96,6 +110,17 @@ export async function updateLeadStatus(id: string, status: string, lostReason?: 
   if (error) {
     throw new Error(error.message)
   }
+
+  // Registro append-only del cambio de etapa (incl. movimientos hacia atrás):
+  // un evento nuevo por cada movimiento, con etapa origen→destino y autor.
+  await logLeadEvent(supabase, {
+    leadId: id,
+    type: LEAD_EVENT.STAGE_CHANGE,
+    actorId: user?.id ?? null,
+    fromStatus: current.status,
+    toStatus: status,
+    metadata: lostReason ? { lost_reason: lostReason } : {},
+  })
 
   // Only fire automation for allowed transitions to prevent accidental re-triggers
   const allowedNext = VALID_TRANSITIONS[current.status] ?? []

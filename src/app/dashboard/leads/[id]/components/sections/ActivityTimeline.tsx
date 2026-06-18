@@ -14,6 +14,9 @@ interface TimelineEvent {
   desc: string
   isMismatch?: boolean
   quoteId?: string
+  actor?: string
+  href?: string
+  linkLabel?: string
 }
 
 interface Props {
@@ -58,6 +61,10 @@ export function ActivityTimeline({ events, activeQuote, onRegenerateQuote }: Pro
                 </div>
                 <p className={`text-xs font-bold mt-2 ${event.isMismatch ? 'text-red-600' : 'text-slate-500'}`}>{event.desc}</p>
 
+                {event.actor && (
+                  <p className="text-[10px] font-bold text-slate-400 mt-1.5">por {event.actor}</p>
+                )}
+
                 {/* Link button for any quote event that has a quoteId */}
                 {isQuoteEvent && event.quoteId && (
                   <div className="mt-4 flex flex-wrap gap-3">
@@ -72,6 +79,20 @@ export function ActivityTimeline({ events, activeQuote, onRegenerateQuote }: Pro
                     >
                       <ExternalLink className="w-3 h-3" />
                       {isActiveQuoteEvent ? 'Ver Propuesta Activa' : 'Ver Enlace (Invalidado)'}
+                    </Link>
+                  </div>
+                )}
+
+                {/* Enlace genérico (vouchers u otros eventos con href) */}
+                {!isQuoteEvent && event.href && (
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href={event.href}
+                      target="_blank"
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border-indigo-100"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      {event.linkLabel || 'Ver'}
                     </Link>
                   </div>
                 )}

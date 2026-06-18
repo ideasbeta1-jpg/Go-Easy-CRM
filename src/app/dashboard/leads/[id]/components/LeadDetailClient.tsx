@@ -4,10 +4,10 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, MessageSquare, Send, Users, User, Car, Clock, DollarSign,
+  ArrowLeft, ArrowRight, MessageSquare, Send, Users, User, Car, Clock, DollarSign,
   CheckCircle2, AlertCircle, Zap, X, Trash2, Calculator, Mic, Volume2,
   Hash, FileText, ChevronDown, ChevronUp, Phone, Mail, MoreHorizontal,
-  Check, Paperclip
+  Check, Paperclip, UserCheck, Pencil, StickyNote
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -73,6 +73,8 @@ export default function LeadDetailClient({
   messages: initialMessages,
   totalMessages,
   leadNotes,
+  leadEvents = [],
+  allVouchers = [],
   tasks: initialTasks,
   notesError,
   currentUser
@@ -89,6 +91,8 @@ export default function LeadDetailClient({
   messages: any[]
   totalMessages: number
   leadNotes: any[]
+  leadEvents?: any[]
+  allVouchers?: any[]
   tasks: Task[]
   notesError?: any
   currentUser?: any
@@ -445,10 +449,26 @@ export default function LeadDetailClient({
   const isUrgent = ['lead_nuevo', 'en_cotizacion'].includes(formData.status) && hoursOld > 48
 
   // Timeline events
-  interface TimelineEvent { id: string; title: string; date: string | any; icon: any; color: string; desc: string; isMismatch?: boolean; quoteId?: string }
+  interface TimelineEvent { id: string; title: string; date: string | any; icon: any; color: string; desc: string; isMismatch?: boolean; quoteId?: string; actor?: string; href?: string; linkLabel?: string }
   const timelineEvents: TimelineEvent[] = [
     { id: 'created', title: 'Lead Capturado', date: lead.created_at || new Date().toISOString(), icon: User, color: 'bg-primary text-white', desc: 'Registro inicial creado en el CRM' }
   ]
+
+  // Helpers de presentación para los eventos del registro de auditoría
+  const agentNameById = (id: string | null) => agents.find((a: any) => a.id === id)?.full_name || (id ? 'Agente' : 'Sin asignar')
+  const categoryNameById = (id: string | null) => categories.find((c: any) => c.id === id)?.name || '—'
+  const statusLabel = (s: string | null) => (s ? STATUS_MAP[s] || s : '—')
+  const fmtDateValue = (v: any) => { try { return v ? format(new Date(v), 'dd MMM yyyy', { locale: es }) : '—' } catch { return String(v ?? '—') } }
+  const fieldChangeDesc = (m: any) => {
+    const label = m.label || m.field
+    let oldV = m.old_value, newV = m.new_value
+    if (m.field === 'category_id') { oldV = categoryNameById(oldV); newV = categoryNameById(newV) }
+    else if (m.field === 'total_amount') { oldV = `$${Number(oldV || 0).toFixed(2)}`; newV = `$${Number(newV || 0).toFixed(2)}` }
+    else if (typeof m.field === 'string' && m.field.includes('date')) { oldV = fmtDateValue(oldV); newV = fmtDateValue(newV) }
+    return `${label}: ${oldV ?? '—'} → ${newV ?? '—'}`
+  }
+  // Notas manuales del agente (excluye marcadores legacy como [VOUCHER_GENERATED])
+  const manualNotes = (leadNotes || []).filter((n: any) => !n.content?.trim().startsWith('['))
 
   // Build quote history events from all quotes (sorted oldest first)
   const sortedQuotes = [...allQuotes].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -497,12 +517,73 @@ export default function LeadDetailClient({
     })
   }
 
-  if (activeVoucher) {
-    timelineEvents.push({ id: 'voucher', title: 'Voucher Enviado', date: activeVoucher.created_at, icon: FileText, color: 'bg-indigo-600 text-white', desc: `Voucher (${activeVoucher.confirmation_number}) enviado al cliente.` })
-  }
-  if (lead.deposit_paid) {
+  // Vouchers (todos, no solo el activo) — append-only desde la tabla vouchers
+  ;(allVouchers || []).forEach((v: any) => {
+    timelineEvents.push({
+      id: `voucher-${v.id}`,
+      title: 'Voucher Enviado',
+      date: v.created_at,
+      icon: FileText,
+      color: 'bg-indigo-600 text-white',
+      desc: `Voucher (${v.confirmation_number}) enviado al cliente.`,
+      href: `/v/${v.id}`,
+      linkLabel: 'Ver Voucher',
+    })
+  })
+
+  // Eventos del registro de auditoría (lead_events): etapa, pago, reasignación,
+  // edición de datos. Cotización/voucher se reconstruyen desde sus tablas arriba.
+  const hasPaymentEvent = (leadEvents || []).some((e: any) => e.event_type === 'payment_confirmed')
+  ;(leadEvents || []).forEach((ev: any) => {
+    const actor = ev.actor?.full_name || ev.actor_label || 'Sistema'
+    const m = ev.metadata || {}
+    switch (ev.event_type) {
+      case 'stage_change':
+        timelineEvents.push({
+          id: `event-${ev.id}`, title: 'Cambio de Etapa', date: ev.created_at, icon: ArrowRight,
+          color: 'bg-slate-700 text-white', actor,
+          desc: `${statusLabel(ev.from_status)} → ${statusLabel(ev.to_status)}${m.lost_reason ? ` · Motivo: ${m.lost_reason}` : ''}`,
+        })
+        break
+      case 'payment_confirmed':
+        timelineEvents.push({
+          id: `event-${ev.id}`, title: 'Pago Confirmado', date: ev.created_at, icon: DollarSign,
+          color: 'bg-emerald-600 text-white', actor,
+          desc: m.amount
+            ? `Depósito de $${Number(m.amount).toFixed(2)} ${m.currency || ''} recibido${m.stripe_payment_id ? ` · Ref: ${m.stripe_payment_id}` : ''}`
+            : `Pago del cliente confirmado${m.simulated ? ' (simulación)' : ''}`,
+        })
+        break
+      case 'agent_assigned':
+        timelineEvents.push({
+          id: `event-${ev.id}`, title: 'Reasignación de Agente', date: ev.created_at, icon: UserCheck,
+          color: 'bg-purple-600 text-white', actor,
+          desc: `${agentNameById(m.from_agent)} → ${agentNameById(m.to_agent)}`,
+        })
+        break
+      case 'field_changed':
+        timelineEvents.push({
+          id: `event-${ev.id}`, title: 'Dato Actualizado', date: ev.created_at, icon: Pencil,
+          color: 'bg-slate-500 text-white', actor, desc: fieldChangeDesc(m),
+        })
+        break
+      // quote_generated / voucher_generated: ya reconstruidos desde quotes/vouchers
+    }
+  })
+
+  // Respaldo: leads viejos ya pagados sin evento de pago registrado
+  if (lead.deposit_paid && !hasPaymentEvent) {
     timelineEvents.push({ id: 'payment', title: 'Depósito Recibido', date: lead.updated_at, icon: DollarSign, color: 'bg-emerald-600 text-white', desc: `Pago confirmado (Ref: ${lead.stripe_payment_id || 'Manual'})` })
   }
+
+  // Notas internas manuales (excluye marcadores legacy tipo [VOUCHER_GENERATED])
+  manualNotes.forEach((n: any) => {
+    timelineEvents.push({
+      id: `note-${n.id}`, title: 'Nota Interna', date: n.created_at, icon: StickyNote,
+      color: 'bg-slate-400 text-white', actor: n.profiles?.full_name || 'Agente', desc: n.content,
+    })
+  })
+
   timelineEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
   // Shared style helpers
@@ -1343,18 +1424,18 @@ export default function LeadDetailClient({
           <div className="border-t border-slate-100 flex flex-col shrink-0" style={{ height: '260px' }}>
             <div className="px-5 py-3.5 flex items-center gap-2 shrink-0">
               <h3 className="text-sm font-bold text-slate-900">Notas internas</h3>
-              {leadNotes.length > 0 && (
+              {manualNotes.length > 0 && (
                 <span className="bg-slate-100 text-slate-500 text-[10px] font-black rounded-full px-2 py-0.5 leading-none">
-                  {leadNotes.length}
+                  {manualNotes.length}
                 </span>
               )}
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 space-y-3 scrollbar-hide">
-              {leadNotes.length === 0 && (
+              {manualNotes.length === 0 && (
                 <p className="text-xs text-slate-400 text-center py-2">Sin notas aún</p>
               )}
-              {leadNotes.map((note: any) => {
+              {manualNotes.map((note: any) => {
                 const noteAge = formatDistanceToNow(new Date(note.created_at), { addSuffix: true, locale: es })
                 const name = note.profiles?.full_name || 'Agente'
                 const initials = name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
