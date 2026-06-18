@@ -46,12 +46,15 @@ En **móvil**, la sidebar se oculta y aparece una navegación inferior (`MobileA
 | :--- | :--- | :--- |
 | Inicio | `/dashboard` | Todos |
 | Leads (Kanban) | `/dashboard/leads` | Todos |
+| Contactos | `/dashboard/contactos` | Admin todos · Agente asignados |
+| Tareas | `/dashboard/tasks` | Todos (propias) |
 | Chats WhatsApp | `/dashboard/chats` | Todos |
 | Catálogo Flota | `/dashboard/catalog` | Todos |
 | Proveedores | `/dashboard/providers` | Todos |
 | Reportes | `/dashboard/reports` | Todos |
 | Mensajes | `/dashboard/messages` | Todos |
-| Automatizaciones | `/dashboard/automations` | Todos |
+| Automatizaciones | `/dashboard/automations` | Admin |
+| Logs del Sistema | `/dashboard/logs` | Admin |
 | Configuración | `/dashboard/settings` | Admin |
 
 ---
@@ -103,19 +106,28 @@ Cada tarjeta muestra:
 ### Detalle del lead
 
 **Ruta:** `/dashboard/leads/[id]`
-**Componente principal:** `LeadDetailClient.tsx`
+**Componente principal:** `LeadDetailClient.tsx` · secciones en `components/sections/`
 
-Vista completa del lead con:
-- Información del cliente (editable)
-- Fechas y ubicaciones (editables)
-- Sistema de precios con triple control (editable)
-- Chat de WhatsApp inline
-- Línea de tiempo de eventos
-- Notas internas del equipo
-- Asignación de proveedor
-- Generación de cotización y voucher
-- Historial de llamadas Zadarma
-- Botón de llamada Click-to-Call
+Layout de dos columnas (izquierda: tabs; derecha: chat WhatsApp + últimas notas). Encabezado con ID corto `GE-{últimos 4}`, badge de estado, badge "Urgente" (si >48h en lead nuevo/cotización) y acciones: Click-to-Call, Email, retroceder/avanzar etapa, archivar (soft delete).
+
+**Barra de pipeline (`PipelineStatusBar`):** 6 etapas clickeables con etapa actual destacada, pasadas con check y futuras en gris.
+
+**Tabs:**
+
+| Tab | Contenido |
+| :--- | :--- |
+| **Información** | Datos del cliente, fecha de recogida, categoría, agente, notas internas, toggle "Depósito Recibido", resumen de cobro |
+| **Cotización** | Selector de vehículo, días/$día/total, rate plan base↔premium, logística pickup/return, negociación triple control, generar/regenerar cotización |
+| **Voucher** | Datos del conductor, nº de confirmación del proveedor, generar/guardar borrador de voucher |
+| **Historial** | Línea de tiempo (`ActivityTimeline`): cotizaciones, vouchers, cambios de etapa, pagos, notas y eventos de `lead_events` |
+| **Tareas** | `TasksPanel`: tareas del lead, crear, completar con resultado, cancelar |
+| **Chat** | Historial WhatsApp con scroll infinito, audio grabado, optimistic updates |
+
+**Banner de cliente recurrente (`ContactReservationsBanner`):** si el lead pertenece a un contacto con otras reservas, muestra un resumen y enlace a su ficha.
+
+**Panel de llamadas (`CallLogPanel`):** llamadas Zadarma asociadas al lead.
+
+**Sistema de precios — triple control:** ver [`esquema-datos.md`](esquema-datos.md#13-lógica-de-cálculo-y-negociación-sistema-de-triple-control).
 
 ---
 
@@ -223,28 +235,69 @@ Historial completo de todos los mensajes del CRM. Diferente a `/chats` (que agru
 
 ## 9. Automatizaciones
 
-**Ruta:** `/dashboard/automations`
-**Componente principal:** `AutomationConfigPanel.tsx`
+**Ruta:** `/dashboard/automations` · **Acceso:** Admin
+**Componentes:** `AutomationConfigPanel`, `RulesPanel`, `PendingActionsPanel`, `FailedLogsPanel`
 
-### Descripción
+Centro de control del motor. Ver lógica completa en [`automatizaciones.md`](automatizaciones.md). Cuatro paneles:
 
-Panel para configurar y monitorear el motor de automatización. Permite a los administradores controlar qué automatizaciones están activas por etapa del pipeline.
+#### 9.1 Control de Canales (`AutomationConfigPanel`)
+Matriz **etapa × canal** con toggles sobre la tabla `automation_config`. Canales: WhatsApp 💬, Email 📧, n8n ⚙️, Meta CAPI 📊, Notif. Interna 🔔, WA al Agente 🤝.
 
-### Funcionalidades
+#### 9.2 Reglas (`RulesPanel`)
+CRUD de `automation_rules`. Constructor de regla: **disparador** (`stage_delay` / `date_field` / `inactivity`) → **acción** (`whatsapp_template`, `whatsapp_text`, `change_stage`, `notify_agent`, `create_task`). Para `create_task` configura tipo, título, vencimiento, prioridad y follow-ups por resultado (positiva/negativa/sin respuesta).
 
-- **Activar/desactivar** automatizaciones por etapa y canal (WhatsApp / Email)
-- **Ver logs** de las últimas ejecuciones del motor (tabla `automation_logs`)
-- **Filtrar logs** por status (`sent`, `failed`), etapa o canal
-- **Ver detalles** de errores cuando una automatización falla
-- **Panel de acciones pendientes**: automatizaciones programadas (retrasadas) que aún no se han ejecutado con opción de cancelación
+#### 9.3 Cola de Acciones (`PendingActionsPanel`)
+Vista de `pending_actions`: **Próximas** (`pending`/`processing`) e **Historial** (`done`/`failed`/`cancelled`). Cada fila muestra lead, regla, estado, error y hora de ejecución; las pendientes pueden cancelarse.
 
-### Tipos de acciones
+#### 9.4 Fallos (`FailedLogsPanel`)
+Últimas automatizaciones con status `failed`/`error` (tabla `automation_logs`) con botón **Reintentar** (`retryAutomation`).
 
-| Tipo | Descripción |
+---
+
+## 9b. Tareas
+
+**Ruta:** `/dashboard/tasks`
+**Componente principal:** `TasksClient.tsx`
+
+Bandeja centralizada de tareas del usuario (propias). Soporta filtros (Pendientes / Completadas / Todas), búsqueda y registro de resultados.
+
+| Concepto | Valores |
 | :--- | :--- |
-| Inmediata | Se ejecuta en el momento del trigger |
-| Programada | Se ejecuta después de un delay definido en horas/días |
-| Inactividad | Se ejecuta si el lead no avanza en X días |
+| **Tipo** (`task_type`) | `call` (azul), `whatsapp` (verde), `meeting` (púrpura), `email` (ámbar), `custom` (gris) |
+| **Estado** (`status`) | `pending`, `in_progress`, `completed`, `cancelled` |
+| **Prioridad** (`priority`) | `low`, `medium`, `high`, `urgent` |
+| **Resultado** (`outcome`) | `positive` ✅, `negative` ❌, `no_answer` 📵 |
+| **Origen** (`source`) | `manual` o `automation` (badge) |
+
+Las tareas también aparecen en el Lead Detail (`TasksPanel`), en un banner del Kanban (`TaskBanner`, "tienes X tareas para hoy") y se completan vía `TaskOutcomeModal`. El seguimiento automático (follow-up) se describe en [`automatizaciones.md`](automatizaciones.md#tareas-y-seguimiento-follow-up).
+
+---
+
+## 9c. Contactos
+
+**Ruta:** `/dashboard/contactos` · **Detalle:** `/dashboard/contactos/[id]`
+**Componente principal:** `ContactsDirectoryClient.tsx`
+
+Directorio de **clientes** (`contacts`). Un contacto es una persona única; un lead es una reserva concreta. Un contacto puede acumular varias reservas. Deduplicación por `phone_normalized`.
+
+**Directorio:** nombre, teléfono, email, total de reservas, reservas ganadas, **LTV** (suma de `total_amount` de leads `cerrado_ganado`), última actividad y badge "Recurrente" (2+ reservas). Orden por defecto: LTV descendente. Métricas resumen: total de contactos, recurrentes y valor total ganado.
+
+**Ficha de contacto:** encabezado con datos + agente, tarjetas KPI (total reservas, valor ganado, cliente desde) y tabla de todas sus reservas con estado, fecha, categoría y total.
+
+**Acceso:** admin ve todos; agente solo los contactos con `assigned_to = su id`.
+
+---
+
+## 9d. Logs del Sistema
+
+**Ruta:** `/dashboard/logs` · **Acceso:** Admin
+**Componente principal:** `SystemLogsPanel.tsx`
+
+Bitácora de salud de las integraciones (tabla `system_logs`). **Semáforo** por integración según errores de la última hora: ✅ Operativo (0), ⚠️ Inestable (1-2), 🔴 Caído (3+ o `critical`).
+
+Integraciones monitoreadas: WhatsApp 💬, Email 📧, Pagos 💳, Formularios 📋, n8n ⚙️ (también `meta_capi`, `system`).
+
+**Filtros:** por categoría, por severidad (`info`/`warning`/`error`/`critical`) y búsqueda libre. Muestra los últimos 150 eventos con badges, mensaje, detalle técnico, tiempo relativo y enlace al lead si aplica.
 
 ---
 
@@ -328,12 +381,18 @@ Cuando llega una notificación:
 
 ### Tipos de notificaciones
 
-| Tipo (`type`) | Descripción | Quién la recibe |
+| Tipo (`type`) | Emoji | Descripción |
 | :--- | :--- | :--- |
-| `lead_assigned` | Nuevo lead asignado | Agente asignado |
-| `payment_confirmed` | Pago recibido vía Stripe | Agente asignado |
-| `new_message` | Nuevo mensaje de WhatsApp | Agente asignado |
-| `new_lead` | Lead nuevo en el sistema | Todos los agentes activos |
+| `new_lead` | 🟢 | Lead nuevo en el sistema |
+| `lead_assigned` | 👤 | Nuevo lead asignado al agente |
+| `payment_confirmed` | 💰 | Pago recibido vía Stripe |
+| `new_message` | 💬 | Nuevo mensaje de WhatsApp |
+| `quote_generated` | 📄 | Cotización generada |
+| `voucher_sent` | 📋 | Voucher enviado |
+| `lead_closed` | ✅ | Lead cerrado (ganado/perdido) |
+| `status_changed` | 🔄 | Cambio de etapa |
+
+Los colores y emojis se definen en `NotificationBell.tsx`. El `NotificationProvider` además reproduce un beep (Web Audio API), dispara notificaciones de escritorio y web push.
 
 ---
 

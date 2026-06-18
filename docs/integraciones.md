@@ -14,10 +14,12 @@ La integración oficial con Meta para enviar mensajes aprobados (templates) a cl
 
 ### Variables de entorno necesarias
 ```
-WABA_ACCESS_TOKEN=EAAG...
+WABA_ID=...                     # WhatsApp Business Account ID
 WABA_PHONE_NUMBER_ID=123456789012345
-WABA_BUSINESS_ACCOUNT_ID=...
-WABA_API_VERSION=v21.0
+WABA_ACCESS_TOKEN=EAAG...
+WABA_VERSION=v21.0
+WABA_APP_SECRET=...             # valida firma del webhook (x-hub-signature-256)
+WABA_VERIFY_TOKEN=...           # verificación GET del webhook
 ```
 
 ### Flujo de uso
@@ -29,7 +31,7 @@ WABA_API_VERSION=v21.0
 
 ### Endpoint de la API
 ```
-POST https://graph.facebook.com/{WABA_API_VERSION}/{WABA_PHONE_NUMBER_ID}/messages
+POST https://graph.facebook.com/{WABA_VERSION}/{WABA_PHONE_NUMBER_ID}/messages
 Authorization: Bearer {WABA_ACCESS_TOKEN}
 Content-Type: application/json
 ```
@@ -71,7 +73,7 @@ El endpoint `POST /api/webhooks/whatsapp` recibe:
 | `cotizacion_enviada` | `en_cotizacion` | `es` |
 | `reserva_confirmada` | `reserva_confirmada` | `es` |
 | `voucher_disponible` | `voucher_enviado` | `es_CO` |
-| `gracias_feedback` | `cerrado` | `es` |
+| `gracias_feedback` | `cerrado_ganado` | `es` |
 
 > Los templates deben estar aprobados previamente en Meta Business Suite antes de poder usarlos.
 
@@ -87,9 +89,9 @@ Cliente alternativo de WhatsApp que permite enviar mensajes de texto libre (no s
 
 ### Variables de entorno necesarias
 ```
-EVOLUTION_API_URL=https://evolution.tudominio.com
-EVOLUTION_API_KEY=tu-api-key-evolution
-EVOLUTION_INSTANCE_NAME=goeasy
+WHATSAPP_EVOLUTION_URL=https://evolution.tudominio.com
+WHATSAPP_EVOLUTION_KEY=tu-api-key-evolution
+WHATSAPP_EVOLUTION_INSTANCE=goeasy
 ```
 
 ### Diferencia clave vs. WABA
@@ -167,11 +169,12 @@ Integración con el PBX en la nube de Zadarma para realizar llamadas directament
 
 ### Variables de entorno necesarias
 ```
-ZADARMA_USER_ID=tu-user-id
-ZADARMA_API_KEY=tu-api-key
-ZADARMA_API_SECRET=tu-api-secret
-ZADARMA_WEBHOOK_SECRET=secreto-hmac
+ZADARMA_USER_KEY=tu-user-key
+ZADARMA_SECRET_KEY=tu-secret-key
+ZADARMA_PBX_NUMBER=...           # número PBX para el widget WebRTC
 ```
+
+> La firma HMAC del webhook se construye con `ZADARMA_SECRET_KEY` (ver `src/lib/zadarma.ts`). Endpoints WebRTC: `/api/zadarma/webrtc-key`; credencial SIP del agente en `profiles.zadarma_sip` / `zadarma_sip_password`.
 
 ### Configuración por agente
 
@@ -182,8 +185,10 @@ Cada agente debe tener su extensión PBX configurada en el campo `zadarma_sip` d
 | Endpoint | Método | Descripción |
 | :--- | :--- | :--- |
 | `/api/zadarma/click-to-call` | `POST` | Inicia una llamada saliente desde el CRM |
-| `/api/zadarma/webhook` | `POST` | Recibe eventos: llamada iniciada, contestada, finalizada, grabación lista |
+| `/api/zadarma/webhook` | `GET/POST` | Recibe eventos: llamada iniciada, contestada, finalizada, grabación lista |
 | `/api/zadarma/calls` | `GET` | Lista el historial de llamadas de un lead |
+| `/api/zadarma/webrtc-key` | `POST` | Credenciales WebRTC para el widget del agente |
+| `/api/zadarma/test` | `GET` | Test de conexión |
 
 ### Eventos del webhook de Zadarma
 
@@ -207,7 +212,7 @@ Servicio de envío de emails transaccionales. Usado para confirmar cotizaciones,
 ### Variables de entorno necesarias
 ```
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=noreply@goeasy.com
+EMAIL_FROM=Goeasy Florida <reservas@tudominio.com>
 ```
 
 ### Templates de email
@@ -220,7 +225,7 @@ Los templates HTML se almacenan en la tabla `email_templates` (una fila por etap
 | `en_cotizacion` | "Tu propuesta personalizada está lista" |
 | `reserva_confirmada` | "¡Reserva confirmada! Detalles de tu vehículo" |
 | `voucher_enviado` | "Tu voucher de reserva - Go Easy Florida" |
-| `cerrado` | "¡Gracias por confiar en Go Easy Florida!" |
+| `cerrado_ganado` | "¡Gracias por confiar en Go Easy Florida!" |
 
 ### Gestión de templates
 
@@ -239,18 +244,20 @@ Envía eventos de conversión directamente al pixel de Facebook para mejorar el 
 ### Variables de entorno necesarias
 ```
 NEXT_PUBLIC_FB_PIXEL_ID=123456789
-META_CAPI_ACCESS_TOKEN=...
+FB_ACCESS_TOKEN=...
+FB_TEST_EVENT_CODE=...        # opcional — test events
 ```
 
 ### Eventos que se envían
 
-| Evento | Cuándo | Descripción |
+| Evento | Etapa | Descripción |
 | :--- | :--- | :--- |
-| `Lead` | Nuevo lead creado | Captación de interés |
-| `InitiateCheckout` | Cotización generada | El cliente recibe el link de pago |
-| `Purchase` | Webhook de Stripe confirm | Reserva completada con pago |
+| `Lead` | `lead_nuevo` | Captación de interés |
+| `InitiateCheckout` | `en_cotizacion` | El cliente recibe el link de pago |
+| `Purchase` | `reserva_confirmada` | Reserva pagada (valor = depósito) |
+| `Schedule` | `voucher_enviado` | Voucher entregado |
 
-> La integración es opcional. Si `NEXT_PUBLIC_FB_PIXEL_ID` no está definida, los eventos no se envían.
+> El PII (email, teléfono, nombre) se envía hasheado con SHA-256. Cada evento usa `eventID = {leadId}_{stage}` para deduplicar con el pixel del cliente. Si `NEXT_PUBLIC_FB_PIXEL_ID` no está definida, no se envían eventos.
 
 ---
 
@@ -280,39 +287,42 @@ npx web-push generate-vapid-keys
 1. El agente abre el CRM en el navegador.
 2. El componente `PWAHead` solicita permiso para notificaciones.
 3. Si el usuario acepta, el service worker crea una suscripción.
-4. El CRM guarda la suscripción en la tabla `push_subscriptions` vía `POST /api/push`.
+4. El CRM guarda la suscripción en la tabla `push_subscriptions` vía `POST /api/push/subscribe`.
 5. Cuando ocurre un evento, el backend itera las suscripciones del usuario y envía la notificación.
 
 ### Endpoint de suscripción
 
 ```
-POST /api/push
+POST /api/push/subscribe
 Body: { subscription: PushSubscription, user_id: string }
 ```
 
+> Las suscripciones inválidas (respuestas `410`/`404`) se eliminan automáticamente al enviar (`push-notifications.ts`).
+
 ---
 
-## 8. n8n (Fallback Pasivo)
+## 8. n8n (Bus de Eventos Secundario)
 
 ### Descripción
-n8n actúa como bus de eventos secundario. El motor interno de automatización es el ejecutor principal. n8n solo recibe una copia del evento si `N8N_WEBHOOK_URL` está configurada.
+n8n actúa como bus de eventos secundario. El motor interno de automatización es el ejecutor principal; n8n recibe una copia del evento para integraciones externas (grupos de WhatsApp de proveedores, etc.).
 
 ### Archivo principal
 `src/utils/n8n.ts`
 
-### Variable de entorno
-```
-N8N_WEBHOOK_URL=https://n8n.tudominio.com/webhook/...
-# Dejar vacío para desactivar completamente
-```
+### Configuración
+La URL base del webhook está **fijada en el código** (`https://n8nib.ideasbeta.com/webhook`), no se configura por variable de entorno. El evento se mapea a una ruta según la etapa:
+
+| Etapa | Ruta del webhook |
+| :--- | :--- |
+| `lead_nuevo` | `nuevo-lead-whatsapp` |
+| `reserva_confirmada` | `pago-recibido-whatsapp` |
+| `voucher_enviado` | `confirmacion-proveedor-whatsapp` |
 
 ### Cuándo se activa
 
 ```typescript
-// En automation-engine.ts, después de ejecutar la automatización principal:
-if (process.env.N8N_WEBHOOK_URL) {
-  await sendLeadToN8n(leadData)
-}
+// automation-engine.ts, tras la automatización principal (si el canal n8n está habilitado):
+await sendLeadToN8n(leadId, event, payload)
 ```
 
-Los workflows de n8n legacy están en el directorio `n8n-workflows/` del repositorio para referencia histórica.
+Los workflows de n8n están en el directorio `n8n-workflows/` del repositorio.

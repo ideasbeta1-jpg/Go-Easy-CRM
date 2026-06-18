@@ -9,6 +9,8 @@
 | **Fecha** | Marzo 2026 |
 | **Estado** | Definición para Desarrollo |
 
+> 📌 **Nota:** este es el documento de **visión original**. El producto evolucionó desde entonces (motor de automatización interno, contactos, tareas con follow-up, logs del sistema, doble cierre ganado/perdido, Meta CAPI, Zadarma VoIP). Para el estado actual ver [arquitectura](arquitectura.md), [esquema de datos](esquema-datos.md), [automatizaciones](automatizaciones.md) y [módulos del dashboard](modulos-dashboard.md).
+
 ---
 
 ## 1. Resumen Ejecutivo
@@ -41,6 +43,7 @@
 2. **En Cotización:** Agente define precio/descuentos y envía link de landing.
 3. **Reserva Confirmada (Auto):** Activado por Webhook de Stripe tras el pago.
 4. **Voucher Enviado:** Generación de documento y cierre de notificaciones.
+5. **Cierre:** `cerrado_ganado` (éxito) o `cerrado_perdido` (con motivo de pérdida).
 
 ---
 
@@ -79,8 +82,15 @@
 ---
 
 ## 7. Stack Tecnológico
-* **Frontend/Backend:** Next.js + Tailwind CSS.
-* **Base de Datos:** Supabase (PostgreSQL) + Auth.
-* **Orquestación/Fallback:** n8n (Self-hosted) para flujos adicionales y webhooks secundarios.
-* **Mensajería:** Evolution API / WhatsApp Business API.
+
+> Estado actual — ver [arquitectura.md](arquitectura.md#-stack-tecnológico) para el detalle de versiones.
+
+* **Frontend/Backend:** Next.js 16 (App Router) + React 19 + Tailwind CSS v4.
+* **Base de Datos:** Supabase (PostgreSQL 17) + Auth + Realtime.
+* **Mensajería:** WhatsApp Business API (Meta) + Evolution API.
 * **Pagos:** Stripe API.
+* **Telefonía:** Zadarma VoIP (WebRTC + PBX).
+* **Email:** Resend.
+* **Tracking:** Meta Conversions API + Google.
+* **Notificaciones:** Web Push (VAPID) + in-app (Realtime).
+* **Orquestación/Bus secundario:** n8n (self-hosted) para integraciones externas.

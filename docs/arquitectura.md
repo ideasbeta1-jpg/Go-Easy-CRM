@@ -1,72 +1,158 @@
 # 🏗️ Arquitectura y Estructura del Proyecto
 
-Este documento detalla la estructura del repositorio de **Go Easy CRM**, las rutas de API disponibles, los módulos core y las integraciones con servicios externos.
+> Actualizado `2026-06-17` · Next.js 16.2 (App Router) · React 19 · Tailwind CSS v4 · TypeScript.
+
+Este documento detalla la estructura del repositorio de **Go Easy CRM**, las rutas de API, los módulos core, las server actions y las integraciones externas.
+
+---
+
+## 📦 Stack Tecnológico
+
+| Capa | Tecnología |
+| :--- | :--- |
+| Framework | Next.js 16.2 (App Router) · React 19.2 |
+| Lenguaje | TypeScript 5 |
+| Estilos | Tailwind CSS v4 (tokens en `globals.css`, sin `tailwind.config`) |
+| Base de datos / Auth | Supabase (`@supabase/ssr`, `@supabase/supabase-js`) |
+| Pagos | Stripe |
+| WhatsApp | Meta WABA (oficial) + Evolution API (alternativo) |
+| Email | Resend |
+| VoIP | Zadarma (WebRTC + PBX) |
+| Gráficas | Recharts |
+| UI | lucide-react (iconos), sonner (toasts), Material Symbols |
+| PWA | `@ducanh2912/next-pwa` (Workbox), `web-push` |
+| Tracking | Meta CAPI + Google (`@next/third-parties`) |
+| Audio | `@ffmpeg-installer/ffmpeg` (conversión a OGG/OPUS) |
+| PDF | `jspdf` + `html2canvas` |
 
 ---
 
 ## 📂 Estructura del Repositorio
 
-El proyecto utiliza **Next.js (App Router)** y **TypeScript** para estructurar la lógica del CRM:
-
 ```
-├── .next                  # Archivos generados por Next.js en build
-├── public                 # Assets públicos, imágenes estáticas
-├── src                    # Directorio fuente de la aplicación
-│   ├── app                # Next.js App Router (Páginas, APIs, Estilos)
-│   │   ├── api            # Rutas de API REST de backend
-│   │   │   ├── audio      # Procesamiento de audio/mensajes
-│   │   │   ├── cron       # Tareas programadas (Scheduler)
-│   │   │   ├── leads      # Operaciones CRUD para Leads
-│   │   │   ├── media      # Carga de archivos y multimedia
-│   │   │   ├── push       # Envío de notificaciones web push
-│   │   │   ├── webhooks   # Webhooks de Stripe y WhatsApp/Evolution API
-│   │   │   └── zadarma    # Webhook y llamadas VoIP de Zadarma
-│   │   ├── cotizacion     # Vista/Gestión de cotización
-│   │   ├── dashboard      # Panel de administración principal (Agentes, Leads)
-│   │   ├── globals.css    # Estilos globales y Tailwind CSS
-│   │   ├── landing        # Páginas de destino y formularios de captura
-│   │   └── page.tsx       # Redirección o página principal
-│   ├── lib                # Lógicas core del CRM
-│   │   ├── leads          # Funciones para la gestión y asignación de leads
-│   │   └── zadarma.ts     # Cliente API de integración con Zadarma VoIP
-│   └── utils              # Utilidades compartidas y motores
-│       ├── assignment.ts  # Algoritmo Round Robin de asignación
-│       ├── automation-engine.ts  # Motor interno de automatizaciones
-│       ├── automation-scheduler.ts # Programador de tareas automáticas
-│       ├── email.ts       # Utilidad para envío de emails (Resend)
-│       ├── n8n.ts         # Integración secundaria con n8n
-│       ├── push-notifications.ts # Gestor de notificaciones push
-│       ├── stripe.ts      # Cliente API para procesamiento de pagos
-│       └── waba.ts        # Cliente de WhatsApp Business API (Evolution API)
+├── docs/                   # 📚 Esta documentación (+ schema.sql)
+├── public/                 # Assets públicos, service worker, iconos PWA
+├── n8n-workflows/          # Workflows n8n (bus de eventos secundario)
+├── src/
+│   ├── app/                # App Router (páginas, APIs, layouts)
+│   │   ├── api/            # Route handlers (backend REST)
+│   │   │   ├── audio/      # convert · send (conversión OGG y envío WA)
+│   │   │   ├── cron/       # process-actions · daily-report
+│   │   │   ├── export/     # messages (exportar chat)
+│   │   │   ├── leads/      # POST formulario público
+│   │   │   ├── media/      # send (multimedia WA)
+│   │   │   ├── public-data/# datos públicos (catálogo, ubicaciones)
+│   │   │   ├── push/       # subscribe (web push)
+│   │   │   ├── webhooks/   # stripe · whatsapp
+│   │   │   └── zadarma/    # webhook · calls · click-to-call · webrtc-key · test
+│   │   ├── dashboard/      # CRM (ver modulos-dashboard.md)
+│   │   │   ├── automations/  contactos/  tasks/  logs/
+│   │   │   ├── leads/  chats/  catalog/  providers/  reports/
+│   │   │   ├── messages/  profile/  settings/  components/
+│   │   ├── cotizacion/ q/  # vistas públicas de cotización
+│   │   ├── voucher/ v/     # vistas públicas de voucher (v = enlace corto)
+│   │   ├── cotizar/        # formulario de cotización
+│   │   ├── landing*/       # landing pages (PR, PR v2)
+│   │   ├── login/ auth/    # autenticación
+│   │   └── utils/actions/  # 🔑 Server Actions (mutaciones)
+│   ├── components/         # Componentes globales (ZadarmaWidget)
+│   ├── lib/                # zadarma.ts · leads/ (transitions, etc.)
+│   └── utils/              # Motores y clientes
+│       ├── automation-engine.ts     # Motor de automatizaciones por etapa
+│       ├── automation-scheduler.ts  # Programa reglas → pending_actions/tasks
+│       ├── assignment.ts            # Round Robin
+│       ├── waba.ts / whatsapp.ts    # WhatsApp (oficial / Evolution)
+│       ├── email.ts                 # Resend
+│       ├── meta-capi.ts             # Conversions API
+│       ├── n8n.ts                   # Bus de eventos secundario
+│       ├── stripe.ts                # Cliente Stripe
+│       ├── push-notifications.ts    # Web Push (VAPID)
+│       ├── system-log.ts            # logSystemEvent()
+│       └── supabase/                # client · server · admin · middleware
+├── vercel.json             # Vercel Cron
+└── package.json
 ```
 
 ---
 
-## 🌐 Rutas de API Clave (Endpoints)
+## 🌐 Rutas de API (Endpoints)
 
-| Endpoint | Método | Descripción |
-| :--- | :--- | :--- |
-| `/api/leads` | `GET`, `POST` | Listar y crear leads en la plataforma. |
-| `/api/leads/[id]` | `GET`, `PATCH` | Obtener y actualizar datos o estados de un lead. |
-| `/api/webhooks/stripe`| `POST` | Webhook para detectar y procesar pagos exitosos. |
-| `/api/webhooks/whatsapp`| `POST` | Webhook para recibir mensajes y eventos de WhatsApp. |
-| `/api/zadarma/webhook`| `POST` | Recibir eventos de llamadas y grabaciones de Zadarma. |
+| Endpoint | Método | Auth | Descripción |
+| :--- | :--- | :--- | :--- |
+| `/api/leads` | POST | Pública | Crear lead desde formulario → dispara `lead_nuevo` |
+| `/api/public-data` | GET | Pública | Catálogo y ubicaciones para formularios |
+| `/api/webhooks/stripe` | POST | Firma Stripe | `checkout.session.completed` → confirma reserva / auto-voucher |
+| `/api/webhooks/whatsapp` | GET/POST | Verify token / firma | Mensajes y estados de WABA + Evolution |
+| `/api/zadarma/webhook` | GET/POST | Firma Zadarma | Eventos de llamadas (`NOTIFY_*`) y grabaciones |
+| `/api/zadarma/calls` | GET | Sesión | Listar llamadas |
+| `/api/zadarma/click-to-call` | POST | Sesión | Iniciar llamada al cliente |
+| `/api/zadarma/webrtc-key` | POST | Sesión | Credenciales WebRTC del widget |
+| `/api/zadarma/test` | GET | Sesión | Test de conexión |
+| `/api/audio/convert` | POST | Sesión | Convertir audio (ffmpeg) |
+| `/api/audio/send` | POST | Sesión | Enviar audio OGG por WhatsApp |
+| `/api/media/send` | POST | Sesión | Enviar imagen/documento por WhatsApp |
+| `/api/export/messages` | GET | Sesión | Exportar historial de mensajes |
+| `/api/push/subscribe` | POST | Sesión | Registrar suscripción web push |
+| `/api/cron/process-actions` | GET | `CRON_SECRET` | Ejecuta `pending_actions` + reglas de inactividad |
+| `/api/cron/daily-report` | GET | `CRON_SECRET` | Reporte diario de ventas por WhatsApp |
+
+---
+
+## 🔑 Server Actions (`src/app/utils/actions/`)
+
+Toda mutación de datos pasa por server actions. Archivos principales:
+
+| Archivo | Funciones clave |
+| :--- | :--- |
+| `leads.ts` | `updateLead`, `updateLeadStatus`, `deleteLead` (con auditoría en `lead_events`) |
+| `tasks.ts` | `getMyTasks`, `getTasksForLead`, `createTask`, `completeTask`, `updateTask`, `cancelTask`, `createTaskAdmin` |
+| `automation.ts` | `getAutomationConfig`, `saveAutomationConfig`, `getFailedAutomationLogs`, `retryAutomation` |
+| `automation-rules.ts` | `getAutomationRules`, `createAutomationRule`, `toggleAutomationRule`, `deleteAutomationRule`, `getPendingActions`, `cancelPendingAction` |
+| `whatsapp.ts` | `sendManualWhatsApp`, `sendManualWhatsAppMedia`, `getLeadMessages`, `sendTemplateFromChat` |
+| `notifications.ts` | `broadcastNotification`, `createNotification`, `markNotificationRead` |
+| `quotes.ts` | `generateQuoteForLead` |
+| `vouchers.ts` | `generateVoucherForLead`, `saveVoucherDraft`, `updateProviderConfirmation` |
+| `waba.ts` | `getWABATemplatesAction`, `createWABATemplateAction`, `saveTemplateMappingAction` |
+| `providers.ts` | `createProvider`, `updateProvider`, `getProviderOffices` |
+| `public.ts` | `submitPublicLead` |
+| `simulate-payment.ts` | `simulatePayment` (testing) |
 
 ---
 
 ## 🧮 Lógica de Asignación Round Robin
 
-El sistema de asignación de leads a los agentes se gestiona a través del algoritmo implementado en `src/utils/assignment.ts`:
+Implementada en `src/utils/assignment.ts`. Resumen:
 
-1. **Filtro de Agentes Activos:** Se seleccionan perfiles que tengan el rol de `agente` (`role = 'agente'`) y estén activos.
-2. **Criterio Round Robin:** Los agentes se ordenan de manera ascendente por el campo `last_assigned_at` (`ASC`), seleccionando al que más tiempo lleva sin recibir un lead.
-3. **Persistencia:** Al asignar el lead al agente seleccionado, el campo `last_assigned_at` se actualiza con el timestamp actual (`now()`), moviendo al agente al final de la cola para futuras asignaciones.
+1. **Filtro:** agentes con `role = 'agente'` y `disabled = false`.
+2. **Orden:** `last_assigned_at ASC` (NULLS FIRST) — el que lleva más tiempo sin recibir lead.
+3. **Persistencia:** al asignar, `profiles.last_assigned_at = now()`.
+4. **Herencia:** clientes recurrentes (con `contact_id`) heredan su agente sin pasar por la cola.
+
+Detalle completo y `assignLeadWithContact` en [`automatizaciones.md`](automatizaciones.md#asignación-round-robin).
+
+---
+
+## 🔐 Autenticación y Clientes Supabase
+
+| Cliente | Archivo | Uso | RLS |
+| :--- | :--- | :--- | :--- |
+| Browser | `utils/supabase/client.ts` | Componentes cliente | Respeta RLS |
+| Server | `utils/supabase/server.ts` | Server components / actions / route handlers | Respeta RLS |
+| Admin | `utils/supabase/admin.ts` | Webhooks y cron | **Bypass RLS** (service key) |
+
+El middleware (`utils/supabase/middleware.ts`) protege `/dashboard`; sin sesión redirige a `/login`. El layout del dashboard hace una verificación adicional en servidor.
 
 ---
 
 ## 🔗 Integraciones Externas
 
-* **Supabase Client:** Usado para acceder a la base de datos de manera directa tanto en el cliente como en el backend con políticas de RLS.
-* **Evolution API / WABA Client:** Administra la comunicación de WhatsApp enviando textos o multimedia al cliente.
-* **Resend Client:** Genera correos electrónicos de confirmación usando plantillas HTML profesionales basadas en la etapa actual.
-* **Stripe API Client:** Genera enlaces de pago y confirma transacciones para asegurar las reservas.
+Ver detalle de cada cliente, funciones y variables en [`integraciones.md`](integraciones.md) y [`automatizaciones.md`](automatizaciones.md#integraciones-de-canal-utils).
+
+* **Supabase** — base de datos, auth y realtime (notificaciones, chats).
+* **Meta WABA / Evolution API** — envío y recepción de WhatsApp.
+* **Resend** — emails transaccionales por etapa.
+* **Stripe** — enlaces de pago y confirmación de reservas.
+* **Zadarma** — telefonía VoIP (click-to-call, grabaciones, WebRTC).
+* **Meta CAPI** — eventos de conversión server-side.
+* **n8n** — bus de eventos secundario.
+* **Web Push (VAPID)** — notificaciones del navegador.

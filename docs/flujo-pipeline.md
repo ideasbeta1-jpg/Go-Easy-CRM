@@ -6,11 +6,19 @@ Este documento describe en detalle el recorrido completo de un lead: desde su ca
 
 ## 1. Estados del Pipeline
 
-El lead recorre los siguientes estados en orden (definidos en el enum `lead_status`):
+El lead recorre los siguientes estados (definidos en el enum `lead_status`):
 
 ```
-lead_nuevo → en_cotizacion → reserva_confirmada → voucher_enviado → cerrado
+lead_nuevo → en_cotizacion → reserva_confirmada → voucher_enviado → cerrado_ganado
+                                     │
+                                     └────────────► cerrado_perdido (desde cualquier etapa)
 ```
+
+* **`cerrado_ganado`** — venta exitosa.
+* **`cerrado_perdido`** — venta caída; requiere `lost_reason`. Alcanzable desde cualquier etapa.
+* `cerrado` (sin sufijo) es un estado **legacy** conservado solo por registros históricos.
+
+> El orden lineal y los colores están en `src/lib/leads/transitions.ts` (`STAGE_ORDER`, `STATUS_CONFIG`, `LOST_STAGE`, `LOST_REASONS`). Ver [`sistema-diseno.md`](sistema-diseno.md#4-colores-del-pipeline-fuente-única-de-verdad).
 
 Cada transición puede ser:
 - **Automática**: Disparada por un webhook externo (Stripe, WhatsApp) o por el cron.
@@ -48,13 +56,13 @@ if (existing) {
 
 ### Asignación Round Robin
 
-Inmediatamente después de crear el lead:
+Inmediatamente después de crear el lead (`assignLeadWithContact`):
 
-1. Se consultan todos los agentes con `role = 'agente'` y `is_active = true`.
-2. Se ordenan por `last_assigned_at ASC` (el que lleva más tiempo sin recibir un lead va primero).
-3. Se asigna el lead al primero de la lista.
-4. Se actualiza `last_assigned_at` del agente a `now()`.
-5. Se crea una notificación in-app para el agente asignado.
+1. Si el lead pertenece a un **contacto recurrente** con agente, hereda ese agente (sin Round Robin).
+2. Si no, se consultan los agentes con `role = 'agente'` y `disabled = false`.
+3. Se ordenan por `last_assigned_at ASC` (NULLS FIRST) — el que lleva más tiempo sin recibir un lead.
+4. Se asigna el lead al primero y se actualiza `last_assigned_at = now()`.
+5. Se propaga el agente al `contacts.assigned_to` y se crea una notificación in-app.
 
 ### Automatizaciones disparadas
 
@@ -204,15 +212,19 @@ El sistema usa el patrón `/v/[voucher_id]` como enlace corto. Esta ruta redirig
 
 ---
 
-## 6. Etapa 5: Cerrado (`cerrado`)
+## 6. Etapa 5: Cierre (`cerrado_ganado` / `cerrado_perdido`)
 
-### Quién activa esta transición
+### Cerrado Ganado (`cerrado_ganado`)
+El agente marca el lead como ganado cuando la reserva se concreta.
+- **WhatsApp + Email al cliente**: agradecimiento/cierre (`gracias_feedback`).
+- **Notificación in-app**: `lead_closed` 🏆.
 
-El agente manualmente cuando el alquiler ha finalizado exitosamente.
+### Cerrado Perdido (`cerrado_perdido`)
+El agente marca el lead como perdido y selecciona un `lost_reason` (precio alto, eligió competencia, sin respuesta, canceló viaje, fechas no disponibles, no calificó, otro). Alcanzable desde cualquier etapa.
+- **Notificación in-app**: `lead_closed` ❌.
+- **No** envía WhatsApp/Email automáticos al cliente.
 
-### Automatizaciones disparadas
-
-- **WhatsApp al cliente**: Template `gracias_feedback` agradeciendo la preferencia y solicitando retroalimentación.
+> Ambas transiciones quedan registradas en `lead_events` (auditoría) y disparan los canales habilitados en `automation_config`.
 
 ---
 
@@ -244,12 +256,16 @@ Cliente llena formulario / escribe por WA
     │  VOUCHER ENVIADO  │──► Voucher en Storage
     │ (voucher_enviado) │──► WhatsApp + Email: Enlace del voucher
     └──────┬────────────┘
-           │ Alquiler finalizado, agente cierra
+           │ Agente cierra el lead
            ▼
-    ┌────────────┐
-    │  CERRADO   │──► WhatsApp: Gracias y feedback
-    │  (cerrado) │
-    └────────────┘
+    ┌──────────────────┐        ┌───────────────────┐
+    │ CERRADO GANADO   │   o    │ CERRADO PERDIDO   │
+    │(cerrado_ganado)  │        │(cerrado_perdido)  │  (con lost_reason)
+    │ WhatsApp+Email   │        │ solo notif. in-app│
+    └──────────────────┘        └───────────────────┘
+
+  En paralelo: el motor puede crear TAREAS de seguimiento (llamar, verificar
+  voucher) según automation_rules → ver automatizaciones.md
 ```
 
 ---
@@ -287,7 +303,9 @@ Cada lead tiene una línea de tiempo (`Timeline`) visible en su vista de detalle
 | Regenerar cotización | `en_cotizacion` | Actualiza snapshot y link de pago |
 | Agregar nota | Cualquiera | Nota interna visible solo para el equipo |
 | Generar voucher | `reserva_confirmada` | Crea voucher y mueve a `voucher_enviado` |
-| Cerrar lead | `voucher_enviado` | Finaliza el ciclo, mueve a `cerrado` |
+| Cerrar ganado | `voucher_enviado` | Finaliza el ciclo, mueve a `cerrado_ganado` |
+| Marcar perdido | Cualquiera | Mueve a `cerrado_perdido` con `lost_reason` |
+| Crear tarea | Cualquiera | Tarea de seguimiento (llamada, WhatsApp, etc.) |
 | Enviar mensaje manual | Cualquiera | Mensaje libre por WhatsApp desde el chat inline |
 
 ---
