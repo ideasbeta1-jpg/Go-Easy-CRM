@@ -17,6 +17,23 @@ export async function updateLead(id: string, updates: any) {
     ? await supabase.from('leads').select(auditKeys.join(',')).eq('id', id).single()
     : { data: null }
 
+  // Solo los administradores pueden reasignar el responsable. Se exige cuando
+  // `assigned_to` realmente cambia respecto al valor previo, para no romper los
+  // guardados normales de un agente sobre su propio lead (que reenvían el campo
+  // sin modificarlo). La RLS ya impide la reasignación cruzada; esto es defensa
+  // en profundidad con un mensaje de error claro.
+  const reassigning =
+    'assigned_to' in updates &&
+    prev &&
+    String((prev as any).assigned_to ?? '') !== String(updates.assigned_to ?? '')
+  if (reassigning) {
+    const { data: actorProfile } = await supabase
+      .from('profiles').select('role').eq('id', user.id).single()
+    if (actorProfile?.role !== 'admin') {
+      throw new Error('Solo los administradores pueden reasignar el responsable')
+    }
+  }
+
   const { data, error } = await supabase
     .from('leads')
     .update(updates)

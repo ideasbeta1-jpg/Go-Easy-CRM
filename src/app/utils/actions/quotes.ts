@@ -56,35 +56,16 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     }
   }
 
-  // 3. Invalidate all previous quotes for this lead
-  await supabase
-    .from('quotes')
-    .update({ is_active: false })
-    .eq('lead_id', leadId)
+  // 3. Pre-generamos el id de la cotización para poder referenciarlo en las URLs
+  //    de Stripe SIN haber tocado todavía la base de datos. Así, si Stripe falla,
+  //    no dejamos una cotización huérfana (activa y sin enlace de pago) ni
+  //    invalidamos la cotización anterior del cliente.
+  const quoteId = crypto.randomUUID()
 
-  // 4. Create new quote record (with snapshot of amount and deposit)
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + 3)
-
-  const { data: quote, error: quoteError } = await supabase
-    .from('quotes')
-    .insert({
-      lead_id: leadId,
-      expires_at: expiresAt.toISOString(),
-      total_amount: totalAmount,
-      deposit_amount: depositDollars,
-      pickup_date: lead.pickup_date,
-      return_date: lead.return_date,
-      is_active: true,
-    })
-    .select()
-    .single()
-
-  if (quoteError) throw new Error(quoteError.message)
-
-  // 5. Create Stripe Checkout Session
+  // 4. Create Stripe Checkout Session (antes de cualquier mutación en BD)
   const safeImageUrl = category?.image_url?.startsWith('https://') ? category.image_url : undefined
   const safeDepositAmount = Math.max(depositAmount, 50) // Stripe minimum is 50 cents
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'
 
   let session: Awaited<ReturnType<typeof stripe.checkout.sessions.create>>
   try {
@@ -106,11 +87,11 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://goeasyflorida.com'}/q/${quote.id}`,
+      success_url: `${appUrl}/q/${quoteId}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/q/${quoteId}`,
       metadata: {
         lead_id: leadId,
-        quote_id: quote.id,
+        quote_id: quoteId,
       },
     })
   } catch (stripeError: any) {
@@ -118,7 +99,35 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     throw new Error(`Error al crear sesión de pago: ${stripeError?.message || 'Error de Stripe'}`)
   }
 
-  // 6. Update lead status and save amount
+  // 5. Stripe OK → ahora sí mutamos la BD. Invalidamos las cotizaciones previas.
+  await supabase
+    .from('quotes')
+    .update({ is_active: false })
+    .eq('lead_id', leadId)
+
+  // 6. Create new quote record (con snapshot de monto, depósito y enlace de pago)
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 3)
+
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .insert({
+      id: quoteId,
+      lead_id: leadId,
+      expires_at: expiresAt.toISOString(),
+      total_amount: totalAmount,
+      deposit_amount: depositDollars,
+      pickup_date: lead.pickup_date,
+      return_date: lead.return_date,
+      stripe_link: session.url,
+      is_active: true,
+    })
+    .select()
+    .single()
+
+  if (quoteError) throw new Error(quoteError.message)
+
+  // 7. Update lead status and save amount
   const { error: updateError } = await supabase
     .from('leads')
     .update({
@@ -129,14 +138,6 @@ export async function generateQuoteForLead(leadId: string, totalAmount: number) 
     .eq('id', leadId)
 
   if (updateError) throw new Error(updateError.message)
-
-  // 7. Save stripe_link on the quote
-  const { error: updateQuoteError } = await supabase
-    .from('quotes')
-    .update({ stripe_link: session.url })
-    .eq('id', quote.id)
-
-  if (updateQuoteError) throw new Error(updateQuoteError.message)
 
   // 7.1 Registrar el evento en la línea de tiempo (con enlace de pago)
   await logLeadEvent(supabase, {

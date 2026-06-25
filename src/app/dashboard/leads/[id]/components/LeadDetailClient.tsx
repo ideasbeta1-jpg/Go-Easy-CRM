@@ -238,8 +238,8 @@ export default function LeadDetailClient({
         await generateQuoteForLead(lead.id, formData.total_amount)
         setFormData(prev => ({ ...prev, status: 'en_cotizacion' }))
         router.refresh()
-      } catch {
-        alert('Error al regenerar cotización')
+      } catch (e: any) {
+        alert('Error al generar la cotización: ' + (e?.message || 'Error desconocido'))
       }
     })
   }
@@ -429,6 +429,8 @@ export default function LeadDetailClient({
   // ─── Computed ──────────────────────────────────────────────────────────────
   const selectedProvider = providers.find(p => p.id === formData.provider_id)
   const selectedAgent = agents.find(a => a.id === formData.assigned_to)
+  // Solo los administradores pueden reasignar el responsable; los agentes lo ven en solo lectura.
+  const isAdmin = currentUser?.role === 'admin'
   const daysForCalc = rentalDays || 1
   const categoryBaseCost = parseFloat(selectedCategory?.base_daily_cost || 0)
   const categoryDefaultMargin = parseFloat(selectedCategory?.daily_price || 0)
@@ -790,17 +792,26 @@ export default function LeadDetailClient({
                   </select>
                 </div>
 
-                {/* Agente asignado */}
+                {/* Agente asignado — editable solo para administradores */}
                 <div>
                   <label className={labelCls}>Agente Asignado</label>
-                  <select
-                    value={formData.assigned_to}
-                    onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
-                    className={fieldCls}
-                  >
-                    <option value="">Sin agente</option>
-                    {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                  </select>
+                  {isAdmin ? (
+                    <select
+                      value={formData.assigned_to}
+                      onChange={e => setFormData({ ...formData, assigned_to: e.target.value })}
+                      className={fieldCls}
+                    >
+                      <option value="">Sin agente</option>
+                      {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={selectedAgent?.full_name || 'Sin agente'}
+                      disabled
+                      className={fieldCls}
+                    />
+                  )}
                 </div>
               </div>
 

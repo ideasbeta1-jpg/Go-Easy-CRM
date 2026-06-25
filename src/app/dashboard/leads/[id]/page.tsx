@@ -55,7 +55,7 @@ export default async function LeadDetailPage({
     leadRaw.assigned_to ? supabase.from('profiles').select('*').eq('id', leadRaw.assigned_to).single() : Promise.resolve({ data: null, error: null }),
     getCachedCategories(),
     supabase.from('providers').select('*').order('name'),
-    supabase.from('profiles').select('*').order('full_name'),
+    supabase.from('profiles').select('*').eq('role', 'agente').eq('disabled', false).order('full_name'),
     supabase.from('quotes').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     supabase.from('vouchers').select('*').eq('lead_id', id).order('created_at', { ascending: false }),
     getCachedLocations(),
@@ -74,6 +74,14 @@ export default async function LeadDetailPage({
     category: categoryRes.data,
     provider: providerRes.data,
     assigned_to_profile: profileRes.data
+  }
+
+  // Lista de agentes asignables (solo agentes activos). Si el lead ya está
+  // asignado a un perfil fuera de ese filtro (admin o agente deshabilitado),
+  // se añade para que el <select> muestre correctamente el valor actual.
+  const agents = allAgentsRes.data || []
+  if (profileRes.data && !agents.some((a: any) => a.id === profileRes.data!.id)) {
+    agents.push(profileRes.data)
   }
 
   // Contacto (persona) y sus otras reservas → historial unificado del cliente
@@ -104,7 +112,7 @@ export default async function LeadDetailPage({
         activeVoucher={vouchersRes.data?.[0]}
         categories={categoriesData || []}
         providers={allProvidersRes.data || []}
-        agents={allAgentsRes.data || []}
+        agents={agents}
         locations={locationsData || []}
         providerOffices={providerOfficesRes.data || []}
         messages={(messagesRes.data || []).reverse()}
