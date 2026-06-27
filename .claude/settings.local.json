@@ -27,7 +27,9 @@
       "PowerShell(npx next build 2>&1)",
       "Bash(cat src/proxy.ts)",
       "Bash(cat proxy.ts)",
-      "PowerShell($env:STRIPE_SECRET_KEY='sk_test_dummy_for_build'; $env:SUPABASE_SERVICE_ROLE_KEY='dummy_service_role_for_build'; $env:STRIPE_WEBHOOK_SECRET='whsec_dummy'; npx next build 2>&1 | Select-Object -Last 45)"
+      "PowerShell($env:STRIPE_SECRET_KEY='sk_test_dummy_for_build'; $env:SUPABASE_SERVICE_ROLE_KEY='dummy_service_role_for_build'; $env:STRIPE_WEBHOOK_SECRET='whsec_dummy'; npx next build 2>&1 | Select-Object -Last 45)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__get_logs"
     ]
   }
 }
